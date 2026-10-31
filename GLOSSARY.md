@@ -69,7 +69,7 @@ _Avoid_: Bench points
 A week in which named pairs of managers are meant to face each other. A pairing names managers, not teams, and counts only if the platform's schedule really matches them that week.
 
 **Log entry**:
-A dated record of something that happened under the stakes in a given week, such as a fine issued or how a punishment turned out. It belongs to one season, and the prose uses it only around the week it happened.
+A dated record of something that happened under the stakes in a given week, such as a fine issued or how a punishment turned out. It belongs to one season, and the prose uses it only around the week it happened unless the pundit pins it.
 
 **Winnings to date**:
 How many times a team has won each house-rule prize so far in the season, multiplied by the prize's amount. A stat drawn from the recorded rules, not a record of money paid or owed.
