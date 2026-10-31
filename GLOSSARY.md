@@ -5,7 +5,7 @@ A local tool that turns fantasy league data into power rankings and recaps. The 
 ## People and voice
 
 **League workspace**:
-Everything the tool knows about one league: its platform data, lore, persona, rules and stakes, and every pundit's rankings. A league can have several pundits.
+Everything the tool knows about one league: its platform data, lore, persona, stakes for each season, and every pundit's rankings. A league can have several pundits.
 
 **Pundit**:
 The human who authors a league's rankings and owns every placement in them. Each pundit in a league keeps their own rankings and settings, and one person can be the pundit in several leagues.
@@ -44,6 +44,36 @@ A league setting saying that people of any age may read what is published. While
 
 **Blurb shape**:
 Whether a persona writes a team's blurb as prose or as bullets, and about how long it is. The validator treats each bullet like a sentence.
+
+## Rules and stakes
+
+**Stakes**:
+What a league plays for in one season beyond the platform's own settings: the buy-in, payouts by final place, house rules and rivalry weeks. They belong to the league workspace and are shared by every pundit in it. A league can record that it plays for bragging rights only, which is different from recording nothing.
+_Avoid_: Rules (for the whole thing), settings
+
+**Pot**:
+The buy-in times the number of teams. Payouts are stated as amounts or shares of it.
+
+**House rule**:
+A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words) and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize.
+_Avoid_: Side bet, punishment (for the whole thing)
+
+**Trigger**:
+The measurable event that decides who a house rule applies to, such as high score, low score, most points left on the bench, last place or champion, for a week or a season. A rule without a trigger is applied by hand through log entries.
+
+**Points left on the bench**:
+The best possible lineup's points minus the points actually scored in a week.
+_Avoid_: Bench points
+
+**Rivalry week**:
+A week in which named pairs of managers are meant to face each other. A pairing names managers, not teams, and counts only if the platform's schedule really matches them that week.
+
+**Log entry**:
+A dated record of something that happened under the stakes in a given week, such as a fine issued or how a punishment turned out. It belongs to one season, and the prose uses it only around the week it happened.
+
+**Winnings to date**:
+How many times a team has won each house-rule prize so far in the season, multiplied by the prize's amount. A stat drawn from the recorded rules, not a record of money paid or owed.
+_Avoid_: Balance, ledger
 
 ## Rankings
 
