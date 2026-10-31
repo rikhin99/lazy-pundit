@@ -26,7 +26,24 @@ Another name for a manager or a team, such as "Karna" or "Rad Team". The validat
 _Avoid_: Alias
 
 **Persona**:
-The voice the prose is written in. It belongs to the pundit's output, not to the pundit.
+The voice the prose is written in: a preset, any tone-control overrides, a blurb shape and length, and an optional style note. Each pundit has one per league and can switch it any week, and each draft records the persona it was written in. It belongs to the pundit's output, not to the pundit. A persona shapes only LLM prose and never changes a stat line.
+_Avoid_: Voice, tone (for the whole thing)
+
+**Preset**:
+A named, ready-made persona: a set of tone-control values plus a short style note. A pundit picks one and can override any part of it.
+_Avoid_: Template, standard persona
+
+**Tone control**:
+One dial on a persona: swearing (off, mild, on), teasing (none, light, roast) or formality (formal, casual, unhinged).
+
+**Style note**:
+The free text in a persona that describes the voice beyond the tone controls. It may name lore sections or managers but never copies lore.
+
+**Family league**:
+A league setting saying that people of any age may read what is published. While it is on, personas are held to no swearing and light teasing unless a pundit deliberately relaxes their own persona. A relaxed persona has no limit, and the tool flags it on every load and asks the pundit to confirm before publishing with it for the first time. It belongs to the league workspace, not to lore or a persona.
+
+**Blurb shape**:
+Whether a persona writes a team's blurb as prose or as bullets, and about how long it is. The validator treats each bullet like a sentence.
 
 ## Rankings
 
@@ -104,7 +121,7 @@ The stats the tool computes for each team for a week, each under an evidence ID.
 The name of one stat in the evidence pack, such as `record` or `w8.points`. A claim cites it in the draft as `[7-1]{ev=record}`. Publishing strips it.
 
 **Validator**:
-The deterministic check of every claim in a blurb against the evidence pack. It gates LLM drafts before they're written and reports on the pundit's edits without rejecting them.
+The deterministic check of every claim in a blurb against the evidence pack, and of the blurb's words against the persona when swearing is off. It gates LLM drafts before they're written and reports on the pundit's edits without rejecting them.
 _Avoid_: Fact-checker
 
 **Stale claim**:
