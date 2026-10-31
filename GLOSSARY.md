@@ -11,6 +11,20 @@ Everything the tool knows about one league: its platform data, lore, persona, ru
 The human who authors a league's rankings and owns every placement in them. Each pundit in a league keeps their own rankings and settings, and one person can be the pundit in several leagues.
 _Avoid_: Writer, ranker, user
 
+**Manager**:
+A person who runs a team in the league. A manager stays the same across seasons, while their team's name can change. A manager isn't a pundit unless they also write rankings.
+_Avoid_: Owner, player
+
+**Lore**:
+What the pundits have written down about a league and its people that the platform data doesn't hold: the league's type and history, facts about each manager, the relationships between them, running jokes, nicknames, and anything else the pundit chooses to add. It belongs to the league workspace and is shared by every pundit in it. Lore is context for the prose, not evidence.
+
+**Lore entry**:
+One fact or note in a league's lore, filed under a league, manager, team or other section. A blurb that uses a lore entry cites the section it came from. The validator checks that the section exists, never whether the entry is true.
+
+**Nickname**:
+Another name for a manager or a team, such as "Karna" or "Rad Team". The validator uses nicknames to work out which team a sentence is about. A team's current name and its manager's display name always count as nicknames.
+_Avoid_: Alias
+
 **Persona**:
 The voice the prose is written in. It belongs to the pundit's output, not to the pundit.
 
