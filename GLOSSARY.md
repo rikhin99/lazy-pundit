@@ -84,6 +84,9 @@ _Avoid_: Power score, standings
 **Week**:
 The platform's matchup period. In daily-lineup sports, one week is one matchup built from many days of lineups.
 
+**Ranking week**:
+The week a ranking is labelled with: the most recent scored week in its data when its draft begins. It never changes afterwards. A ranking made before any week is scored is week 0, the preseason ranking.
+
 **Scored week**:
 A week the platform has finished scoring. Until then the week is in progress and its results aren't evidence. A scored week can still change through stat corrections, and nothing signals when they stop.
 _Avoid_: Final week
@@ -133,6 +136,9 @@ A team's change in place since the pundit's most recent published ranking in the
 
 **Small-sample flag**:
 A warning that the season is too young for the power score to mean much. It appears only in the editing view.
+
+**No-starting-order flag**:
+A warning on a week-0 ranking's draft: the teams are in the platform's own order, not a starting order, and the pundit orders them by gut. It appears only in the editing view and lasts for that draft's life.
 
 ## Stats
 
