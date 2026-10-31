@@ -29,6 +29,9 @@ The pundit's working copy of a week's ranking. It can be edited freely, before a
 **Blurb**:
 The short prose about one team that goes with its place in the ranking. The LLM drafts it and the pundit can rewrite it.
 
+**Stat line**:
+A blurb made only of the team's checked stats, such as its record, points rank, streak and latest result, with no prose. It stands in whenever no LLM blurb exists, and the pundit can keep, extend or delete it.
+
 **Group**:
 An optional label over a run of consecutive places in a ranking, such as a tier or a playoff split into championship and consolation groups. Places are numbered straight through the groups.
 _Avoid_: Bracket, division
