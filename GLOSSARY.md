@@ -84,6 +84,16 @@ _Avoid_: Power score, standings
 **Week**:
 The platform's matchup period. In daily-lineup sports, one week is one matchup built from many days of lineups.
 
+**Scored week**:
+A week the platform has finished scoring. Until then the week is in progress and its results aren't evidence. A scored week can still change through stat corrections, and nothing signals when they stop.
+_Avoid_: Final week
+
+**Stat correction**:
+A change the platform makes to a week's scores after it has been scored.
+
+**Drastic correction**:
+A stat correction that flips a matchup result or changes who a house-rule trigger applies to. It becomes evidence for the next draft, whichever week that is, and lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
+
 **Draft**:
 The pundit's working copy of a week's ranking. It can be edited freely, before and after publishing, and the league never sees it.
 
