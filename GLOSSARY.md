@@ -83,6 +83,10 @@ The sum of a team's starters' points in a week, before any bonus or override. Li
 **Bye**:
 A week in which a team has no matchup. The team still scores points, but it gets no result.
 
+**Snapshot**:
+One complete fetch of a season's data from its platform, kept in the league workspace. Each draft records the snapshot it was built from, so the data it was checked against can be looked at again later. "Data changed" means a scored week's results, scores, lineups, transactions or standings changed. A change to injuries, names or ownership doesn't count.
+_Avoid_: Cache, fixture, pull
+
 ## Rules and stakes
 
 **Stakes**:
@@ -133,7 +137,7 @@ _Avoid_: Final week
 A change the platform makes to a week's scores after it has been scored.
 
 **Drastic correction**:
-A stat correction that flips a matchup result or changes who a house-rule trigger applies to. It becomes evidence for the next draft, whichever week that is, and lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
+A stat correction that flips a matchup result or changes who a house-rule trigger applies to. It is found by comparing fresh data with the snapshot behind the latest published ranking, so it only covers weeks that a published ranking has already shown. It becomes evidence for the next draft, whichever week that is, and lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
 
 **Draft**:
 The pundit's working copy of a week's ranking. It can be edited freely, before and after publishing, and the league never sees it.
