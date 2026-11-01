@@ -12,8 +12,12 @@ The human who authors a league's rankings and owns every placement in them. Each
 _Avoid_: Writer, ranker, user
 
 **Manager**:
-A person who runs a team in the league. A manager stays the same across seasons, while their team's name can change. A manager isn't a pundit unless they also write rankings.
+A person who runs a team in the league. A manager stays the same across seasons and platforms, while their team, its name and their platform account can change. A team can have several managers who share it, and a manager can join, leave or come back in any season. A manager isn't a pundit unless they also write rankings.
 _Avoid_: Owner, player
+
+**Manager handle**:
+The league workspace's own short name for a manager, linked to each platform account they have played under. Lore and rivalry weeks name managers by handle. A link between accounts is made only when the pundit confirms it.
+_Avoid_: Username, user ID
 
 **Lore**:
 What the pundits have written down about a league and its people that the platform data doesn't hold: the league's type and history, facts about each manager, the relationships between them, running jokes, nicknames, and anything else the pundit chooses to add. It belongs to the league workspace and is shared by every pundit in it. Lore is context for the prose, not evidence.
@@ -44,6 +48,31 @@ A league setting saying that people of any age may read what is published. While
 
 **Blurb shape**:
 Whether a persona writes a team's blurb as prose or as bullets, and about how long it is. The validator treats each bullet like a sentence.
+
+## League data
+
+**Platform**:
+The fantasy service a league's season is played on, such as Sleeper, ESPN or Yahoo. Each season is played on one platform.
+
+**Season**:
+One year of a league, named by the platform's season year. Stakes, teams, rankings and movement belong to a season. Lore and personas carry over between seasons.
+
+**Team**:
+A manager's entry in one season, named by its platform and the platform's team ID for that season. A team's identity isn't assumed to survive into the next season; anything that spans seasons follows the manager instead.
+_Avoid_: Roster, franchise
+
+**Matchup**:
+One head-to-head game in one week. It is a regular-season, winners-bracket, consolation or losers-bracket game, and it ends in a win, loss or tie. A win decided by a tiebreak is still a win, marked as decided that way.
+_Avoid_: Game (for the fantasy contest)
+
+**Matchup score**:
+The points a team is credited with in a matchup, including any home bonus or commissioner override. Results, points for and score-based triggers use it.
+
+**Players' points**:
+The sum of a team's starters' points in a week, before any bonus or override. Lineup stats use it.
+
+**Bye**:
+A week in which a team has no matchup. The team still scores points, but it gets no result.
 
 ## Rules and stakes
 
