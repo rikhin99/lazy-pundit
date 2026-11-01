@@ -237,6 +237,10 @@ _Avoid_: Fact-checker
 **Stale claim**:
 A claim that was true when written and is no longer true after a refresh or after the pundit reorders the teams.
 
+**Eval harness**:
+The builder's own measure of LLM prose quality, run on prepared leagues rather than on any pundit's real weeks. It looks for what the validator can't see by design, such as untagged superlatives or invented facts, and decides which model is the default. Pundits never run it.
+_Avoid_: Test suite, usage stats
+
 ## Surfaces
 
 **Editing view**:
