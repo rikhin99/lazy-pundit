@@ -1,15 +1,34 @@
+export { type Clipboard, systemClipboard } from "./clipboard.ts";
 export { type Clock, systemClock } from "./clock.ts";
+export { type Deps, systemDeps } from "./deps.ts";
+export { DraftExistsError, type DraftResult, draft } from "./draft.ts";
 export { fileTransport } from "./file-transport.ts";
+export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
+export type {
+  League,
+  Matchup,
+  MatchupSide,
+  Result,
+  Standing,
+  Team,
+  TeamId,
+  Week,
+} from "./league.ts";
+export { type PublishResult, publish } from "./publish.ts";
+export { RankingFileError } from "./ranking-file.ts";
 export {
   type FetchSleeperOptions,
   fetchSleeperSnapshot,
 } from "./sleeper/fetcher.ts";
+export { normalizeSleeper } from "./sleeper/normalizer.ts";
 export {
   FetchError,
   type Manifest,
   type ManifestRequest,
   readBlob,
   readManifest,
+  readSnapshot,
+  type Snapshot,
 } from "./snapshot.ts";
 export {
   httpTransport,

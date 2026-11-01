@@ -4,12 +4,17 @@ import { expect, test } from "vitest";
 
 const SRC = join(import.meta.dirname, "..", "src");
 
-/** The only modules allowed to reach the network or the system clock. */
-const PRODUCTION_BOUNDARIES = new Set(["transport.ts", "clock.ts"]);
+/** The only modules allowed to reach the network, system clock or clipboard. */
+const PRODUCTION_BOUNDARIES = new Set([
+  "transport.ts",
+  "clock.ts",
+  "clipboard.ts",
+]);
 
 const FORBIDDEN: [string, RegExp][] = [
   ["the network", /\bfetch\s*\(|node:https?\b|node:net\b|\bWebSocket\b/],
   ["the system clock", /\bDate\.now\b|\bnew Date\(\s*\)|\bperformance\.now\b/],
+  ["other processes", /node:child_process\b/],
 ];
 
 async function sourceFiles(dir: string): Promise<string[]> {
@@ -19,7 +24,7 @@ async function sourceFiles(dir: string): Promise<string[]> {
     .map((e) => join(e.parentPath, e.name));
 }
 
-test("no module reaches the network or the system clock except through the injected transport and clock", async () => {
+test("no module reaches the network, system clock or other processes except through the injected transport, clock and clipboard", async () => {
   const offences: string[] = [];
   for (const file of await sourceFiles(SRC)) {
     const path = relative(SRC, file);

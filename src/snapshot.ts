@@ -156,6 +156,42 @@ export async function readManifest(
   return manifestSchema.parse(JSON.parse(text));
 }
 
+/** A snapshot read into memory: its manifest and every payload by URL. */
+export interface Snapshot {
+  id: string;
+  manifest: Manifest;
+  /** Whether the snapshot holds a payload for this parameterless URL. */
+  has(url: string): boolean;
+  /** The parsed JSON payload for this parameterless URL. */
+  json(url: string): unknown;
+}
+
+/** Reads a whole snapshot: its manifest plus every payload it lists. */
+export async function readSnapshot(
+  snapshotsDir: string,
+  id: string,
+): Promise<Snapshot> {
+  const manifest = await readManifest(snapshotsDir, id);
+  const payloads = new Map<string, unknown>();
+  for (const r of manifest.requests) {
+    const body = await readBlob(snapshotsDir, r.sha256);
+    payloads.set(requestKey(r), JSON.parse(new TextDecoder().decode(body)));
+  }
+  const key = (url: string) => requestKey({ url, params: {} });
+  return {
+    id,
+    manifest,
+    has: (url) => payloads.has(key(url)),
+    json(url) {
+      const k = key(url);
+      if (!payloads.has(k)) {
+        throw new Error(`Snapshot ${id} has no payload for ${url}`);
+      }
+      return payloads.get(k);
+    },
+  };
+}
+
 /** Reads one raw payload from the shared blob store. */
 export async function readBlob(
   snapshotsDir: string,
