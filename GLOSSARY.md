@@ -172,7 +172,7 @@ The pundit's choice of how the power score is computed, including its weights. I
 
 **Starting order**:
 The order the tool proposes from the power score. The pundit edits it into the ranking. It is fixed when a draft begins and changes only when the pundit refreshes.
-_Avoid_: Suggested ranking, default ranking, recommendation
+_Avoid_: Suggested ranking, default ranking, recommendation, starting-order snapshot
 
 **Refresh**:
 The pundit's explicit act of recomputing a draft's starting order from newer data or a changed method. It never changes the pundit's order or blurbs.
