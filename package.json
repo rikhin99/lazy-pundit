@@ -18,16 +18,18 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepare": "npm run build",
+    "prepare": "npm run build && husky",
     "typecheck": "tsc --noEmit",
     "lint": "biome check --error-on-warnings .",
     "format": "biome check --write .",
     "test": "vitest run",
-    "scrub:sleeper": "node scripts/scrub-sleeper.ts"
+    "scrub:sleeper": "node scripts/scrub-sleeper.ts",
+    "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
     "@types/node": "^24.19.2",
+    "husky": "^9.1.7",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },

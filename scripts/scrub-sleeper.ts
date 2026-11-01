@@ -3,7 +3,7 @@
  * branch, never pushed) into the small anonymized snapshot set committed to
  * `main`.
  *
- *   git archive fixtures/raw fixtures/raw/sleeper | tar -x   # untracked, gitignored
+ *   npm run fixtures:raw   # untracked, gitignored
  *   npm run scrub:sleeper
  *
  * The raw files were fetched after the 2025 season ended. Each output snapshot

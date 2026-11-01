@@ -14,6 +14,15 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: post the explanation with `gh issue comment <number> --body "..."`, then `gh issue close <number>`. On an already-closed issue, `gh issue close --comment` drops the comment and still exits 0.
 
+## Reading spec #37
+
+Spec #37's decisions (Implementation Decisions, Testing Decisions, Out of Scope, Further Notes) are in its first comment, not the body. The body holds only the user stories. Save each part to a file and grep `^#` for the sections a ticket names, rather than printing them whole:
+
+```sh
+gh issue view 37 --json comments --jq '.comments[0].body' > spec-37-decisions.md
+gh issue view 37 --json body --jq .body > spec-37-stories.md
+```
+
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
 File issues only into the user's own repo. Never file into `mattpocock/skills` (the repo these skills come from) unless the user owns it. In a fork, `gh` can default to the upstream parent, so before the first `gh issue create` of a session, check the target with `gh repo view --json nameWithOwner` and confirm it with the user if it is not their repo.

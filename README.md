@@ -5,7 +5,7 @@ League data comes from the [Sleeper API](https://docs.sleeper.com/) and (experim
 
 ## Development
 
-Needs Node 24 (see `.nvmrc`).
+Needs Node 24 (see `.nvmrc`; `.npmrc` makes npm refuse other versions). A pre-commit hook runs typecheck, lint and tests.
 
 ```sh
 npm install        # also builds dist/ via prepare
@@ -21,7 +21,7 @@ The library never reaches the network or the system clock directly: every entry 
 `fixtures/sleeper/fear-the-turtle-2025/` is a scrubbed, committed snapshot set (see `fixtures/sleeper/README.md`). It's made from the private raw fixtures on the local `fixtures/raw` branch, which hold real names and are never pushed:
 
 ```sh
-git archive fixtures/raw fixtures/raw/sleeper | tar -x   # untracked and gitignored
+npm run fixtures:raw     # unpacks the local fixtures/raw branch: untracked and gitignored
 npm run scrub:sleeper
 ```
 
