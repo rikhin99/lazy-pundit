@@ -11,6 +11,15 @@ Everything the tool knows about one league: its platform data, lore, persona, st
 The human who authors a league's rankings and owns every placement in them. Each pundit in a league keeps their own rankings and settings, and one person can be the pundit in several leagues.
 _Avoid_: Writer, ranker, user
 
+**Existing pundit**:
+A pundit who was already writing rankings for their league before using Lazy Pundit.
+
+**New pundit**:
+A pundit who started writing rankings for a league because of Lazy Pundit, often in a league that had none before.
+
+**Concierge**:
+A pundit for whom someone else runs the tool. The concierge pundit only edits and posts what they are handed.
+
 **Manager**:
 A person who runs a team in the league. A manager stays the same across seasons and platforms, while their team, its name and their platform account can change. A team can have several managers who share it, and a manager can join, leave or come back in any season. A manager isn't a pundit unless they also write rankings.
 _Avoid_: Owner, player
