@@ -163,7 +163,7 @@ _Avoid_: Header, summary
 A league-wide item picked deterministically from the week's data, such as the top score, the biggest margin or an upset. Awards appear on publish styles and are never written by the LLM.
 
 **Revision**:
-An LLM rewrite of one team's blurb that follows the pundit's instruction. It is held to the same checks as an LLM draft, and it replaces the blurb only when the pundit accepts it. An edit the pundit makes with some other LLM isn't a revision; it counts as the pundit's own edit.
+An LLM rewrite of one team's blurb that follows the pundit's instruction. It is held to the same checks as an LLM draft, stays within the persona's tone controls whatever the instruction asks, and replaces the blurb only when the pundit accepts it. An edit the pundit makes with some other LLM isn't a revision; it counts as the pundit's own edit.
 _Avoid_: Rewrite, regenerate
 
 **Group**:
