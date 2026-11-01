@@ -144,6 +144,10 @@ The short prose about one team that goes with its place in the ranking. The LLM 
 **Stat line**:
 A blurb made only of the team's checked stats, such as its record, points rank, streak and latest result, with no prose. It stands in whenever no LLM blurb exists, and the pundit can keep, extend or delete it.
 
+**Revision**:
+An LLM rewrite of one team's blurb that follows the pundit's instruction. It is held to the same checks as an LLM draft, and it replaces the blurb only when the pundit accepts it. An edit the pundit makes with some other LLM isn't a revision; it counts as the pundit's own edit.
+_Avoid_: Rewrite, regenerate
+
 **Group**:
 An optional label over a run of consecutive places in a ranking, such as a tier or a playoff split into championship and consolation groups. Places are numbered straight through the groups.
 _Avoid_: Bracket, division
