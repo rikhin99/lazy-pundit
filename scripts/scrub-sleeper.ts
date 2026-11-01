@@ -15,15 +15,20 @@
  *
  * Users, display names, team names, `p_nick_*` player nicknames, user IDs and
  * the league and draft IDs (which lead back to the real league) become
- * deterministic fakes. Bracket and transaction IDs are kept: they don't. The snapshots
+ * deterministic fakes. Bracket and transaction IDs are kept: they don't.
+ * Sleeper's players file (`players_nfl.json.gz`, next to the league folders,
+ * fetched in October 2026) is public NFL data and is kept as it is; each
+ * snapshot holds only the players its league names. The snapshots
  * are written by the real fetcher, so the fixture format is the snapshot
  * format.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { fetchSleeperSnapshot, type Transport } from "../src/index.ts";
-import { SLEEPER_API } from "../src/sleeper/fetcher.ts";
+import { SLEEPER_API, SLEEPER_PLAYERS_URL } from "../src/sleeper/api.ts";
 
 /** Week 1, a mid-season week, the first clinch week, the first playoff week, and the week before each. */
 export const FEAR_THE_TURTLE_2025_WEEKS = [1, 7, 8, 9, 10, 14, 15];
@@ -97,6 +102,8 @@ interface Raw {
   losers: Obj[];
   matchups: Map<number, Obj[]>;
   transactions: Map<number, Obj[]>;
+  /** Sleeper's whole players file. */
+  players: Obj;
 }
 
 export async function scrubSleeperFixtures(opts: {
@@ -110,12 +117,15 @@ export async function scrubSleeperFixtures(opts: {
   await rm(opts.outDir, { recursive: true, force: true });
   await mkdir(opts.outDir, { recursive: true });
 
+  // One cache across the weeks, as one pundit's machine would have.
+  const cacheDir = await mkdtemp(join(tmpdir(), "lazy-pundit-scrub-cache-"));
   const ids: Record<string, string> = {};
   for (const week of weeks) {
     const { id } = await fetchSleeperSnapshot({
       transport: servePayloads(asOfWeek(raw, week)),
       clock: { now: () => new Date(FIRST_TUESDAY_2025 + (week - 1) * WEEK_MS) },
       snapshotsDir: opts.outDir,
+      cacheDir,
       leagueId: FAKE_LEAGUE_ID,
     });
     ids[String(week)] = id;
@@ -147,6 +157,11 @@ async function readRaw(dir: string): Promise<Raw> {
     losers: await read("league_losers_bracket.json"),
     matchups,
     transactions,
+    players: JSON.parse(
+      gunzipSync(
+        await readFile(join(dirname(dir), "players_nfl.json.gz")),
+      ).toString("utf8"),
+    ),
   };
 }
 
@@ -340,6 +355,7 @@ function asOfWeek(raw: Raw, week: number): Map<string, Json> {
     [`${base}/rosters`, rosters],
     [`${base}/winners_bracket`, bracket(raw.winners)],
     [`${base}/losers_bracket`, bracket(raw.losers)],
+    [SLEEPER_PLAYERS_URL, raw.players],
   ]);
   for (let w = 1; w <= week; w++) {
     payloads.set(`${base}/matchups/${w}`, raw.matchups.get(w) ?? []);

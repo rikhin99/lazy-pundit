@@ -2,7 +2,7 @@
  * Prints one payload from a committed Sleeper fixture week as pretty JSON.
  *
  *   npm run fixture:show -- <week>            lists the week's payload paths
- *   npm run fixture:show -- <week> <path>     prints one, e.g. rosters, matchups/8
+ *   npm run fixture:show -- <week> <path>     prints one, e.g. rosters, matchups/8, players/nfl
  *   npm run fixture:show -- <week> ""         prints the league payload
  *
  * --league <folder> picks another league under fixtures/sleeper
@@ -48,13 +48,19 @@ const base = `https://api.sleeper.app/v1/league/${manifest.league_id}`;
 if (rawPath === undefined) {
   console.log(`week ${week}: snapshot ${id}`);
   for (const r of manifest.requests) {
-    console.log(
-      `  ${r.url.slice(base.length).replace(/^\//, "") || '""  (league)'}`,
-    );
+    const path = r.url.startsWith(base)
+      ? r.url.slice(base.length).replace(/^\//, "") || '""  (league)'
+      : r.url.replace("https://api.sleeper.app/v1/", "");
+    console.log(`  ${path}`);
   }
 } else {
   const path = rawPath.replace(/^\//, "");
-  const url = path ? `${base}/${path}` : base;
+  // The players file sits outside the league's URLs.
+  const url = path.startsWith("players/")
+    ? `https://api.sleeper.app/v1/${path}`
+    : path
+      ? `${base}/${path}`
+      : base;
   const request = manifest.requests.find((r) => r.url === url);
   if (!request) {
     console.error(`No ${path || "league"} payload in week ${week}`);

@@ -37,8 +37,8 @@ test("no module reaches the network, system clock or other processes except thro
   expect(offences).toEqual([]);
 });
 
-/** The only modules allowed to write files: workspace files and snapshots. */
-const FILE_WRITERS = new Set(["workspace-files.ts", "snapshot.ts"]);
+/** The only modules allowed to write files: workspace files, snapshots and the person-level cache. */
+const FILE_WRITERS = new Set(["workspace-files.ts", "snapshot.ts", "cache.ts"]);
 
 test("workspace files are written only through writeWorkspaceFile or writeOutput, which keep the format version", async () => {
   const offences: string[] = [];

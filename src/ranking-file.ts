@@ -43,6 +43,8 @@ const metaSchema = z.object({
   data_as_of: z.string(),
   checked_at: z.string(),
   snapshot: z.string(),
+  /** The data hash of the snapshot through the ranking week (`dataHash`). */
+  data_hash: z.string().regex(/^[0-9a-f]{64}$/),
   starting_order: z.array(z.string()),
   created_at: z.string(),
 });

@@ -3,12 +3,12 @@
   "platform": "sleeper",
   "league_id": "900000000000000001",
   "season": "2025",
-  "fetched_at": "2025-11-04T12:00:00.000Z",
+  "fetched_at": "2025-10-21T12:00:00.000Z",
   "requests": [
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001",
       "params": {},
-      "sha256": "28def053e41523cc0c401114e326ad51e159b2979637022e2862fe95c1e8b5ee"
+      "sha256": "926b752bf6070f60d3ac167216ac2d94b8a083ecda12a389ad97dc6c25331f3a"
     },
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/losers_bracket",
@@ -51,19 +51,9 @@
       "sha256": "01b8ccb1a4c62095fa69d2bed1353fdc261a2de0e2ca1fda64feba950da0961f"
     },
     {
-      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/8",
-      "params": {},
-      "sha256": "40631fc558a27a36eb9c2113446cb62670f16b4e82f71f29b50ad09fc49690b3"
-    },
-    {
-      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/9",
-      "params": {},
-      "sha256": "3002dfd6729587d0d0829e24dbea1ae13a59ad0e2a5a5bd8abd39f054661ae74"
-    },
-    {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/rosters",
       "params": {},
-      "sha256": "243a81e6ccbeb6b94eb9b8da707fba219092a21bd5a937e3de99c7c3f02d7d1b"
+      "sha256": "9031944f8eb53f6a79b86a7e6fccf9af4c59861b7c25e9ad23c73a0217e04b77"
     },
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/1",
@@ -101,16 +91,6 @@
       "sha256": "b69d85aa40c7466f35d6b5f6837e0ce80b51fb777ded2454a659d8e0464c1bc1"
     },
     {
-      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/8",
-      "params": {},
-      "sha256": "2181c1495cf5f12644400a11c7a7d661c98a29355753f1ba1fc1849cac2fc819"
-    },
-    {
-      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/9",
-      "params": {},
-      "sha256": "c2f516b71373b53f749553fc6c8ca481ffcb59a826fa38af0341bf1202573d4e"
-    },
-    {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/users",
       "params": {},
       "sha256": "33e506811d2837a62d0c6277d7c150af2139c82cc22501ce67550af2b762df1b"
@@ -119,6 +99,11 @@
       "url": "https://api.sleeper.app/v1/league/900000000000000001/winners_bracket",
       "params": {},
       "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/players/nfl",
+      "params": {},
+      "sha256": "52b640963334a96b5da5bb49d1bb2f2dd893082f9c25c6aaf9170c867b7cdfbe"
     }
   ]
 }

@@ -7,6 +7,7 @@ import {
   type Clock,
   type Deps,
   fileTransport,
+  type Transport,
 } from "../../src/index.ts";
 
 export const FIXTURES = join(
@@ -68,6 +69,7 @@ seasons:
     transport: fileTransport(FIXTURES, snapshot),
     clock: fixedClock("2025-10-28T15:00:00.000Z"),
     clipboard,
+    cacheDir: await mkdtemp(join(tmpdir(), "lazy-pundit-cache-")),
   };
   return { dir, deps, clipboard };
 }
@@ -75,4 +77,30 @@ seasons:
 /** Where a pundit's ranking files for a season live. */
 export function rankingsDir(dir: string, season = "2025", pundit = "rikhin") {
   return join(dir, "pundits", pundit, season);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: a raw payload being patched
+export type Json = any;
+
+/**
+ * Wraps a transport so each payload whose URL has a patch is changed before
+ * it's recorded: a real payload, varied the way a real fetch could see it.
+ */
+export function patchingTransport(
+  inner: Transport,
+  patches: Record<string, (payload: Json) => void>,
+): Transport {
+  return {
+    async request(req) {
+      const res = await inner.request(req);
+      const patch = patches[req.url];
+      if (!patch) return res;
+      const payload = JSON.parse(new TextDecoder().decode(res.body));
+      patch(payload);
+      return {
+        status: 200,
+        body: new TextEncoder().encode(JSON.stringify(payload)),
+      };
+    },
+  };
 }

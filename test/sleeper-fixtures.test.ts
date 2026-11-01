@@ -108,6 +108,7 @@ describe("committed Sleeper fixtures (Fear The Turtle 2025)", () => {
         transport: fileTransport(FIXTURES, id),
         clock,
         snapshotsDir: out,
+        cacheDir: await mkdtemp(join(tmpdir(), "lazy-pundit-cache-")),
         leagueId: manifest.league_id,
       });
       expect(replayed.id, `week ${week}`).toBe(id);

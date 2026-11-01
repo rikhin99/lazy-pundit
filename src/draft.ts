@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
 import type { League, TeamId } from "./league.ts";
 import { renderDraft } from "./ranking-file.ts";
@@ -40,6 +41,7 @@ export async function draft(
     transport: deps.transport,
     clock: deps.clock,
     snapshotsDir: snapshotsDir(ws),
+    cacheDir: deps.cacheDir,
     leagueId: ws.season.leagueId,
   });
   const snapshot = await readSnapshot(snapshotsDir(ws), id);
@@ -58,6 +60,7 @@ export async function draft(
       data_as_of: snapshot.manifest.fetched_at,
       checked_at: now,
       snapshot: id,
+      data_hash: dataHash(league, week),
       starting_order: order,
       created_at: now,
     },

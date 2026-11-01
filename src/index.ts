@@ -5,15 +5,26 @@ export { DraftExistsError, type DraftResult, draft } from "./draft.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 export type {
+  Claim,
   League,
+  LeagueSettings,
+  LineupEntry,
+  LineupSlot,
+  Manager,
   Matchup,
+  MatchupKind,
   MatchupSide,
+  NflPlayer,
   Result,
+  RosterSpot,
   Standing,
   Team,
   TeamId,
+  Trade,
+  Transaction,
   Week,
 } from "./league.ts";
+export { bestLineupPoints } from "./lineup.ts";
 export { type PublishResult, publish } from "./publish.ts";
 export { RankingFileError } from "./ranking-file.ts";
 export {

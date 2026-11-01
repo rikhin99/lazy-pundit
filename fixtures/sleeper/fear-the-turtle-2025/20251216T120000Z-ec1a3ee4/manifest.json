@@ -179,6 +179,11 @@
       "url": "https://api.sleeper.app/v1/league/900000000000000001/winners_bracket",
       "params": {},
       "sha256": "b0bf8ee6ed20429e5bc4f378602cfa9fba2283cf90e6e0a9012f590e4985b554"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/players/nfl",
+      "params": {},
+      "sha256": "0948a393601b7755abfdaa747515408eda3176a33b943e5236c047bbe4ff1348"
     }
   ]
 }

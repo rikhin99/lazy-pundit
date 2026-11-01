@@ -68,6 +68,19 @@ export class SnapshotRecorder {
     url: string,
     params: Record<string, string> = {},
   ): Promise<Uint8Array> {
+    const body = await this.getUnrecorded(url, params);
+    this.put(url, body, params);
+    return body;
+  }
+
+  /**
+   * Fetches one payload without recording it, with the same failure rules as
+   * `get`. For a payload the snapshot keeps only part of (see `put`).
+   */
+  async getUnrecorded(
+    url: string,
+    params: Record<string, string> = {},
+  ): Promise<Uint8Array> {
     const req: TransportRequest = { url, params, headers: this.#headers };
     let res: Awaited<ReturnType<Transport["request"]>>;
     try {
@@ -78,11 +91,18 @@ export class SnapshotRecorder {
     if (res.status < 200 || res.status >= 300) {
       throw new FetchError(`GET ${requestUrl(req)} returned ${res.status}`);
     }
-    this.#fetched.push({
-      request: { url, params, sha256: sha256(res.body) },
-      body: res.body,
-    });
     return res.body;
+  }
+
+  /**
+   * Records `body` as the payload for `url`. Replaying the snapshot serves it
+   * back as that URL's response, so a trimmed payload must still parse as one.
+   */
+  put(url: string, body: Uint8Array, params: Record<string, string> = {}) {
+    this.#fetched.push({
+      request: { url, params, sha256: sha256(body) },
+      body,
+    });
   }
 
   async getJson(
@@ -98,6 +118,33 @@ export class SnapshotRecorder {
   }
 
   /**
+   * What has been fetched so far, readable as a snapshot before it's written,
+   * so a platform can normalize it first.
+   */
+  snapshot(opts: {
+    platform: Platform;
+    leagueId: string;
+    season: string;
+  }): Snapshot {
+    const payloads = new Map<string, unknown>();
+    for (const f of this.#fetched) {
+      payloads.set(
+        requestKey(f.request),
+        JSON.parse(new TextDecoder().decode(f.body)),
+      );
+    }
+    const manifest: Manifest = {
+      format: SNAPSHOT_FORMAT,
+      platform: opts.platform,
+      league_id: opts.leagueId,
+      season: opts.season,
+      fetched_at: new Date(0).toISOString(),
+      requests: this.#fetched.map((f) => f.request),
+    };
+    return inMemorySnapshot("(unwritten)", manifest, payloads);
+  }
+
+  /**
    * Writes the snapshot: blobs first (each atomically), then the manifest
    * into a temp folder that is renamed into place once complete.
    */
@@ -107,6 +154,8 @@ export class SnapshotRecorder {
     platform: Platform;
     leagueId: string;
     season: string;
+    /** The hash the snapshot ID ends with: the platform's data hash. */
+    idHash: string;
   }): Promise<{ id: string; manifest: Manifest }> {
     const requests = [...this.#fetched]
       .map((f) => f.request)
@@ -119,7 +168,7 @@ export class SnapshotRecorder {
       fetched_at: opts.clock.now().toISOString(),
       requests,
     };
-    const id = snapshotId(manifest);
+    const id = snapshotId(manifest, opts.idHash);
 
     const blobsDir = join(opts.snapshotsDir, "blobs");
     await mkdir(blobsDir, { recursive: true });
@@ -177,6 +226,14 @@ export async function readSnapshot(
     const body = await readBlob(snapshotsDir, r.sha256);
     payloads.set(requestKey(r), JSON.parse(new TextDecoder().decode(body)));
   }
+  return inMemorySnapshot(id, manifest, payloads);
+}
+
+function inMemorySnapshot(
+  id: string,
+  manifest: Manifest,
+  payloads: Map<string, unknown>,
+): Snapshot {
   const key = (url: string) => requestKey({ url, params: {} });
   return {
     id,
@@ -216,19 +273,12 @@ export function requestKey(
   return JSON.stringify([req.url, params]);
 }
 
-/**
- * `<fetched_at UTC>-<short hash>`. The hash covers the requests and their
- * payloads' SHA-256.
- */
-function snapshotId(manifest: Manifest): string {
+/** `<fetched_at UTC>-<the data hash's first 8 hex digits>`. */
+function snapshotId(manifest: Manifest, hash: string): string {
   const stamp = manifest.fetched_at
     .replace(/[-:]/g, "")
     .replace(/\.\d+Z$/, "Z");
-  const hash = createHash("sha256")
-    .update(JSON.stringify(manifest.requests))
-    .digest("hex")
-    .slice(0, 8);
-  return `${stamp}-${hash}`;
+  return `${stamp}-${hash.slice(0, 8)}`;
 }
 
 function sha256(body: Uint8Array): string {
