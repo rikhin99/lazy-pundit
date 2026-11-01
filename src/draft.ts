@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Deps } from "./deps.ts";
 import type { League, TeamId } from "./league.ts";
@@ -12,6 +12,7 @@ import {
   snapshotsDir,
   weekStem,
 } from "./workspace.ts";
+import { writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface DraftResult {
   /** The ranking file written. */
@@ -65,7 +66,7 @@ export async function draft(
   );
   await mkdir(dir, { recursive: true });
   try {
-    await writeFile(path, text, { flag: "wx" });
+    await writeWorkspaceFile(path, text, { exclusive: true });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     throw new DraftExistsError(

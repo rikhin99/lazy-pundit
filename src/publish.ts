@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Deps } from "./deps.ts";
 import { WorkspaceFileError } from "./front-matter.ts";
@@ -12,6 +12,7 @@ import {
   snapshotsDir,
   weekStem,
 } from "./workspace.ts";
+import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishResult {
   week: number;
@@ -46,11 +47,11 @@ export async function publish(
   checkOrder(`${stem}.md`, ranking, league);
 
   const publishedPath = join(dir, `${stem}.published.md`);
-  await writeFile(publishedPath, draftText);
+  await writeWorkspaceFile(publishedPath, draftText);
   // The frozen copy is the draft verbatim, so the parsed draft renders it.
   const text = renderPlainText(ranking, league);
   const textPath = join(dir, `${stem}.txt`);
-  await writeFile(textPath, text);
+  await writeOutput(textPath, text);
   const copied = await deps.clipboard.write(text);
 
   return { week, publishedPath, textPath, text, copied };

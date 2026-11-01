@@ -36,3 +36,21 @@ test("no module reaches the network, system clock or other processes except thro
   }
   expect(offences).toEqual([]);
 });
+
+/** The only modules allowed to write files: workspace files and snapshots. */
+const FILE_WRITERS = new Set(["workspace-files.ts", "snapshot.ts"]);
+
+test("workspace files are written only through writeWorkspaceFile or writeOutput, which keep the format version", async () => {
+  const offences: string[] = [];
+  for (const file of await sourceFiles(SRC)) {
+    const path = relative(SRC, file);
+    if (FILE_WRITERS.has(path)) continue;
+    const text = await readFile(file, "utf8");
+    if (
+      /\b(writeFile|appendFile|createWriteStream|copyFile)(Sync)?\b/.test(text)
+    ) {
+      offences.push(`${path} writes files directly`);
+    }
+  }
+  expect(offences).toEqual([]);
+});

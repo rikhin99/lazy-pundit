@@ -27,7 +27,8 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "scrub:sleeper": "node scripts/scrub-sleeper.ts",
-    "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x"
+    "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x",
+    "fixture:show": "node scripts/show-fixture.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
