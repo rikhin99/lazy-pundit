@@ -144,6 +144,13 @@ The short prose about one team that goes with its place in the ranking. The LLM 
 **Stat line**:
 A blurb made only of the team's checked stats, such as its record, points rank, streak and latest result, with no prose. It stands in whenever no LLM blurb exists, and the pundit can keep, extend or delete it.
 
+**Week intro**:
+An optional blurb about the whole league's week, above the teams. It cites league-wide evidence and any team's stats, follows the persona's blurb shape, and carries the line for any drastic correction. A persona setting turns it off.
+_Avoid_: Header, summary
+
+**Award**:
+A league-wide item picked deterministically from the week's data, such as the top score, the biggest margin or an upset. Awards appear on publish styles and are never written by the LLM.
+
 **Revision**:
 An LLM rewrite of one team's blurb that follows the pundit's instruction. It is held to the same checks as an LLM draft, and it replaces the blurb only when the pundit accepts it. An edit the pundit makes with some other LLM isn't a revision; it counts as the pundit's own edit.
 _Avoid_: Rewrite, regenerate
@@ -222,8 +229,12 @@ A claim that was true when written and is no longer true after a refresh or afte
 ## Surfaces
 
 **Editing view**:
-What the pundit sees while ranking: the starting order, the stats behind it, and any flags.
+What the pundit sees while ranking: the starting order, the stats behind it, and every flag and claim problem, gathered in one problems list. In Stage 1 it's a local preview page beside the Markdown file the pundit edits, plus the same list in the terminal.
 
 **Published ranking**:
-What the league sees, and anything copied, pasted or screenshotted from it. It is fixed at publish time. It carries no tool-internal flags or scores unless the pundit puts them there.
+What the league sees, and anything copied, pasted or screenshotted from it. It is fixed at publish time. It carries no tool-internal flags or scores unless the pundit puts them there. It comes as plain text for pasting and as publish styles for screenshots, all rendered from the same frozen copy.
 _Avoid_: Post
+
+**Publish style**:
+A screenshot-ready page layout of the published ranking, such as Tabloid or Broadcast. Every style renders from the same frozen copy, so a style never changes the ranking.
+_Avoid_: Theme, template
