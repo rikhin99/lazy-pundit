@@ -83,8 +83,15 @@ The sum of a team's starters' points in a week, before any bonus or override. Li
 **Bye**:
 A week in which a team has no matchup. The team still scores points, but it gets no result.
 
+**Playoff bye**:
+A top seed's place in the second round of the winners bracket, skipping the first round. A losers-bracket bye isn't one.
+
+**Playoff status**:
+Whether a team has clinched a playoff bye, clinched a playoff spot or been eliminated. It is stated only when it holds whatever happens in the remaining games and however ties are broken. Otherwise the team has none, and nothing is said.
+_Avoid_: Playoff odds, magic number, in the hunt
+
 **Snapshot**:
-One complete fetch of a season's data from its platform, kept in the league workspace. Each draft records the snapshot it was built from, so the data it was checked against can be looked at again later. "Data changed" means a scored week's results, scores, lineups, transactions or standings changed. A change to injuries, names or ownership doesn't count.
+One complete fetch of a season's data from its platform, kept in the league workspace. Each draft records the snapshot it was built from, so the data it was checked against can be looked at again later. "Data changed" means a scored week's results, scores, lineups, transactions or standings changed, or the league's number of playoff spots or regular-season length changed. A change to injuries, names or ownership doesn't count.
 _Avoid_: Cache, fixture, pull
 
 ## Rules and stakes
