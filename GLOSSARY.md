@@ -174,7 +174,7 @@ The pundit's explicit act of declaring a week's ranking final. Only a published 
 _Avoid_: Export, save
 
 **Movement**:
-A team's change in place since the pundit's most recent published ranking in the same season. A team with no earlier published place is new, never given an invented movement.
+A team's change in place since the pundit's most recent published ranking from an earlier ranking week in the same season. Republishing a week never moves the baseline. A team with no earlier published place is new, never given an invented movement.
 
 **Small-sample flag**:
 A warning that the season is too young for the power score to mean much. It appears only in the editing view.
@@ -203,17 +203,21 @@ _Avoid_: Coaching efficiency, max points
 A checkable statement of fact in a blurb: a number, record, rank, streak or result. Opinions and jokes are not claims.
 
 **Evidence pack**:
-The stats the tool computes for each team for a week, each under an evidence ID. The LLM writes claims only from it, and the validator checks claims against it.
+The stats and order evidence the tool computes for each team for a week, each under an evidence ID. The LLM writes claims only from it, and the validator checks claims against it.
 
 **Evidence ID**:
 The name of one stat in the evidence pack, such as `record` or `w8.points`. A claim cites it in the draft as `[7-1]{ev=record}`. Publishing strips it.
+
+**Order evidence**:
+A team's place, movement and group, read from the draft's current order each time it's checked rather than fixed when the draft begins. Its source is the pundit, not the platform. A claim can cite it like any other evidence.
+_Avoid_: Rank (for place)
 
 **Validator**:
 The deterministic check of every claim in a blurb against the evidence pack, and of the blurb's words against the persona when swearing is off. It gates LLM drafts before they're written and reports on the pundit's edits without rejecting them.
 _Avoid_: Fact-checker
 
 **Stale claim**:
-A claim that was true when written and is no longer true after a refresh.
+A claim that was true when written and is no longer true after a refresh or after the pundit reorders the teams.
 
 ## Surfaces
 
