@@ -218,10 +218,10 @@ _Avoid_: Coaching efficiency, max points
 ## Grounding
 
 **Claim**:
-A checkable statement of fact in a blurb: a number, record, rank, streak or result. Opinions and jokes are not claims.
+A checkable statement of fact in a blurb: a number, record, rank, streak, result or playoff status. Opinions and jokes are not claims.
 
 **Evidence pack**:
-The stats and order evidence the tool computes for each team for a week, each under an evidence ID. The LLM writes claims only from it, and the validator checks claims against it.
+The stats and order evidence the tool computes for each team and for the league for a week, each under an evidence ID. The LLM writes claims only from it, and the validator checks claims against it.
 
 **Evidence ID**:
 The name of one stat in the evidence pack, such as `record` or `w8.points`. A claim cites it in the draft as `[7-1]{ev=record}`. Publishing strips it.
