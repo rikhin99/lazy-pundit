@@ -4,3 +4,12 @@
 
 # OS
 .DS_Store
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Private raw fixtures (from the local fixtures/raw branch) and the name denylist: never pushed
+fixtures/raw/
+fixtures/denylist.txt

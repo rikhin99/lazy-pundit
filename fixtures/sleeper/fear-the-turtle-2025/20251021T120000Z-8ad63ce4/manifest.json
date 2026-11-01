@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "platform": "sleeper",
+  "league_id": "900000000000000001",
+  "season": "2025",
+  "fetched_at": "2025-10-21T12:00:00.000Z",
+  "requests": [
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001",
+      "params": {},
+      "sha256": "926b752bf6070f60d3ac167216ac2d94b8a083ecda12a389ad97dc6c25331f3a"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/losers_bracket",
+      "params": {},
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/1",
+      "params": {},
+      "sha256": "ec4821a1c5847de848ece2417dc69de603797303d99e6c472bc14371071da34d"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/2",
+      "params": {},
+      "sha256": "a830510a5bd960dc6a0bbd5947df8d5bd17fa4a9ff230a859b205281b87608ed"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/3",
+      "params": {},
+      "sha256": "b64e9e81fe7e4b135537db19a7ad9395c982b207ed5a1a2acbe83205bd07a984"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/4",
+      "params": {},
+      "sha256": "9ea8702708d3a25976410ea038a26b8d41e0113c273abd22aac14b54b6bfe65b"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/5",
+      "params": {},
+      "sha256": "7e0de93ec4928f4fff89f359dc0ed888bb71eaa0c6bbd6c175e43f49ee12109d"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/6",
+      "params": {},
+      "sha256": "032fdf565be72a435694aaeae16c73915231641b49789bb6d1ac619c68daa5c0"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/7",
+      "params": {},
+      "sha256": "01b8ccb1a4c62095fa69d2bed1353fdc261a2de0e2ca1fda64feba950da0961f"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/rosters",
+      "params": {},
+      "sha256": "9031944f8eb53f6a79b86a7e6fccf9af4c59861b7c25e9ad23c73a0217e04b77"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/1",
+      "params": {},
+      "sha256": "39dfc2ecd3d0156f6de1118895691e95de9e4dc00409a969fbbeeac71e33cedd"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/2",
+      "params": {},
+      "sha256": "3e660ad57c5c97931ebbfcae0978bcb25d3e42094596638cbc8adf943ded0d52"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/3",
+      "params": {},
+      "sha256": "4676666adc5abc016f7b6c904ffd6edabecd717c00f2cab786480f736912cc32"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/4",
+      "params": {},
+      "sha256": "ff69eb31944594685f2d88fb9be2c3f4d24ba6f432ef923d827d78a402588cda"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/5",
+      "params": {},
+      "sha256": "58f1d24f4cc98253ed238a597bfce08b90ffe13351f76478ab62ff36c6d08234"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/6",
+      "params": {},
+      "sha256": "475b5859556add728564bb3f501b16921715b591a9f24ea6fa245c298ab8eaaa"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/7",
+      "params": {},
+      "sha256": "b69d85aa40c7466f35d6b5f6837e0ce80b51fb777ded2454a659d8e0464c1bc1"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/users",
+      "params": {},
+      "sha256": "33e506811d2837a62d0c6277d7c150af2139c82cc22501ce67550af2b762df1b"
+    },
+    {
+      "url": "https://api.sleeper.app/v1/league/900000000000000001/winners_bracket",
+      "params": {},
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  ]
+}
