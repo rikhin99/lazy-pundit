@@ -8,6 +8,11 @@
  *     teams (scrubbed names, managers, standings as reported, then rank,
  *     seed and tiebreak through the last scored week) and every week's scores,
  *     the values hand-checked test literals should come from
+ *   npm run fixture:show -- <week> --lineups [<scored week>]
+ *     prints every team's lineup in a scored week (default <week>), by
+ *     matchup: slot, player, eligible positions and points, with the
+ *     starters' sum. No derived stats, so a best lineup or efficiency is
+ *     still worked by hand from it.
  *
  * --league <folder> picks another league under fixtures/sleeper
  * (default fear-the-turtle-2025).
@@ -15,7 +20,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { formatRecord } from "../src/league.ts";
+import { formatRecord, isStarter } from "../src/league.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { normalizeSleeper } from "../src/sleeper/normalizer.ts";
 import { readBlob, readManifest, readSnapshot } from "../src/snapshot.ts";
@@ -26,12 +31,13 @@ const { values, positionals } = parseArgs({
   options: {
     league: { type: "string", default: "fear-the-turtle-2025" },
     model: { type: "boolean", default: false },
+    lineups: { type: "boolean", default: false },
   },
 });
 const [week, rawPath] = positionals;
 if (!week) {
   console.error(
-    "usage: npm run fixture:show -- <week> [path | --model] [--league <folder>]",
+    "usage: npm run fixture:show -- <week> [path | --model | --lineups [<scored week>]] [--league <folder>]",
   );
   process.exit(2);
 }
@@ -52,6 +58,40 @@ if (!id) {
     `No week ${week}; committed weeks: ${Object.keys(weeks).join(", ")}`,
   );
   process.exit(1);
+}
+if (values.lineups) {
+  const league = normalizeSleeper(await readSnapshot(dir, id));
+  const shown = Number(rawPath ?? week);
+  const w = league.weeks.find((x) => x.week === shown);
+  if (!w) {
+    console.error(`No week ${shown} in week ${week}'s snapshot`);
+    process.exit(1);
+  }
+  const names = new Map(league.teams.map((t) => [t.id, t.name]));
+  console.log(
+    `week ${shown} lineups from week ${week}'s snapshot${w.scored ? "" : " (in progress)"}; slots ${league.settings.lineupSlots.map((x) => (x.positions.join("/") === x.slot ? x.slot : `${x.slot}=${x.positions.join("/")}`)).join(" ")}`,
+  );
+  for (const m of w.matchups) {
+    const kind = m.kind === "regular" ? "" : `  [${m.kind} r${m.round}]`;
+    console.log(
+      `${m.sides.map((x) => names.get(x.team)).join("  v  ")}${kind}`,
+    );
+    for (const side of m.sides) {
+      const starters = side.lineup.filter(isStarter);
+      const sum = starters.reduce((t, e) => t + e.points, 0);
+      console.log(
+        `  ${names.get(side.team)} (${side.team})  score ${side.score}${side.result ? ` ${side.result}` : ""}  starters' points ${Math.round(sum * 100) / 100}`,
+      );
+      for (const e of side.lineup) {
+        const p = league.players[e.player];
+        const positions = (p?.positions ?? [e.position]).join("/");
+        console.log(
+          `    ${e.slot.padEnd(5)} ${(p?.name ?? e.player).padEnd(24)} ${positions.padEnd(8)} ${e.points}`,
+        );
+      }
+    }
+  }
+  process.exit(0);
 }
 if (values.model) {
   const league = normalizeSleeper(await readSnapshot(dir, id));

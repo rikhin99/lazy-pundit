@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 import { scrubSleeperFixtures } from "../scripts/scrub-sleeper.ts";
 import {
   bestLineupPoints,
+  isStarter,
   type League,
   type MatchupSide,
   normalizeSleeper,
@@ -152,7 +153,7 @@ describe("Sleeper normalizer", () => {
 
 function startersPoints(s: MatchupSide | undefined): number {
   const cents = (s?.lineup ?? [])
-    .filter((e) => e.slot !== "BN")
+    .filter(isStarter)
     .reduce((sum, e) => sum + Math.round(e.points * 100), 0);
   return cents / 100;
 }

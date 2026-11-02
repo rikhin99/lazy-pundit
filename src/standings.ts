@@ -78,8 +78,8 @@ export function standingsThrough(league: League, week: number): TeamStanding[] {
 }
 
 function winPercentage(s: Standing): number {
-  const games = s.wins + s.losses + s.ties;
-  return games === 0 ? 0 : (s.wins + s.ties / 2) / games;
+  const matchups = s.wins + s.losses + s.ties;
+  return matchups === 0 ? 0 : (s.wins + s.ties / 2) / matchups;
 }
 
 /** Each team's W-L-T and points through `week`, from the scored regular-season matchups. */

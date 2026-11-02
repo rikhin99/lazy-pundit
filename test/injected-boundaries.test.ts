@@ -85,6 +85,26 @@ test("the Sleeper API's base URL is written only in src/sleeper/api.ts", async (
   expect(offences).toEqual([]);
 });
 
+test("whether a lineup entry started is decided only by isStarter in src/league.ts", async () => {
+  const root = join(import.meta.dirname, "..");
+  const offences: string[] = [];
+  for (const dir of ["src", "scripts"]) {
+    for (const file of await sourceFiles(join(root, dir))) {
+      const path = relative(root, file);
+      // A platform's normalizer reads the platform's own slot names.
+      if (
+        path === join("src", "league.ts") ||
+        path.startsWith(join("src", "sleeper"))
+      )
+        continue;
+      if (/["'`]BN["'`]/.test(await codeOf(file))) {
+        offences.push(`${path} checks the bench slot; use isStarter`);
+      }
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
 test("the validator is pure: beyond its own modules it imports only types from the league model", async () => {
   const own = join(SRC, "validator");
   const files = [join(SRC, "validator.ts"), ...(await sourceFiles(own))];

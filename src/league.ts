@@ -126,7 +126,9 @@ export interface MatchupSide {
   score: number;
   /**
    * Set once the week is scored; in a two-week playoff round, only once the
-   * bracket has a winner.
+   * bracket has a winner. A playoff result is the bracket's, not the score's:
+   * in Sleeper's losers bracket the lower score advances and gets the W, so
+   * anything about who outscored whom reads `score`, never `result`.
    */
   result?: Result;
   /** Set when the scores tied and the platform's tiebreak gave the result. */
@@ -139,12 +141,22 @@ export interface LineupEntry {
   player: string;
   position: string;
   /**
-   * The starting slot, such as `QB` or `FLEX`, or `BN` for a player who
-   * didn't start. Sleeper's matchups don't say which non-starters were on IR.
+   * The starting slot, such as `QB` or `FLEX`, or {@link BENCH} for a player
+   * who didn't start. A normalizer maps every non-starting slot (a
+   * platform's IR or taxi slot) to `BENCH`. Sleeper's matchups don't say
+   * which non-starters were on IR.
    */
   slot: string;
   /** The player's points this week, before any bonus or override. */
   points: number;
+}
+
+/** The slot of every lineup entry that didn't start. */
+export const BENCH = "BN";
+
+/** Whether a lineup entry started: the one test, so every stat agrees. */
+export function isStarter(e: LineupEntry): boolean {
+  return e.slot !== BENCH;
 }
 
 export type Result = "W" | "L" | "T";

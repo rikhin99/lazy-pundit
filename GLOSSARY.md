@@ -86,8 +86,11 @@ A week in which a team has no matchup. The team still scores points, but it gets
 **Playoff bye**:
 A top seed's place in the second round of the winners bracket, skipping the first round. A losers-bracket bye isn't one.
 
+**Losers bracket**:
+The playoff bracket for teams that missed the playoffs. On Sleeper the team with the lower score advances and is given the win, so a losers-bracket result says nothing about who outscored whom. Streaks, luck and close matchups leave it out, and score-based items read the scores.
+
 **Playoff status**:
-Whether a team has clinched a playoff bye, clinched a playoff spot or been eliminated. It is stated only when it holds whatever happens in the remaining games and however ties are broken. Otherwise the team has none, and nothing is said.
+Whether a team has clinched a playoff bye, clinched a playoff spot or been eliminated. It is stated only when it holds whatever happens in the remaining matchups and however ties are broken. Otherwise the team has none, and nothing is said.
 _Avoid_: Playoff odds, magic number, in the hunt
 
 **Snapshot**:

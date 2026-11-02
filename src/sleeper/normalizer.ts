@@ -17,6 +17,7 @@ import type {
   Transaction,
   Week,
 } from "../league.ts";
+import { BENCH } from "../league.ts";
 import type { Snapshot } from "../snapshot.ts";
 import { SLEEPER_API, SLEEPER_PLAYERS_URL } from "./api.ts";
 
@@ -159,7 +160,6 @@ const FLEX_SLOTS: Record<string, string[]> = {
 };
 /** `roster_positions` entries that aren't starting slots. */
 const NON_STARTING = new Set(["BN", "IR", "TAXI"]);
-const BENCH = "BN";
 
 /** Turns one Sleeper snapshot into the league model. Pure. */
 export function normalizeSleeper(snapshot: Snapshot): League {

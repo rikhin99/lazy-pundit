@@ -1,5 +1,6 @@
 import {
   formatRecord,
+  isStarter,
   type League,
   type LineupEntry,
   type MatchupKind,
@@ -82,7 +83,7 @@ function playedWeeks(league: League, week: number): Map<TeamId, Played[]> {
     const cents = (s: MatchupSide) => Math.round(s.score * 100);
     for (const { kind, side, opp } of sides) {
       const others = sides.filter((o) => o.side !== side);
-      const starters = side.lineup.filter((e) => e.slot !== "BN");
+      const starters = side.lineup.filter(isStarter);
       out.get(side.team)?.push({
         week: w.week,
         kind,
@@ -152,9 +153,9 @@ function seasonStats(
     ev.pf_rank = pfRank.get(s.team) as number;
     ev.pa = s.pointsAgainst;
     ev.pa_rank = paRank.get(s.team) as number;
-    const perGame = ppg.get(s.team);
-    if (perGame !== undefined) {
-      ev.ppg = perGame;
+    const pointsPerWeek = ppg.get(s.team);
+    if (pointsPerWeek !== undefined) {
+      ev.ppg = pointsPerWeek;
       ev.ppg_rank = ppgRank.get(s.team) as number;
     }
 
@@ -213,10 +214,10 @@ function weekStats(
     ev[`${w}.top`] = name(top);
     ev[`${w}.top_points`] = top.points;
   }
-  const zeros = g.side.lineup.filter((e) => e.slot !== "BN" && e.points === 0);
+  const zeros = g.side.lineup.filter((e) => isStarter(e) && e.points === 0);
   if (zeros.length > 0) ev[`${w}.zeros`] = list(zeros.map(name));
   const bench = g.side.lineup
-    .filter((e) => e.slot === "BN")
+    .filter((e) => !isStarter(e))
     .sort((a, b) => b.points - a.points)[0];
   if (bench && g.best > g.playersPoints) {
     ev[`${w}.benchmiss`] = name(bench);
@@ -268,7 +269,7 @@ function activity(
       (played.get(team) ?? [])
         .filter((g) => g.week >= from)
         .flatMap((g) =>
-          g.side.lineup.filter((e) => e.player === player && e.slot !== "BN"),
+          g.side.lineup.filter((e) => e.player === player && isStarter(e)),
         )
         .map((e) => e.points),
     );
@@ -413,7 +414,7 @@ function leagueItems(
 
 function topStarter(lineup: LineupEntry[]): LineupEntry | undefined {
   return lineup
-    .filter((e) => e.slot !== "BN")
+    .filter(isStarter)
     .reduce<LineupEntry | undefined>(
       (best, e) => (!best || e.points > best.points ? e : best),
       undefined,

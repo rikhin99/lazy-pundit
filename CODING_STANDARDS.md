@@ -1,6 +1,6 @@
 # Coding standards
 
-Read during review. Each rule is a judgement call; the mechanical rules are tests in `test/injected-boundaries.test.ts` (outside world only through injected `Deps`; files written only through `src/workspace-files.ts`; the validator imports nothing beyond its own modules except league-model types) and `test/format-versions.test.ts` (a file shape change needs a version bump), and Biome and `tsc` cover formatting and types. Where a rule has a source, the source wins.
+Read during review. Each rule is a judgement call; the mechanical rules are tests in `test/injected-boundaries.test.ts` (outside world only through injected `Deps`; files written only through `src/workspace-files.ts`; the validator imports nothing beyond its own modules except league-model types; whether a lineup entry started is decided only by `isStarter`), `test/format-versions.test.ts` (a file shape change needs a version bump) and `test/glossary-terms.test.ts` (no unambiguous glossary _Avoid_ term in identifiers or comments), and Biome and `tsc` cover formatting and types. Where a rule has a source, the source wins.
 
 ## Shape
 
@@ -12,7 +12,7 @@ Read during review. Each rule is a judgement call; the mechanical rules are test
 
 ## Names
 
-- Code and comments use `GLOSSARY.md` terms. A glossary _Avoid_ term appears only as a platform's own field name (`owner_id`), never as our identifier or prose: say _manager_, _place_, _team_, _matchup_.
+- Code and comments use `GLOSSARY.md` terms. A glossary _Avoid_ term appears only as a platform's own field name (`owner_id`), never as our identifier or prose: say _manager_, _place_, _team_, _matchup_. The test covers the unambiguous terms; the reviewer covers the rest, such as _player_ for a manager or _roster_ for a team, and prose in strings.
 - Team identity follows ADR 0001: `<platform>:<team id>`, scoped to one season.
 
 ## Tests

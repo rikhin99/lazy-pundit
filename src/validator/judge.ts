@@ -166,7 +166,7 @@ export function judge(
       "wrong",
       r
         ? show(ctx, r)
-        : "no settled playoff status: it still depends on games to come",
+        : "no settled playoff status: it still depends on matchups to come",
     );
   }
 

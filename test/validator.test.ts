@@ -586,7 +586,7 @@ describe("playoff words", () => {
       [
         "clinched",
         "wrong",
-        "no settled playoff status: it still depends on games to come",
+        "no settled playoff status: it still depends on matchups to come",
       ],
     ]);
   });

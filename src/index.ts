@@ -25,6 +25,7 @@ export type {
   Transaction,
   Week,
 } from "./league.ts";
+export { BENCH, isStarter } from "./league.ts";
 export { bestLineupPoints } from "./lineup.ts";
 export { type PublishResult, publish } from "./publish.ts";
 export { RankingFileError } from "./ranking-file.ts";
