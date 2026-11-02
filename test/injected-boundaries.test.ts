@@ -72,3 +72,9 @@ test("the Sleeper API's base URL is written only in src/sleeper/api.ts", async (
   }
   expect(offences).toEqual([]);
 });
+
+test("the validator is pure: it imports only types, from the league model", async () => {
+  const text = await readFile(join(SRC, "validator.ts"), "utf8");
+  const imports = [...text.matchAll(/^import .*$/gm)].map((m) => m[0]);
+  expect(imports).toEqual(['import type { TeamId } from "./league.ts";']);
+});

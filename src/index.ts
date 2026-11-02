@@ -47,3 +47,20 @@ export {
   type TransportRequest,
   type TransportResponse,
 } from "./transport.ts";
+export {
+  type AutoTag,
+  applyAutoTags,
+  type CheckedClaim,
+  type ClaimStatus,
+  type EvidencePack,
+  type EvidenceValue,
+  gateLlm,
+  isHard,
+  type OrderEvidence,
+  type Swear,
+  type Swearing,
+  stripTags,
+  type ValidationResult,
+  type ValidatorInput,
+  validate,
+} from "./validator.ts";
