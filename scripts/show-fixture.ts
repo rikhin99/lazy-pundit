@@ -5,7 +5,8 @@
  *   npm run fixture:show -- <week> <path>     prints one, e.g. rosters, matchups/8, players/nfl
  *   npm run fixture:show -- <week> ""         prints the league payload
  *   npm run fixture:show -- <week> --model    prints the normalized model:
- *     teams (scrubbed names, managers, standings) and every week's scores,
+ *     teams (scrubbed names, managers, standings as reported, then rank,
+ *     seed and tiebreak through the last scored week) and every week's scores,
  *     the values hand-checked test literals should come from
  *
  * --league <folder> picks another league under fixtures/sleeper
@@ -18,6 +19,7 @@ import { formatRecord } from "../src/league.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { normalizeSleeper } from "../src/sleeper/normalizer.ts";
 import { readBlob, readManifest, readSnapshot } from "../src/snapshot.ts";
+import { standingsThrough } from "../src/standings.ts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -57,11 +59,18 @@ if (values.model) {
     `${league.name} ${league.season}, week ${week} snapshot ${id}: last scored week ${league.lastScoredWeek}`,
   );
   const names = new Map(league.teams.map((t) => [t.id, t.name]));
+  const through = new Map(
+    standingsThrough(league, league.lastScoredWeek).map((s) => [s.team, s]),
+  );
   for (const t of league.teams) {
     const s = t.standing;
     const managers = t.managers.map((m) => m.displayName).join(", ");
+    const st = through.get(t.id);
+    const place = st
+      ? `  rank ${st.rank ?? "-"}  seed ${st.seed ?? "-"}${st.tiebreak ? `  (${st.tiebreak})` : ""}`
+      : "";
     console.log(
-      `  ${t.id}  ${t.name} (${managers || "no manager"})  ${formatRecord(s)}  pf ${s.pointsFor}  pa ${s.pointsAgainst}`,
+      `  ${t.id}  ${t.name} (${managers || "no manager"})  ${formatRecord(s)}  pf ${s.pointsFor}  pa ${s.pointsAgainst}${place}`,
     );
   }
   for (const w of league.weeks) {

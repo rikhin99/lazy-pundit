@@ -6,48 +6,12 @@ import { describe, expect, test } from "vitest";
 import { scrubSleeperFixtures } from "../scripts/scrub-sleeper.ts";
 import {
   bestLineupPoints,
-  fetchSleeperSnapshot,
-  fileTransport,
   type League,
   type MatchupSide,
   normalizeSleeper,
   readSnapshot,
 } from "../src/index.ts";
-import { SLEEPER_API } from "../src/sleeper/api.ts";
-import {
-  FEAR_THE_TURTLE_ID,
-  FIXTURES,
-  fixedClock,
-  type Json,
-  patchingTransport,
-  WEEKS,
-} from "./support/workspace.ts";
-
-/**
- * Replays a committed week with some payloads patched, as a real fetch would
- * have seen them, and normalizes the result. Keys are paths under the league.
- */
-async function patched(
-  week: number,
-  patches: Record<string, (payload: Json) => void>,
-): Promise<League> {
-  const base = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
-  const transport = patchingTransport(
-    fileTransport(FIXTURES, WEEKS[String(week)] as string),
-    Object.fromEntries(
-      Object.entries(patches).map(([p, f]) => [p ? `${base}/${p}` : base, f]),
-    ),
-  );
-  const dir = await mkdtemp(join(tmpdir(), "lazy-pundit-"));
-  const { id } = await fetchSleeperSnapshot({
-    transport,
-    clock: fixedClock("2025-10-28T15:00:00.000Z"),
-    snapshotsDir: dir,
-    cacheDir: await mkdtemp(join(tmpdir(), "lazy-pundit-cache-")),
-    leagueId: FEAR_THE_TURTLE_ID,
-  });
-  return normalizeSleeper(await readSnapshot(dir, id));
-}
+import { committed, FIXTURES, patched } from "./support/workspace.ts";
 
 /** Each matchup of a week as `kind round: team v team`, sorted. */
 function kinds(league: League, week: number): string[] {
@@ -60,12 +24,6 @@ function kinds(league: League, week: number): string[] {
       return `${m.kind} ${m.round ?? "-"}: ${a} v ${b}`;
     })
     .sort();
-}
-
-async function committed(week: number): Promise<League> {
-  return normalizeSleeper(
-    await readSnapshot(FIXTURES, WEEKS[String(week)] as string),
-  );
 }
 
 /** A side of one week's matchups, by team. */

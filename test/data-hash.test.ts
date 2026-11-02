@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import { parse } from "yaml";
+import { dataHash } from "../src/data-hash.ts";
 import { draft } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
+  committed,
   FEAR_THE_TURTLE_ID,
   fearTheTurtle,
   type Json,
@@ -76,5 +78,13 @@ describe("data hash", () => {
     ]);
     expect(corrected.data_hash).not.toBe(plain.data_hash);
     expect(corrected.snapshot).not.toBe(plain.snapshot);
+  });
+
+  test("it covers standings through the week, not as of the fetch", async () => {
+    // Nothing through week 8 differs between the week-8 and week-10
+    // snapshots, though the week-10 one reports standings through week 10.
+    expect(dataHash(await committed(10), 8)).toBe(
+      dataHash(await committed(8), 8),
+    );
   });
 });

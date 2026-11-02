@@ -7,6 +7,7 @@ import { renderDraft } from "./ranking-file.ts";
 import { fetchSleeperSnapshot } from "./sleeper/fetcher.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
+import { standingsThrough } from "./standings.ts";
 import {
   rankingsDir,
   readWorkspace,
@@ -50,7 +51,7 @@ export async function draft(
 
   const dir = rankingsDir(ws);
   const path = join(dir, `${weekStem(week)}.md`);
-  const order = startingOrder(league);
+  const order = startingOrder(league, week);
   const now = deps.clock.now().toISOString();
   const text = renderDraft(
     {
@@ -80,18 +81,9 @@ export async function draft(
 }
 
 /**
- * The tool's proposed order: by standings (wins, ties as half, then points
- * for). The power-score methods replace this later.
+ * The tool's proposed order: the standings through the ranking week. The
+ * power-score methods replace this later.
  */
-function startingOrder(league: League): TeamId[] {
-  const winValue = (t: League["teams"][number]) =>
-    t.standing.wins + t.standing.ties / 2;
-  return [...league.teams]
-    .sort(
-      (a, b) =>
-        winValue(b) - winValue(a) ||
-        b.standing.pointsFor - a.standing.pointsFor ||
-        a.id.localeCompare(b.id, "en", { numeric: true }),
-    )
-    .map((t) => t.id);
+function startingOrder(league: League, week: number): TeamId[] {
+  return standingsThrough(league, week).map((s) => s.team);
 }

@@ -42,6 +42,11 @@ export {
   type Snapshot,
 } from "./snapshot.ts";
 export {
+  standingsThrough,
+  type TeamStanding,
+  type Tiebreak,
+} from "./standings.ts";
+export {
   httpTransport,
   type Transport,
   type TransportRequest,

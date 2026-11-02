@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import type { League } from "./league.ts";
+import { standingsThrough } from "./standings.ts";
 
 /**
  * SHA-256 of the league data a ranking for `throughWeek` stands on, as
  * canonical JSON: the scored weeks up to it (matchups, scores, results,
- * lineups, byes), transactions up to it, standings, and the playoff spot count
- * and regular-season length. Names, managers, current rosters, injuries,
+ * lineups, byes), transactions up to it, the standings through it (with
+ * rank, seed and tiebreaks), and the playoff spot count and regular-season
+ * length. Names, managers, current rosters, injuries,
  * player details and any in-progress week are left out, so only a change that
  * counts as "data changed" changes it.
  *
@@ -16,7 +18,7 @@ export function dataHash(league: League, throughWeek: number): string {
   const covered = {
     playoffTeams: league.settings.playoffTeams,
     regularSeasonWeeks: league.settings.regularSeasonWeeks,
-    standings: league.teams.map((t) => [t.id, t.standing]),
+    standings: standingsThrough(league, throughWeek),
     weeks: league.weeks
       .filter((w) => w.scored && w.week <= throughWeek)
       .map((w) => ({

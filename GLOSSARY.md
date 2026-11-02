@@ -188,7 +188,10 @@ _Avoid_: Suggested ranking, default ranking, recommendation, starting-order snap
 The pundit's explicit act of recomputing a draft's starting order from newer data or a changed method. It never changes the pundit's order or blurbs.
 
 **Standings**:
-The platform's own order, by record with its tiebreaks. A stat the pundit sees, not a ranking.
+The league's table by record, ordered with the platform's own tiebreaks, as of a given scored week. A stat the pundit sees, not a ranking.
+
+**Seed**:
+A team's position in the playoff order: its position in the standings, if that is within the playoff spots. Before the regular season ends, it is the seed the team would have if the season ended now. In a league with divisions, no seed is given.
 
 **Publish**:
 The pundit's explicit act of declaring a week's ranking final. Only a published ranking counts as the previous ranking for movement. Changes made to the draft afterwards reach the league only when the pundit publishes again.
