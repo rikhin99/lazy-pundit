@@ -9,7 +9,7 @@ import {
   type Transport,
   type TransportRequest,
 } from "../src/index.ts";
-import { fearTheTurtle, fixedClock, person } from "./support/workspace.ts";
+import { fearTheTurtle, fixedClock, operator } from "./support/workspace.ts";
 
 /**
  * A transport that answers Anthropic's model list with `status`, and
@@ -32,10 +32,10 @@ function anthropicAnswers(status: number): Transport & {
   };
 }
 
-/** One person with a config listing Fear The Turtle and a stored key. */
+/** One operator with a config listing Fear The Turtle and a stored key. */
 async function setUp() {
   const { dir } = await fearTheTurtle(8);
-  const deps = await person();
+  const deps = await operator();
   await mkdir(deps.configDir, { recursive: true });
   await writeFile(
     join(deps.configDir, "config.yaml"),
@@ -59,7 +59,7 @@ test("a healthy setup passes every check", async () => {
     Node: "ok",
     "config.yaml": "ok",
     "credentials.yaml": "ok",
-    "usage.yaml": "ok",
+    "spend.yaml": "ok",
     "Anthropic key": "ok",
     "ESPN cookie": "ok",
     "workspace fear-the-turtle": "ok",
@@ -73,7 +73,7 @@ function find(checks: DoctorCheck[], subject: string) {
 }
 
 test("on a fresh machine with an old Node, doctor fails Node and says to run init", async () => {
-  const deps = await person();
+  const deps = await operator();
   deps.env = { nodeVersion: "v22.11.0" };
 
   const { checks, ok } = await doctor(deps);

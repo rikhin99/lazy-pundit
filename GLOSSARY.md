@@ -7,6 +7,10 @@ A local tool that turns fantasy league data into power rankings and recaps. The 
 **League workspace**:
 Everything the tool knows about one league: its platform data, lore, persona, stakes for each season, and every pundit's rankings. A league can have several pundits.
 
+**League slug**:
+A league workspace's own short name, in lowercase letters, digits and dashes, by which the operator names the league from anywhere. It belongs to the workspace, not the platform.
+_Avoid_: League ID (the platform's own ID), league name
+
 **Pundit**:
 The human who authors a league's rankings and owns every placement in them. Each pundit in a league keeps their own rankings and settings, and one person can be the pundit in several leagues.
 _Avoid_: Writer, ranker, user
@@ -19,6 +23,10 @@ A pundit who started writing rankings for a league because of Lazy Pundit, often
 
 **Concierge**:
 A pundit for whom someone else runs the tool. The concierge pundit only edits and posts what they are handed.
+
+**Operator**:
+The person who runs the tool on their own machine, and whose credentials, spend cap and cache it uses. Usually the pundit; for a concierge pundit, whoever runs the tool for them.
+_Avoid_: User, owner, account
 
 **Manager**:
 A person who runs a team in the league. A manager stays the same across seasons and platforms, while their team, its name and their platform account can change. A team can have several managers who share it, and a manager can join, leave or come back in any season. A manager isn't a pundit unless they also write rankings.
@@ -98,7 +106,27 @@ One complete fetch of a season's data from its platform, kept in the league work
 _Avoid_: Cache, fixture, pull
 
 **Players file**:
-The platform's list of every NFL player, with positions, NFL team and injury status. It is fetched rarely and kept in the pundit's cache, outside any workspace, and each snapshot keeps only the players its league names. "Cache" means only this person-level store, never a snapshot.
+The platform's list of every NFL player, with positions, NFL team and injury status. It is fetched rarely and kept in the operator's cache, outside any workspace, and each snapshot keeps only the players its league names. "Cache" means only this person-level store, never a snapshot.
+
+## Setup and cost
+
+**Setup step**:
+One part of setting up a league, such as the lore, the persona or the Anthropic key, that `init` walks through in order and `setup` can re-run on its own. Only the pundit name and league data steps can't be skipped.
+
+**Credentials**:
+The operator's secrets: the Anthropic key and the ESPN cookie. They belong to the operator, never to a league workspace, so a workspace can be shared or backed up without them.
+
+**Spend**:
+What the operator's LLM calls cost, as estimated from the price table, counted by calendar month across all their leagues.
+_Avoid_: Usage, cost (on its own), billing
+
+**Spend cap**:
+The most the operator lets LLM calls spend in one calendar month, across every league. A call whose estimated cost would pass it is never made.
+_Avoid_: Budget, monthly cap, hard cap, limit
+
+**Price table**:
+The dated price per token of each model, shipped with the tool, which the operator can add to or correct for a model. A model with no price is never called.
+_Avoid_: Rate card, pricing
 
 ## Rules and stakes
 

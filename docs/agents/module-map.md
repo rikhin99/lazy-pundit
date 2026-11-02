@@ -15,13 +15,13 @@ Read this before opening source files. It says which file owns what, so you can 
 | `index.ts` | The library's public API; the CLI and tests import only this | re-exports |
 | `cli.ts` | Arg parsing, the publish prompt and printing the problems list; no logic | commander program |
 | `deps.ts` | Injected outside world: transport, clock, clipboard, cache, config and workspaces folders, environment overrides; the only reader of `process.env` | `Deps`, `Environment`, `systemDeps` |
-| `config.ts` | The person-level files: `config.yaml`, `credentials.yaml` (0600), `usage.yaml`, with `CONFIG_FORMAT` | `readConfig`, `loadCredentials`, `saveCredentials`, `dropWorkspaces` |
+| `config.ts` | The operator's files: `config.yaml`, `credentials.yaml` (0600), `spend.yaml`, with `CONFIG_FORMAT` | `readConfig`, `loadCredentials`, `saveCredentials`, `dropWorkspaces` |
 | `anthropic.ts` | Anthropic's API base and the live key check | `ANTHROPIC_API`, `checkAnthropicKey` |
 | `doctor.ts` | The `doctor` command: each check with its fix | `doctor`, `DoctorCheck` |
 | `transport.ts`, `file-transport.ts`, `clock.ts`, `clipboard.ts` | The adapters behind `Deps`; only these touch network, time or other processes | `httpTransport`, `fileTransport`, `systemClipboard`, `noClipboard` |
 | `workspace.ts` | `workspace.md`, finding a workspace (`--league` or upwards from the current folder), season folders, file naming | `readWorkspace`, `findWorkspace`, `rankingsDir`, `snapshotsDir`, `weekStem` |
 | `front-matter.ts`, `workspace-files.ts` | Front matter with the FORMAT version; writing workspace files and outputs | `readFrontMatter`, `writeWorkspaceFile`, `writeOutput` |
-| `cache.ts` | The person-level cache (players file) | `readCacheEntry`, `writeCacheEntry` |
+| `cache.ts` | The operator's cache (players file) | `readCacheEntry`, `writeCacheEntry` |
 | `sleeper/api.ts` | Sleeper's API base and players URLs | `SLEEPER_API`, `SLEEPER_PLAYERS_URL` |
 | `sleeper/fetcher.ts` | Fetching every Sleeper payload into a snapshot | `fetchSleeperSnapshot` |
 | `snapshot.ts` (300) | Snapshot manifest and blobs on disk | `readSnapshot`, `readManifest`, `readBlob` |
@@ -48,7 +48,7 @@ Read this before opening source files. It says which file owns what, so you can 
 
 The seams, and the helpers each one uses:
 
-- **Library API against a temp workspace** (`draft-publish`, `check`, `config`, `doctor`): `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files. `person()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides, so nothing touches the real home directory.
+- **Library API against a temp workspace** (`draft-publish`, `check`, `config`, `doctor`): `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides, so nothing touches the real home directory.
 - **Validator** (`validator`): `blurb()` and `week8Evidence()` in `support/week8-evidence.ts` hold literal week-8 evidence; `support/plain-prose.ts` lists sentences that must never come back hard.
 - **League model and stats** (`sleeper-normalizer`, `standings`, `stats`, `data-hash`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.
 - **CLI** (`cli`): spawns `src/cli.ts` in a workspace with `LAZY_PUNDIT_CLIPBOARD=off` and HOME and the XDG folders in a temp home; `homeListing()` writes a `config.yaml` for `--league`.

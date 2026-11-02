@@ -11,8 +11,8 @@ import {
   loadCredentials,
   readConfig,
   readConfigFile,
-  usagePath,
-  usageSchema,
+  spendPath,
+  spendSchema,
 } from "./config.ts";
 import type { Deps } from "./deps.ts";
 import { readWorkspace } from "./workspace.ts";
@@ -40,7 +40,7 @@ const NODE_MAJOR = 24;
 const COOKIE_MONTHS = 11;
 
 /**
- * Checks the person's setup: Node, each person-level file, each credential
+ * Checks the operator's setup: Node, each of their files, each credential
  * with one live call, and every workspace `config.yaml` lists. A listed
  * folder that has gone is dropped from the list; no folder is ever touched.
  */
@@ -70,7 +70,7 @@ export async function doctor(deps: Deps): Promise<DoctorResult> {
   }
 
   const credentials = await credentialsCheck(deps, checks);
-  checks.push(await usageCheck(deps));
+  checks.push(await spendCheck(deps));
   checks.push(await anthropicCheck(deps, credentials));
   checks.push(espnCheck(deps, credentials));
   if (config) checks.push(...(await workspaceChecks(deps, config)));
@@ -121,21 +121,21 @@ async function credentialsCheck(
   }
 }
 
-async function usageCheck(deps: Deps): Promise<DoctorCheck> {
-  const subject = "usage.yaml";
+async function spendCheck(deps: Deps): Promise<DoctorCheck> {
+  const subject = "spend.yaml";
   try {
-    const usage = await readConfigFile(usagePath(deps), usageSchema);
+    const spend = await readConfigFile(spendPath(deps), spendSchema);
     return {
       subject,
       status: "ok",
-      message: usage ? usagePath(deps) : "No LLM spend recorded yet.",
+      message: spend ? spendPath(deps) : "No LLM spend recorded yet.",
     };
   } catch (err) {
     return {
       subject,
       status: "fail",
       message: (err as Error).message,
-      fix: `Fix ${usagePath(deps)} as the message says. Deleting it forgets this month's spend.`,
+      fix: `Fix ${spendPath(deps)} as the message says. Deleting it forgets this month's spend.`,
     };
   }
 }

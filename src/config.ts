@@ -6,11 +6,11 @@ import { type ZodType, z } from "zod";
 import type { Deps } from "./deps.ts";
 
 /**
- * The person-level files in the config folder, outside any workspace:
+ * The operator's files in the config folder, outside any workspace:
  *
- *   config.yaml       name, model, monthly cap, price overrides, workspaces
+ *   config.yaml       name, model, spend cap, price overrides, workspaces
  *   credentials.yaml  the Anthropic key and espn_s2, at mode 0600
- *   usage.yaml        LLM spend by calendar month
+ *   spend.yaml        LLM spend by calendar month
  *
  * Each carries `format:`, versioned by `CONFIG_FORMAT`.
  */
@@ -33,11 +33,11 @@ const priceSchema = z.object({
 
 export const configSchema = z.object({
   format: z.literal(CONFIG_FORMAT),
-  /** The person's pundit name, the default for each new workspace. */
+  /** The operator's pundit name, the default for each new workspace. */
   name: z.string().min(1).optional(),
   model: z.string().min(1).default("claude-sonnet-5-5"),
   /** The hard cap on LLM spend per calendar month, across every league. */
-  monthly_cap_usd: z.number().nonnegative().default(5),
+  spend_cap_usd: z.number().nonnegative().default(5),
   /** Prices that replace or add to the table shipped with the tool, by model. */
   prices: z.record(z.string(), priceSchema).default({}),
   /** Each league workspace by slug: its folder. */
@@ -62,7 +62,7 @@ export const credentialsSchema = z.object({
     .optional(),
 });
 
-export const usageSchema = z.object({
+export const spendSchema = z.object({
   format: z.literal(CONFIG_FORMAT),
   /** Spend in US dollars by calendar month in local time (`2025-10`). */
   months: z
@@ -78,8 +78,8 @@ export function credentialsPath(deps: Pick<Deps, "configDir">): string {
   return join(deps.configDir, "credentials.yaml");
 }
 
-export function usagePath(deps: Pick<Deps, "configDir">): string {
-  return join(deps.configDir, "usage.yaml");
+export function spendPath(deps: Pick<Deps, "configDir">): string {
+  return join(deps.configDir, "spend.yaml");
 }
 
 /** A credential in use, and where it came from. */
@@ -93,7 +93,7 @@ export interface Credentials {
   anthropicApiKey?: Credential;
   /** `savedAt` is the stored cookie's local date; an override has none. */
   espnS2?: Credential & { savedAt?: string };
-  /** Anything the person should fix, such as a file others can read. */
+  /** Anything the operator should fix, such as a file others can read. */
   warnings: string[];
 }
 
@@ -204,7 +204,7 @@ function localDate(d: Date): string {
 }
 
 /**
- * Writes a person-level file whole, through a temp file renamed into place,
+ * Writes one of the operator's files whole, through a temp file renamed into place,
  * so a crash never leaves half a file and the new file has `mode` from the
  * start. A new config folder is made at mode 0700, closed to other users.
  */
@@ -221,7 +221,7 @@ export function readConfig(deps: Pick<Deps, "configDir">) {
 }
 
 /**
- * Reads and parses one person-level YAML file. A missing file is undefined;
+ * Reads and parses one of the operator's YAML files. A missing file is undefined;
  * a file that doesn't parse, or has another format version, is refused with
  * its path and what to fix.
  */

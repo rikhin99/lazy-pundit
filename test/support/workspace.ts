@@ -72,7 +72,7 @@ seasons:
   if (!snapshot) throw new Error(`no committed snapshot for week ${week}`);
   const clipboard = recordingClipboard();
   const deps: Deps = {
-    ...(await person()),
+    ...(await operator()),
     transport: fileTransport(FIXTURES, snapshot),
     clipboard,
   };
@@ -80,11 +80,11 @@ seasons:
 }
 
 /**
- * Deps for one person on a fresh machine: temp config, cache and workspaces
+ * Deps for one operator on a fresh machine: temp config, cache and workspaces
  * folders, no environment overrides, Node 24, a fixed clock, a recording
  * clipboard and a transport that answers 404 to everything.
  */
-export async function person(): Promise<Deps> {
+export async function operator(): Promise<Deps> {
   const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
   return {
     transport: {

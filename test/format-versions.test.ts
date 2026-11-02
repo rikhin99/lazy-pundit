@@ -5,7 +5,7 @@ import {
   CONFIG_FORMAT,
   configSchema,
   credentialsSchema,
-  usageSchema,
+  spendSchema,
 } from "../src/config.ts";
 import { FORMAT } from "../src/front-matter.ts";
 import { metaSchema } from "../src/ranking-file.ts";
@@ -26,7 +26,7 @@ const RECORDED = {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",
   } as Record<number, string>,
   CONFIG_FORMAT: {
-    1: "c70830a570780242033203e1635e8e67e6308812218bb30c3cd4ac2b51888e5a",
+    1: "e6305a6713f98408246fac7c27de221ca0981472028e8b62ae492129951b3650",
   } as Record<number, string>,
 };
 
@@ -41,7 +41,7 @@ test.each([
   [
     "CONFIG_FORMAT",
     CONFIG_FORMAT,
-    shapeHash(configSchema, credentialsSchema, usageSchema),
+    shapeHash(configSchema, credentialsSchema, spendSchema),
   ],
 ] as const)(
   "%s %i matches the file shape recorded for it",

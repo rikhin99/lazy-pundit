@@ -32,14 +32,14 @@ From anywhere, `--league <slug>` acts on a workspace your `config.yaml` lists.
 
 ### Config and credentials
 
-Person-level files live in `$XDG_CONFIG_HOME/lazy-pundit/` (else `~/.config/lazy-pundit/`), never in a workspace:
+The operator's files live in `$XDG_CONFIG_HOME/lazy-pundit/` (else `~/.config/lazy-pundit/`), never in a workspace:
 
 ```yaml
 # config.yaml
 format: 1
 name: Rikhin
 model: claude-sonnet-5-5     # the default
-monthly_cap_usd: 5           # the default
+spend_cap_usd: 5             # the default
 workspaces:
   fear-the-turtle: /Users/you/lazy-pundit/fear-the-turtle
 ```

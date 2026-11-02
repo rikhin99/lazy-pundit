@@ -7,18 +7,18 @@ import {
   loadCredentials,
   saveCredentials,
 } from "../src/index.ts";
-import { fearTheTurtle, person } from "./support/workspace.ts";
+import { fearTheTurtle, operator } from "./support/workspace.ts";
 
 test("a folder inside a workspace finds it, as git finds a repo", async () => {
   const { dir } = await fearTheTurtle(8);
   const inside = join(dir, "pundits", "rikhin", "2025");
   await mkdir(inside, { recursive: true });
 
-  expect(await findWorkspace(await person(), { cwd: inside })).toBe(dir);
+  expect(await findWorkspace(await operator(), { cwd: inside })).toBe(dir);
 });
 
 test("saved credentials are written at mode 0600 and read back from the file", async () => {
-  const deps = await person();
+  const deps = await operator();
 
   const path = await saveCredentials(deps, {
     anthropicApiKey: "sk-ant-stored",
@@ -34,7 +34,7 @@ test("saved credentials are written at mode 0600 and read back from the file", a
 });
 
 test("a credentials file others can read loads with a warning and the chmod to fix it", async () => {
-  const deps = await person();
+  const deps = await operator();
   const path = await saveCredentials(deps, {
     anthropicApiKey: "sk-ant-stored",
   });
@@ -49,7 +49,7 @@ test("a credentials file others can read loads with a warning and the chmod to f
 });
 
 test("ANTHROPIC_API_KEY and LAZY_PUNDIT_ESPN_S2 override the stored values", async () => {
-  const deps = await person();
+  const deps = await operator();
   await saveCredentials(deps, {
     anthropicApiKey: "sk-ant-stored",
     espnS2: "AEB%2Fstored",
@@ -68,7 +68,7 @@ test("ANTHROPIC_API_KEY and LAZY_PUNDIT_ESPN_S2 override the stored values", asy
 });
 
 test("saving one credential keeps the other", async () => {
-  const deps = await person();
+  const deps = await operator();
   await saveCredentials(deps, { espnS2: "AEB%2Fstored" });
   await saveCredentials(deps, { anthropicApiKey: "sk-ant-stored" });
 
@@ -79,7 +79,7 @@ test("saving one credential keeps the other", async () => {
   ]);
 });
 
-/** Writes the person's `config.yaml` as a pundit would by hand. */
+/** Writes the operator's `config.yaml` by hand. */
 async function writeConfig(deps: Deps, yaml: string) {
   await mkdir(deps.configDir, { recursive: true });
   await writeFile(join(deps.configDir, "config.yaml"), yaml);
@@ -87,7 +87,7 @@ async function writeConfig(deps: Deps, yaml: string) {
 
 test("--league finds a workspace listed in config.yaml from any folder", async () => {
   const { dir } = await fearTheTurtle(8);
-  const deps = await person();
+  const deps = await operator();
   await writeConfig(
     deps,
     `format: 1\nname: Rikhin\nworkspaces:\n  fear-the-turtle: ${dir}\n`,
@@ -103,7 +103,7 @@ test("--league finds a workspace listed in config.yaml from any folder", async (
 
 test("an unknown --league names the leagues config.yaml lists", async () => {
   const { dir } = await fearTheTurtle(8);
-  const deps = await person();
+  const deps = await operator();
   await writeConfig(
     deps,
     `format: 1\nworkspaces:\n  fear-the-turtle: ${dir}\n`,
@@ -117,16 +117,16 @@ test("an unknown --league names the leagues config.yaml lists", async () => {
 });
 
 test("a config.yaml that doesn't parse names the file and the field", async () => {
-  const deps = await person();
-  await writeConfig(deps, "format: 1\nmonthly_cap_usd: lots\n");
+  const deps = await operator();
+  await writeConfig(deps, "format: 1\nspend_cap_usd: lots\n");
 
   await expect(
     findWorkspace(deps, { cwd: deps.workspacesDir, league: "fear-the-turtle" }),
-  ).rejects.toThrow(/config\.yaml: [\s\S]*monthly_cap_usd/);
+  ).rejects.toThrow(/config\.yaml: [\s\S]*spend_cap_usd/);
 });
 
 test("a workspace listed by a relative or ~ path is refused, asking for a full path", async () => {
-  const deps = await person();
+  const deps = await operator();
   await writeConfig(
     deps,
     "format: 1\nworkspaces:\n  fear-the-turtle: ~/lazy-pundit/fear-the-turtle\n",
@@ -138,7 +138,7 @@ test("a workspace listed by a relative or ~ path is refused, asking for a full p
 });
 
 test("a credentials file others can change but not read is warned about as changeable", async () => {
-  const deps = await person();
+  const deps = await operator();
   const path = await saveCredentials(deps, {
     anthropicApiKey: "sk-ant-stored",
   });

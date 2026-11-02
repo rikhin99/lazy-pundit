@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 
 /**
- * The person-level cache (the XDG cache dir): large platform files that are
+ * The operator's cache (the XDG cache dir): large platform files that are
  * shared by every workspace and safe to lose. A missing or unreadable entry is
  * simply a miss.
  *

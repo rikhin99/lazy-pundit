@@ -65,7 +65,7 @@ test("only src/deps.ts reads environment variables, the home folder or the Node 
   expect(offences).toEqual([]);
 });
 
-/** The only modules allowed to write files: workspace files, snapshots, the person-level cache and config. */
+/** The only modules allowed to write files: workspace files, snapshots, the operator's cache and config. */
 const FILE_WRITERS = new Set([
   "workspace-files.ts",
   "snapshot.ts",

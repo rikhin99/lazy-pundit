@@ -28,7 +28,7 @@ export interface FetchSleeperOptions {
   clock: Clock;
   /** The folder snapshots and their shared blobs are written to. */
   snapshotsDir: string;
-  /** The person-level cache folder, where the players file is kept. */
+  /** The operator's cache folder, where the players file is kept. */
   cacheDir: string;
   leagueId: string;
   /** Sent with every request and never recorded. */

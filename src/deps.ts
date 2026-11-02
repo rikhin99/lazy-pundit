@@ -13,9 +13,9 @@ export interface Deps {
   transport: Transport;
   clock: Clock;
   clipboard: Clipboard;
-  /** The person-level cache folder for large platform files. */
+  /** The operator's cache folder for large platform files. */
   cacheDir: string;
-  /** The person-level config folder: `config.yaml`, `credentials.yaml`, `usage.yaml`. */
+  /** The operator's config folder: `config.yaml`, `credentials.yaml`, `spend.yaml`. */
   configDir: string;
   /** The folder new league workspaces go in by default, one per league slug. */
   workspacesDir: string;
