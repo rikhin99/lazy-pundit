@@ -36,7 +36,8 @@ export interface TeamEntry {
   line: number;
 }
 
-const metaSchema = z.object({
+/** A ranking file's front matter. Its shape is versioned by `FORMAT`. */
+export const metaSchema = z.object({
   season: z.number().int(),
   week: z.number().int().nonnegative(),
   pundit: z.string(),

@@ -37,7 +37,7 @@ npm run lint
 npm test
 ```
 
-The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock** and a **clipboard** (`systemDeps()` in production). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
+The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock**, a **clipboard** and a **cache dir** for the players file (`systemDeps()` in production). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
 
 ### Fixtures
 
@@ -47,5 +47,7 @@ The library never reaches the network or the system clock directly: every entry 
 npm run fixtures:raw     # unpacks the local fixtures/raw branch: untracked and gitignored
 npm run scrub:sleeper
 ```
+
+The branch, not the unpacked folder, is what exists: list it with `git ls-tree -r --name-only fixtures/raw`, and rerun `npm run fixtures:raw` after the branch changes, since an older unpack goes stale silently.
 
 Tests that need the raw files run only when `fixtures/raw/` is present. The fixture name check reads an optional, never-committed `fixtures/denylist.txt` (one real name per line, `#` comments allowed).

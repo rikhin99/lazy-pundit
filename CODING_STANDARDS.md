@@ -1,6 +1,6 @@
 # Coding standards
 
-Read during review. Each rule is a judgement call; the mechanical rules are tests in `test/injected-boundaries.test.ts` (outside world only through injected `Deps`; files written only through `src/workspace-files.ts`), and Biome and `tsc` cover formatting and types. Where a rule has a source, the source wins.
+Read during review. Each rule is a judgement call; the mechanical rules are tests in `test/injected-boundaries.test.ts` (outside world only through injected `Deps`; files written only through `src/workspace-files.ts`) and `test/format-versions.test.ts` (a file shape change needs a version bump), and Biome and `tsc` cover formatting and types. Where a rule has a source, the source wins.
 
 ## Shape
 

@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { z } from "zod";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
 
-const workspaceSchema = z.object({
+/** `workspace.md`'s front matter. Its shape is versioned by `FORMAT`. */
+export const workspaceSchema = z.object({
   pundit: z
     .string()
     .regex(/^[a-z0-9][a-z0-9-]*$/, "use lowercase letters, digits and dashes"),
