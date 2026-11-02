@@ -200,6 +200,10 @@ A league-wide item picked deterministically from the week's data, such as the to
 An LLM rewrite of one team's blurb that follows the pundit's instruction. It is held to the same checks as an LLM draft, stays within the persona's tone controls whatever the instruction asks, and replaces the blurb only when the pundit accepts it. An edit the pundit makes with some other LLM isn't a revision; it counts as the pundit's own edit.
 _Avoid_: Rewrite, regenerate
 
+**Draft context**:
+Everything the LLM may be told about a league-week, gathered once when a draft begins: the evidence pack, the team names and managers' display names, the persona, the lore, the stakes and each team's last published blurb. An LLM draft, a revision and the eval harness all write from it, and nothing outside it is ever sent to the LLM provider.
+_Avoid_: Prompt data, LLM input
+
 **Group**:
 An optional label over a run of consecutive places in a ranking, such as a tier or a playoff split into championship and consolation groups. Places are numbered straight through the groups.
 _Avoid_: Bracket, division

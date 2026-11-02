@@ -14,6 +14,7 @@ import {
   type Transport,
 } from "../../src/index.ts";
 import { SLEEPER_API } from "../../src/sleeper/api.ts";
+import { noLlm } from "./llm.ts";
 
 export const FIXTURES = join(
   import.meta.dirname,
@@ -82,7 +83,8 @@ seasons:
 /**
  * Deps for one operator on a fresh machine: temp config, cache and workspaces
  * folders, no environment overrides, Node 24, a fixed clock, a recording
- * clipboard and a transport that answers 404 to everything.
+ * clipboard, a transport that answers 404 to everything and an LLM that
+ * fails the test if called.
  */
 export async function operator(): Promise<Deps> {
   const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
@@ -90,6 +92,7 @@ export async function operator(): Promise<Deps> {
     transport: {
       request: async () => ({ status: 404, body: new Uint8Array() }),
     },
+    llm: noLlm,
     clock: fixedClock("2025-10-28T15:00:00.000Z"),
     clipboard: recordingClipboard(),
     cacheDir: join(home, ".cache", "lazy-pundit"),

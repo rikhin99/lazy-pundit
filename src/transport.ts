@@ -8,6 +8,10 @@ export interface TransportRequest {
   params?: Record<string, string>;
   /** Request headers (cookies included). Never recorded anywhere. */
   headers?: Record<string, string>;
+  /** `GET` unless given. Platform fetches are all `GET`; the LLM call posts. */
+  method?: "GET" | "POST";
+  /** The request body, sent with a `POST`. Never recorded anywhere. */
+  body?: string;
 }
 
 export interface TransportResponse {
@@ -28,12 +32,14 @@ export function requestUrl(req: Pick<TransportRequest, "url" | "params">) {
   return url.toString();
 }
 
-/** The production transport: the platform's API over Node's built-in fetch. */
+/** The production transport: platform and LLM APIs over Node's built-in fetch. */
 export function httpTransport(): Transport {
   return {
     async request(req) {
       const res = await fetch(requestUrl(req), {
+        method: req.method ?? "GET",
         headers: req.headers ?? {},
+        ...(req.body === undefined ? {} : { body: req.body }),
       });
       return {
         status: res.status,

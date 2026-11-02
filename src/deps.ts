@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { anthropicLlm, type Llm } from "./anthropic.ts";
 import { type Clipboard, noClipboard, systemClipboard } from "./clipboard.ts";
 import { type Clock, systemClock } from "./clock.ts";
 import { httpTransport, type Transport } from "./transport.ts";
@@ -11,6 +12,8 @@ import { httpTransport, type Transport } from "./transport.ts";
  */
 export interface Deps {
   transport: Transport;
+  /** The LLM that writes blurbs and the week intro, called only with a key. */
+  llm: Llm;
   clock: Clock;
   clipboard: Clipboard;
   /** The operator's cache folder for large platform files. */
@@ -47,8 +50,10 @@ export interface Environment {
 export function systemDeps(): Deps {
   const env = process.env;
   const home = homedir();
+  const transport = httpTransport();
   return {
-    transport: httpTransport(),
+    transport,
+    llm: anthropicLlm(transport),
     clock: systemClock,
     clipboard:
       env.LAZY_PUNDIT_CLIPBOARD === "off" ? noClipboard : systemClipboard,

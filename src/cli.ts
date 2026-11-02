@@ -99,6 +99,7 @@ program
   .action(async () => {
     const deps = systemDeps();
     const result = await draft(await workspace(deps), deps);
+    for (const w of result.warnings) console.error(`${MARKS.warn} ${w}`);
     console.log(
       `Drafted week ${result.week}: ${shown(result.path)} (snapshot ${result.snapshot})`,
     );

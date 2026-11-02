@@ -1,3 +1,10 @@
+export {
+  ANTHROPIC_API,
+  anthropicLlm,
+  type Llm,
+  type LlmReply,
+  type LlmRequest,
+} from "./anthropic.ts";
 export { type CheckResult, check, type Problem } from "./check.ts";
 export { type Clipboard, systemClipboard } from "./clipboard.ts";
 export { type Clock, systemClock } from "./clock.ts";

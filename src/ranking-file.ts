@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { DraftData } from "./draft-data.ts";
 import {
   readFrontMatter,
   WorkspaceFileError,
@@ -68,24 +67,28 @@ export class RankingFileError extends WorkspaceFileError {
   }
 }
 
-/**
- * A new draft: the league stat line as the intro, then the starting order,
- * each team with its stat line.
- */
+/** What a new draft's sections hold: the week intro and each team's blurb. */
+export interface DraftProse {
+  /** Empty for no intro section. */
+  intro: string;
+  blurbs: Partial<Record<TeamId, string>>;
+}
+
+/** A new draft: the intro, then the starting order, each team with its blurb. */
 export function renderDraft(
   meta: RankingMeta,
   league: League,
   order: TeamId[],
-  data: DraftData,
+  prose: DraftProse,
 ): string {
   const teams = new Map(league.teams.map((t) => [t.id, t]));
   const sections = order.map((id) => {
     const team = teams.get(id);
     if (!team) throw new Error(`No team ${id} in the league`);
-    const line = data.teams[id]?.statLine;
-    return `## ${team.name} {team=${id}}\n${line ? `${line}\n` : ""}`;
+    const blurb = prose.blurbs[id];
+    return `## ${team.name} {team=${id}}\n${blurb ? `${blurb}\n` : ""}`;
   });
-  if (data.intro) sections.unshift(`## Intro {intro}\n${data.intro}\n`);
+  if (prose.intro) sections.unshift(`## Intro {intro}\n${prose.intro}\n`);
   return `${writeFrontMatter({ ...meta }, ["starting_order"])}\n${sections.join("\n")}`;
 }
 
