@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { expect, test } from "vitest";
 
 const SRC = join(import.meta.dirname, "..", "src");
@@ -73,8 +73,26 @@ test("the Sleeper API's base URL is written only in src/sleeper/api.ts", async (
   expect(offences).toEqual([]);
 });
 
-test("the validator is pure: it imports only types, from the league model", async () => {
-  const text = await readFile(join(SRC, "validator.ts"), "utf8");
-  const imports = [...text.matchAll(/^import .*$/gm)].map((m) => m[0]);
-  expect(imports).toEqual(['import type { TeamId } from "./league.ts";']);
+test("the validator is pure: beyond its own modules it imports only types from the league model", async () => {
+  const own = join(SRC, "validator");
+  const files = [join(SRC, "validator.ts"), ...(await sourceFiles(own))];
+  const offences: string[] = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    const imports = text.matchAll(
+      /^(?:import|export)\s+(type\s+)?[^;]*?\sfrom\s+"([^"]+)"/gms,
+    );
+    for (const [, typeOnly, from = ""] of imports) {
+      const target = join(dirname(file), from);
+      const ownModule = from.startsWith(".") && target.startsWith(`${own}/`);
+      const leagueTypes = typeOnly && target === join(SRC, "league.ts");
+      if (!ownModule && !leagueTypes) {
+        offences.push(`${relative(SRC, file)} imports ${from}`);
+      }
+    }
+    if (/\bimport\s*\(/.test(text)) {
+      offences.push(`${relative(SRC, file)} imports dynamically`);
+    }
+  }
+  expect(offences).toEqual([]);
 });
