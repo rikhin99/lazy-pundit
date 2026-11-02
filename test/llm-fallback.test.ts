@@ -139,8 +139,10 @@ describe("the price table and spend cap", () => {
 
     expect(llm.requests).toEqual([]);
     await expectStatLines(result.path);
+    // The ceiling: 12,855 chars of system and prompt ÷ 3 = 4,285 tokens at
+    // $2/M ($0.0086), plus 16,000 max tokens at $10/M ($0.16): $0.17.
     expect(result.fallback).toMatch(
-      /^The next LLM call could cost up to \$0\.1\d, and \$4\.85 of this month's \$5\.00 spend cap is spent, so it wasn't made: raise spend_cap_usd in .*config\.yaml, or wait for next month; the draft has stat lines\.$/,
+      /^The next LLM call could cost up to \$0\.17, and \$4\.85 of this month's \$5\.00 spend cap is spent, so it wasn't made: raise spend_cap_usd in .*config\.yaml, or wait for next month; the draft has stat lines\.$/,
     );
   });
 
@@ -260,8 +262,9 @@ describe("a stop partway through the LLM gate", () => {
     expect(await spentMonths(deps)).toEqual({ "2025-10": 4.88 });
     const text = await readFile(result.path, "utf8");
     expect(text).toContain(`## Hail Mary Hustle {team=${HUSTLE}}\n${WRONG}\n`);
+    // $0.17 as above: the retry's prompt is the first one's size to within a cent.
     expect(result.fallback).toMatch(
-      /^The next LLM call could cost up to \$0\.1\d, and \$4\.88 of this month's \$5\.00 spend cap is spent, .*; the LLM gate stopped after 1 reply, so the draft has the LLM's prose so far, each failing section at its best attempt\.$/,
+      /^The next LLM call could cost up to \$0\.17, and \$4\.88 of this month's \$5\.00 spend cap is spent, .*; the LLM gate stopped after 1 reply, so the draft has the LLM's prose so far, each failing section at its best attempt\.$/,
     );
   });
 });
