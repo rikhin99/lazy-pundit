@@ -88,7 +88,7 @@
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/rosters",
       "params": {},
-      "sha256": "885cbbbd4ac475835ad57663d4a8ce4e3736e5515ac3c265a9378c6075781046"
+      "sha256": "2c9840075f0cb2482616cd4a103479a067a14e73ed9af98c97485edde3ae9a0a"
     },
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/transactions/1",

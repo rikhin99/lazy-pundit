@@ -10,6 +10,9 @@
  * replays the season as of one ranking week N, as if fetched the Tuesday after
  * week N: the league is scored through N, only weeks 1..N are fetched, and
  * standings (W-L-T, points for and against) are rebuilt from those weeks.
+ * Once the regular season is over the standings are Sleeper's own, as
+ * fetched: they sum unrounded scores, so they can differ from a recount by a
+ * cent, and tests need that real table to compare against.
  * Other roster fields (max points, waiver use, current players and injuries)
  * stay as they were at the season's end.
  *
@@ -324,7 +327,7 @@ function asOfWeek(raw: Raw, week: number): Map<string, Json> {
   }
   const rosters = raw.rosters.map((r): Obj => {
     const s = standings.get(Number(r.roster_id));
-    if (!s) return r;
+    if (!s || week >= regularSeasonEnd) return r;
     return {
       ...r,
       settings: {

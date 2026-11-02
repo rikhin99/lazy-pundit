@@ -3,17 +3,12 @@ import { standingsThrough } from "../src/index.ts";
 import { committed, type Json, patched } from "./support/workspace.ts";
 
 describe("standings through a week", () => {
-  test("through week 14 they match Sleeper's end-of-regular-season standings", async () => {
+  test("through week 14 they match Sleeper's end-of-regular-season standings, to the cent", async () => {
     // Rebuilt from the week-15 snapshot's matchups, so the playoff week is left out.
     const standings = standingsThrough(await committed(15), 14);
-    // From `npm run fixture:show -- 14 rosters`: wins, losses, ties, fpts, fpts_against.
-    const byTeam = Object.fromEntries(
-      standings.map((s) => [
-        s.team,
-        [s.wins, s.losses, s.ties, s.pointsFor, s.pointsAgainst],
-      ]),
-    );
-    expect(byTeam).toEqual({
+    // Sleeper's own table, as fetched (`npm run fixture:show -- 14 rosters`):
+    // wins, losses, ties, fpts, fpts_against.
+    const sleeper: Record<string, number[]> = {
       "sleeper:1": [6, 8, 0, 1458.28, 1632.94],
       "sleeper:2": [6, 8, 0, 1643.95, 1568.17],
       "sleeper:3": [10, 4, 0, 1559.21, 1419.66],
@@ -23,10 +18,27 @@ describe("standings through a week", () => {
       "sleeper:7": [7, 7, 0, 1556.49, 1565.4],
       "sleeper:8": [7, 7, 0, 1474.65, 1575.87],
       "sleeper:9": [5, 9, 0, 1473.17, 1576.34],
-      "sleeper:10": [6, 8, 0, 1459.44, 1402.88],
+      "sleeper:10": [6, 8, 0, 1459.44, 1402.89],
       "sleeper:11": [9, 5, 0, 1744.65, 1540.94],
-      "sleeper:12": [7, 7, 0, 1462.3, 1487.89],
-    });
+      "sleeper:12": [7, 7, 0, 1462.31, 1487.89],
+    };
+    expect(standings.map((s) => s.team).sort()).toEqual(
+      Object.keys(sleeper).sort(),
+    );
+    // Sleeper sums unrounded scores, so its points can be a cent off a sum of
+    // the two-decimal matchup scores (sleeper:10's against, sleeper:12's for).
+    const cents = (x: number) => Math.round(x * 100);
+    for (const s of standings) {
+      const [wins, losses, ties, pointsFor, pointsAgainst] =
+        sleeper[s.team] ?? [];
+      expect([s.wins, s.losses, s.ties]).toEqual([wins, losses, ties]);
+      expect(
+        Math.abs(cents(s.pointsFor) - cents(pointsFor ?? 0)),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(cents(s.pointsAgainst) - cents(pointsAgainst ?? 0)),
+      ).toBeLessThanOrEqual(1);
+    }
   });
 
   test("seeds agree with the 2025 winners bracket's round-1 pairings and byes", async () => {

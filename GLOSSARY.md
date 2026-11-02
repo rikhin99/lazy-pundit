@@ -188,7 +188,7 @@ _Avoid_: Suggested ranking, default ranking, recommendation, starting-order snap
 The pundit's explicit act of recomputing a draft's starting order from newer data or a changed method. It never changes the pundit's order or blurbs.
 
 **Standings**:
-The league's table by record, ordered with the platform's own tiebreaks, as of a given scored week. A stat the pundit sees, not a ranking.
+The league's table by record, ordered with the platform's own tiebreaks, as of a given scored week. A team's position in it is its rank. A stat the pundit sees, not a ranking.
 
 **Seed**:
 A team's position in the playoff order: its position in the standings, if that is within the playoff spots. Before the regular season ends, it is the seed the team would have if the season ended now. In a league with divisions, no seed is given.
@@ -234,7 +234,7 @@ The name of one stat in the evidence pack, such as `record` or `w8.points`. A cl
 
 **Order evidence**:
 A team's place, movement and group, read from the draft's current order each time it's checked rather than fixed when the draft begins. Its source is the pundit, not the platform. A claim can cite it like any other evidence.
-_Avoid_: Rank (for place)
+_Avoid_: rank, for a team's place in the pundit's ranking. A team's rank is its position in the standings.
 
 **Validator**:
 The deterministic check of every claim in a blurb against the evidence pack, and of the blurb's words against the persona when swearing is off. It gates LLM drafts before they're written and reports on the pundit's edits without rejecting them.

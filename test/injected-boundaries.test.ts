@@ -20,6 +20,18 @@ const FORBIDDEN: [string, RegExp][] = [
   ["other processes", /node:child_process\b/],
 ];
 
+/**
+ * A source file's code without its comments, so prose such as "as of the
+ * fetch (…)" can't trip a check. A `//` after a colon or inside a string,
+ * as in a URL, is left alone.
+ */
+async function codeOf(file: string): Promise<string> {
+  const text = await readFile(file, "utf8");
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:"'`\w])\/\/.*$/gm, "$1");
+}
+
 async function sourceFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true, recursive: true });
   return entries
@@ -32,7 +44,7 @@ test("no module reaches the network, system clock or other processes except thro
   for (const file of await sourceFiles(SRC)) {
     const path = relative(SRC, file);
     if (PRODUCTION_BOUNDARIES.has(path)) continue;
-    const text = await readFile(file, "utf8");
+    const text = await codeOf(file);
     for (const [what, pattern] of FORBIDDEN) {
       if (pattern.test(text)) offences.push(`${path} reaches ${what}`);
     }
@@ -48,7 +60,7 @@ test("workspace files are written only through writeWorkspaceFile or writeOutput
   for (const file of await sourceFiles(SRC)) {
     const path = relative(SRC, file);
     if (FILE_WRITERS.has(path)) continue;
-    const text = await readFile(file, "utf8");
+    const text = await codeOf(file);
     if (
       /\b(writeFile|appendFile|createWriteStream|copyFile)(Sync)?\b/.test(text)
     ) {
@@ -78,7 +90,7 @@ test("the validator is pure: beyond its own modules it imports only types from t
   const files = [join(SRC, "validator.ts"), ...(await sourceFiles(own))];
   const offences: string[] = [];
   for (const file of files) {
-    const text = await readFile(file, "utf8");
+    const text = await codeOf(file);
     const imports = text.matchAll(
       /^(?:import|export)\s+(type\s+)?[^;]*?\sfrom\s+"([^"]+)"/gms,
     );

@@ -38,6 +38,8 @@ export type Tiebreak = "points_for" | "unbroken";
  *
  * The order is Sleeper's: win percentage (a tie counts as half a win), then
  * points for. Sleeper reports neither rank nor seed, so both come from it.
+ * How this was confirmed, and what's still unknown, is in
+ * docs/research/sleeper-standings.md.
  * With divisions Sleeper's division seeding isn't modelled, so there's no
  * rank, seed or tiebreak; the list is still sorted by record, so the draft's
  * starting order has one to start from.
