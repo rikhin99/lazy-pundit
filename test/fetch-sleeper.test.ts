@@ -11,8 +11,9 @@ import {
   type Transport,
   type TransportRequest,
 } from "../src/index.ts";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
 
-const SLEEPER = "https://api.sleeper.app/v1";
+const SLEEPER = SLEEPER_API;
 const fixedClock: Clock = { now: () => new Date("2025-10-28T12:00:00.000Z") };
 
 /** A tiny Sleeper league: 2 teams (one with no manager), 2 scored weeks. */

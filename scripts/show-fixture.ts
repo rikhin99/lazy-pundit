@@ -11,6 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { readBlob, readManifest } from "../src/snapshot.ts";
 
 const { values, positionals } = parseArgs({
@@ -43,21 +44,21 @@ if (!id) {
   process.exit(1);
 }
 const manifest = await readManifest(dir, id);
-const base = `https://api.sleeper.app/v1/league/${manifest.league_id}`;
+const base = `${SLEEPER_API}/league/${manifest.league_id}`;
 
 if (rawPath === undefined) {
   console.log(`week ${week}: snapshot ${id}`);
   for (const r of manifest.requests) {
     const path = r.url.startsWith(base)
       ? r.url.slice(base.length).replace(/^\//, "") || '""  (league)'
-      : r.url.replace("https://api.sleeper.app/v1/", "");
+      : r.url.replace(`${SLEEPER_API}/`, "");
     console.log(`  ${path}`);
   }
 } else {
   const path = rawPath.replace(/^\//, "");
   // The players file sits outside the league's URLs.
   const url = path.startsWith("players/")
-    ? `https://api.sleeper.app/v1/${path}`
+    ? `${SLEEPER_API}/${path}`
     : path
       ? `${base}/${path}`
       : base;

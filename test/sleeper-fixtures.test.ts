@@ -11,6 +11,7 @@ import {
   readBlob,
   readManifest,
 } from "../src/index.ts";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const FIXTURES = join(ROOT, "fixtures", "sleeper", "fear-the-turtle-2025");
@@ -27,7 +28,7 @@ async function committedWeeks(): Promise<Record<string, string>> {
 async function payload(week: string, path = ""): Promise<unknown> {
   const id = (await committedWeeks())[week] as string;
   const manifest = await readManifest(FIXTURES, id);
-  const url = `https://api.sleeper.app/v1/league/${manifest.league_id}${path}`;
+  const url = `${SLEEPER_API}/league/${manifest.league_id}${path}`;
   const request = manifest.requests.find((r) => r.url === url);
   if (!request) throw new Error(`no ${path} in week ${week}`);
   return JSON.parse(

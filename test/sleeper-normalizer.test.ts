@@ -13,6 +13,7 @@ import {
   normalizeSleeper,
   readSnapshot,
 } from "../src/index.ts";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
   FEAR_THE_TURTLE_ID,
   FIXTURES,
@@ -30,7 +31,7 @@ async function patched(
   week: number,
   patches: Record<string, (payload: Json) => void>,
 ): Promise<League> {
-  const base = `https://api.sleeper.app/v1/league/${FEAR_THE_TURTLE_ID}`;
+  const base = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
   const transport = patchingTransport(
     fileTransport(FIXTURES, WEEKS[String(week)] as string),
     Object.fromEntries(

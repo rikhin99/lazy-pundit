@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import { parse } from "yaml";
 import { draft } from "../src/index.ts";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
   FEAR_THE_TURTLE_ID,
   fearTheTurtle,
@@ -9,7 +10,7 @@ import {
   patchingTransport,
 } from "./support/workspace.ts";
 
-const SLEEPER = "https://api.sleeper.app/v1";
+const SLEEPER = SLEEPER_API;
 const LEAGUE = `${SLEEPER}/league/${FEAR_THE_TURTLE_ID}`;
 
 /** Drafts week 8, optionally through a patched payload, and reads the front matter. */

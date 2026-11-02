@@ -12,7 +12,10 @@ const PRODUCTION_BOUNDARIES = new Set([
 ]);
 
 const FORBIDDEN: [string, RegExp][] = [
-  ["the network", /\bfetch\s*\(|node:https?\b|node:net\b|\bWebSocket\b/],
+  [
+    "the network",
+    /(?<![.\w])fetch\s*\(|\bglobalThis\.fetch\b|node:https?\b|node:net\b|\bWebSocket\b/,
+  ],
   ["the system clock", /\bDate\.now\b|\bnew Date\(\s*\)|\bperformance\.now\b/],
   ["other processes", /node:child_process\b/],
 ];
@@ -50,6 +53,21 @@ test("workspace files are written only through writeWorkspaceFile or writeOutput
       /\b(writeFile|appendFile|createWriteStream|copyFile)(Sync)?\b/.test(text)
     ) {
       offences.push(`${path} writes files directly`);
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
+test("the Sleeper API's base URL is written only in src/sleeper/api.ts", async () => {
+  const root = join(import.meta.dirname, "..");
+  const offences: string[] = [];
+  for (const dir of ["src", "test", "scripts"]) {
+    for (const file of await sourceFiles(join(root, dir))) {
+      const path = relative(root, file);
+      if (path === join("src", "sleeper", "api.ts")) continue;
+      if (/api\.sleeper\.app/.test(await readFile(file, "utf8"))) {
+        offences.push(`${path} restates the URL; import SLEEPER_API`);
+      }
     }
   }
   expect(offences).toEqual([]);

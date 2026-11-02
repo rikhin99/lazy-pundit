@@ -8,6 +8,9 @@ import type { League } from "./league.ts";
  * and regular-season length. Names, managers, current rosters, injuries,
  * player details and any in-progress week are left out, so only a change that
  * counts as "data changed" changes it.
+ *
+ * Snapshot IDs end with this hash, so changing what it covers changes every
+ * committed fixture ID: regenerate them (see fixtures/sleeper/README.md).
  */
 export function dataHash(league: League, throughWeek: number): string {
   const covered = {
