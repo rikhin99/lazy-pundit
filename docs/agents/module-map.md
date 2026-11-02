@@ -4,7 +4,7 @@ Read this before opening source files. It says which file owns what, so you can 
 
 ## The pipeline
 
-`draft`: fetch (`sleeper/fetcher.ts`) → snapshot on disk (`snapshot.ts`) → League model (`sleeper/normalizer.ts`) → stats and evidence (`draft-data.ts`) → with an Anthropic key, the draft context (`draft-context.ts`), the prompt (`prompt.ts`) and one LLM call → Markdown (`ranking-file.ts` `renderDraft`) → `checkDraft`.
+`draft`: fetch (`sleeper/fetcher.ts`) → snapshot on disk (`snapshot.ts`) → League model (`sleeper/normalizer.ts`) → stats and evidence (`draft-data.ts`) → with an Anthropic key, the draft context (`draft-context.ts`, with last week's published blurbs read in `draft.ts`), the prompt (`prompt.ts`) and the LLM gate (`llm-gate.ts`: one call, then up to 2 retries for failing sections) → Markdown (`ranking-file.ts` `renderDraft`) → `checkDraft`.
 
 `check` and `publish` both start from `checkDraft` in `check.ts`: read the latest `week-NN.md`, parse it, rebuild the evidence from its snapshot, validate each blurb, return the problems list and write any auto-tags. `publish` then freezes the checked text and renders plain text.
 
@@ -33,10 +33,11 @@ Read this before opening source files. It says which file owns what, so you can 
 | `evidence-pack.ts` (490) | Every stat under its evidence ID, per team and league | `buildEvidencePack` |
 | `draft-data.ts` | Evidence pack plus the stat lines and intro a draft starts with | `draftData` |
 | `draft-context.ts` | Everything the LLM may be sent for a league-week, and the persona (Broadcast until #54) | `draftContext`, `DraftContext`, `BROADCAST` |
-| `prompt.ts` | The first-draft instructions and prompt, and reading the reply's sections | `FIRST_DRAFT_SYSTEM`, `firstDraftPrompt`, `readReply` |
+| `prompt.ts` | The first-draft instructions and prompt, the retry prompt with the gate's complaints, and reading the reply's sections | `FIRST_DRAFT_SYSTEM`, `firstDraftPrompt`, `rewritePrompt`, `readReply` |
+| `llm-gate.ts` | The LLM gate: validating each section, retrying the failing ones, keeping each section's best attempt | `gatedProse`, `GATE_RETRIES`, `FailedSection` |
 | `ranking-file.ts` | The `week-NN.md` format: render, parse (with text offsets), order checks | `renderDraft`, `parseRanking`, `checkOrder` |
 | `draft.ts` | The `draft` command | `draft` |
-| `check.ts` | The problems list: validates a draft and writes auto-tags | `check`, `checkDraft`, `Problem` |
+| `check.ts` | The problems list: validates a draft and writes auto-tags; marks a new draft's gate failures | `check`, `checkDraft`, `Problem`, `withGateFailures` |
 | `publish.ts` | Publish confirm, frozen copy, plain text, clipboard | `publish` |
 | `plain-text.ts` | The plain text the league reads | `renderPlainText` |
 | `validator.ts` | The validator's entry: claims, auto-tags, swears for one blurb | `validate`, `applyAutoTags`, `stripTags`, `isHard` |

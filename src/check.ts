@@ -4,6 +4,7 @@ import type { Deps } from "./deps.ts";
 import { draftData } from "./draft-data.ts";
 import { WorkspaceFileError } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
+import type { FailedSection, SectionKey } from "./llm-gate.ts";
 import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
@@ -45,6 +46,11 @@ export interface Problem {
   cause?: "refresh" | "reorder";
   /** The evidence ID cited or matched. */
   id?: string;
+  /**
+   * A gate failure: LLM prose that never passed the LLM gate was written as
+   * its best attempt with this fault in it. Only the new draft's list has it.
+   */
+  gate?: true;
 }
 
 export interface CheckResult {
@@ -171,7 +177,7 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
         line: lineAt(s.start + w.start),
         text: w.word,
         kind: "swear",
-        reason: "on the word list, and swearing is off",
+        reason: SWEAR_REASON,
       });
     }
     problems.push(...unreadableTags(s, at, lineAt));
@@ -179,11 +185,7 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
       autoTags.push({ ...t, start: s.start + t.start, end: s.start + t.end });
     }
   }
-  problems.sort(
-    (a, b) =>
-      Number(b.severity === "hard") - Number(a.severity === "hard") ||
-      a.line - b.line,
-  );
+  problems.sort(byHardThenLine);
 
   let text = written;
   if (autoTags.length > 0) {
@@ -201,6 +203,74 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
     ranking: autoTags.length > 0 ? parseRanking(name, text) : ranking,
     league,
   };
+}
+
+/** Why a word-list hit is a problem. */
+export const SWEAR_REASON = "on the word list, and swearing is off";
+
+/** The problems list's order: hard first, then by line. */
+function byHardThenLine(a: Problem, b: Problem): number {
+  return (
+    Number(b.severity === "hard") - Number(a.severity === "hard") ||
+    a.line - b.line
+  );
+}
+
+/**
+ * A new draft's problems list with each fault of prose that never passed the
+ * LLM gate marked as a gate failure. A claim the check lists is marked where
+ * it stands; a word-list hit, which the check doesn't look for until the
+ * persona sets swearing (#54), joins the list. A claim the check auto-tagged
+ * now cites its evidence and is verified, so it isn't one.
+ */
+export function withGateFailures(
+  checked: CheckedDraft,
+  failed: FailedSection[],
+): Problem[] {
+  if (failed.length === 0) return checked.problems;
+  const team = (key: SectionKey) => (key === "intro" ? null : key);
+  const problems = checked.problems.map((p) =>
+    failed.some(
+      (f) => team(f.key) === p.team && f.claims.some((c) => c.text === p.text),
+    )
+      ? { ...p, gate: true as const }
+      : p,
+  );
+  for (const f of failed) {
+    const start = sectionStart(checked.ranking, team(f.key));
+    if (start === undefined) continue;
+    const line = checked.text.slice(0, start).split("\n").length;
+    const section =
+      f.key === "intro"
+        ? "Intro"
+        : (checked.league.teams.find((t) => t.id === f.key)?.name ?? f.key);
+    for (const w of f.swears) {
+      problems.push({
+        team: team(f.key),
+        section,
+        severity: "soft",
+        // Auto-tags never add a line, so the line holds in the checked text.
+        line: line + f.text.slice(0, w.start).split("\n").length - 1,
+        text: w.word,
+        kind: "swear",
+        reason: SWEAR_REASON,
+        gate: true,
+      });
+    }
+  }
+  return problems.sort(byHardThenLine);
+}
+
+/** Where a section's text starts in the ranking file. */
+function sectionStart(
+  ranking: RankingFile,
+  team: TeamId | null,
+): number | undefined {
+  if (team === null) return ranking.introStart;
+  const entry = ranking.entries.find(
+    (e) => e.kind === "team" && e.team === team,
+  );
+  return entry?.kind === "team" ? entry.blurbStart : undefined;
 }
 
 /** Each team's place and group, read from the draft's current order. */

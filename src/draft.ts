@@ -1,6 +1,6 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { checkDraft, type Problem } from "./check.ts";
+import { checkDraft, type Problem, withGateFailures } from "./check.ts";
 import {
   CONFIG_FORMAT,
   configSchema,
@@ -9,15 +9,20 @@ import {
 } from "./config.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
-import { type DraftContext, draftContext } from "./draft-context.ts";
+import {
+  type DraftContext,
+  draftContext,
+  type LastBlurbs,
+} from "./draft-context.ts";
 import { type DraftData, draftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
-import { FIRST_DRAFT_SYSTEM, firstDraftPrompt, readReply } from "./prompt.ts";
-import { type DraftProse, renderDraft } from "./ranking-file.ts";
+import { type FailedSection, gatedProse } from "./llm-gate.ts";
+import { type DraftProse, parseRanking, renderDraft } from "./ranking-file.ts";
 import { fetchSleeperSnapshot } from "./sleeper/fetcher.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
 import { standingsThrough } from "./standings.ts";
+import { stripTags } from "./validator.ts";
 import {
   rankingsDir,
   readWorkspace,
@@ -68,14 +73,14 @@ export async function draft(
   const order = startingOrder(league, week);
   const data = draftData(league, week);
   const { anthropicApiKey, warnings } = await loadCredentials(deps);
-  const prose = anthropicApiKey
+  const { prose, failed } = anthropicApiKey
     ? await llmProse(
-        draftContext(league, data),
+        draftContext(league, data, await lastBlurbs(dir, week)),
         data,
         anthropicApiKey.value,
         deps,
       )
-    : statLines(data);
+    : { prose: statLines(data), failed: [] };
   const now = deps.clock.now().toISOString();
   const text = renderDraft(
     {
@@ -102,37 +107,74 @@ export async function draft(
       `${weekStem(week)}.md already exists, so it was left as it is`,
     );
   }
-  const { problems } = await checkDraft(workspaceDir);
+  const checked = await checkDraft(workspaceDir);
+  const problems = withGateFailures(checked, failed);
   return { path, week, snapshot: id, problems, warnings };
+}
+
+/**
+ * Each team's blurb in the season's last published ranking before `week`,
+ * tags stripped. None before the first publish.
+ */
+async function lastBlurbs(
+  dir: string,
+  week: number,
+): Promise<LastBlurbs | undefined> {
+  const files = await readdir(dir).catch(() => [] as string[]);
+  const last = files
+    .map((name) => ({
+      name,
+      week: Number(/^week-(\d+)\.published\.md$/.exec(name)?.[1]),
+    }))
+    .filter((f) => f.week < week)
+    .sort((a, b) => b.week - a.week)[0];
+  if (!last) return undefined;
+  const ranking = parseRanking(
+    last.name,
+    await readFile(join(dir, last.name), "utf8"),
+  );
+  return {
+    week: last.week,
+    blurbs: Object.fromEntries(
+      ranking.entries.flatMap((e) =>
+        e.kind === "team" && e.blurb ? [[e.team, stripTags(e.blurb)]] : [],
+      ),
+    ),
+  };
 }
 
 /** Room for a league-week's blurbs and intro, with the model's thinking. */
 const MAX_TOKENS = 16000;
 
 /**
- * The LLM's first draft of the intro and every blurb, from the draft context
- * alone. A team or intro the reply leaves out keeps its stat line.
+ * The LLM's intro and blurbs through the LLM gate, from the draft context
+ * alone. A team or intro the first reply leaves out keeps its stat line.
  */
 async function llmProse(
   ctx: DraftContext,
   data: DraftData,
   key: string,
   deps: Deps,
-): Promise<DraftProse> {
+): Promise<{ prose: DraftProse; failed: FailedSection[] }> {
   const config =
     (await readConfig(deps)) ?? configSchema.parse({ format: CONFIG_FORMAT });
-  const reply = await deps.llm.write({
-    key,
-    model: config.model,
-    system: FIRST_DRAFT_SYSTEM,
-    prompt: firstDraftPrompt(ctx),
-    maxTokens: MAX_TOKENS,
+  const { written, failed } = await gatedProse(ctx, async (system, prompt) => {
+    const reply = await deps.llm.write({
+      key,
+      model: config.model,
+      system,
+      prompt,
+      maxTokens: MAX_TOKENS,
+    });
+    return reply.text;
   });
-  const written = readReply(reply.text, ctx);
   const fallback = statLines(data);
   return {
-    intro: written.intro ?? fallback.intro,
-    blurbs: { ...fallback.blurbs, ...written.teams },
+    prose: {
+      intro: written.intro ?? fallback.intro,
+      blurbs: { ...fallback.blurbs, ...written.teams },
+    },
+    failed,
   };
 }
 

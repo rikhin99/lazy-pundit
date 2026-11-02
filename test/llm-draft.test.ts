@@ -4,11 +4,18 @@ import { describe, expect, test } from "vitest";
 import {
   draft,
   draftData,
+  fileTransport,
   type LlmRequest,
+  publish,
   saveCredentials,
 } from "../src/index.ts";
 import { scriptedLlm } from "./support/llm.ts";
-import { committed, fearTheTurtle } from "./support/workspace.ts";
+import {
+  committed,
+  FIXTURES,
+  fearTheTurtle,
+  WEEKS,
+} from "./support/workspace.ts";
 
 const KEY = "sk-ant-api03-test-key";
 
@@ -134,6 +141,35 @@ describe("draft with an Anthropic key", () => {
     expect(result.problems).toEqual([]);
   });
 
+  test("last week's published blurb is in the prompt for that team, without its tags", async () => {
+    const week7 = await fearTheTurtle(7);
+    const first = await draft(week7.dir, week7.deps);
+    const drafted = await readFile(first.path, "utf8");
+    await writeFile(
+      first.path,
+      drafted.replace(
+        /(## Hail Mary Hustle \{team=sleeper:9\}\n)[^\n]*\n/,
+        "$1Still winless in spirit at [1-6]{ev=record}, and the schedule is no kinder.\n",
+      ),
+    );
+    await publish(week7.dir, week7.deps, { yes: true });
+    const llm = scriptedLlm(await week8Reply());
+    const deps = {
+      ...week7.deps,
+      transport: fileTransport(FIXTURES, WEEKS["8"] as string),
+      llm,
+      env: { ...week7.deps.env, anthropicApiKey: KEY },
+    };
+
+    await draft(week7.dir, deps);
+
+    const { prompt } = llm.requests[0] as LlmRequest;
+    expect(prompt).toMatch(
+      /### Hail Mary Hustle \(team id sleeper:9\)[^#]*Its blurb in the week 7 ranking[^\n]*\n[^\n]*Still winless in spirit at 1-6, and the schedule is no kinder\./,
+    );
+    expect(prompt).not.toContain("{ev=record}");
+  });
+
   test("a credentials file others can read gives a warning", async () => {
     const { dir, deps } = await withLlm(await week8Reply());
     delete deps.env.anthropicApiKey;
@@ -145,5 +181,130 @@ describe("draft with an Anthropic key", () => {
     expect(result.warnings).toEqual([
       `${path} can be read by other users on this machine (mode 0644). Run: chmod 600 ${path}`,
     ]);
+  });
+});
+
+const HUSTLE = "sleeper:9";
+
+/** Week 8's reply with the Hail Mary Hustle's blurb replaced. */
+async function withHustle(blurb: string): Promise<string> {
+  return (await week8Reply()).replace(
+    /(## \{team=sleeper:9\}\n)[^\n]*/,
+    `$1${blurb}`,
+  );
+}
+
+/** The part of a retry prompt that lists the sections to rewrite. */
+function toRewrite(req: LlmRequest | undefined): string {
+  const at = req?.prompt.indexOf("## Sections to rewrite") ?? -1;
+  expect(at).toBeGreaterThan(-1);
+  return (req as LlmRequest).prompt.slice(at);
+}
+
+describe("the LLM gate", () => {
+  test("a wrong claim twice, then a good one, passes on retry 2 with the complaints passed back", async () => {
+    const wrong = "Rock bottom at [2-6]{ev=record}.";
+    const { dir, deps, llm } = await withLlm(
+      await withHustle(wrong),
+      `## {team=${HUSTLE}}\n${wrong}`,
+      `## {team=${HUSTLE}}\nRock bottom at [1-7]{ev=record}.`,
+    );
+
+    const result = await draft(dir, deps);
+
+    expect(llm.requests).toHaveLength(3);
+    for (const req of llm.requests.slice(1)) {
+      const rewrite = toRewrite(req);
+      expect(rewrite).toContain("Hail Mary Hustle (team id sleeper:9)");
+      expect(rewrite).toContain(wrong);
+      expect(rewrite).toContain('"2-6" (cites record): wrong, record is 1-7');
+      expect(rewrite).not.toContain("team id sleeper:1)");
+      expect(rewrite).not.toContain("{intro}");
+    }
+    const text = await readFile(result.path, "utf8");
+    expect(text).toContain(
+      "## Hail Mary Hustle {team=sleeper:9}\nRock bottom at [1-7]{ev=record}.\n",
+    );
+    expect(text.match(/Steady as ever\./g)).toHaveLength(11);
+    expect(text).toMatch(/## Intro \{intro\}\nWhat a week\./);
+    expect(result.problems).toEqual([]);
+  });
+
+  test("prose that never passes is written as its best attempt, with its faults flagged as gate failures", async () => {
+    const { dir, deps, llm } = await withLlm(
+      await withHustle(
+        "Rock bottom at [2-6]{ev=record}, scoring [999]{ev=pf}.",
+      ),
+      `## {team=${HUSTLE}}\nStill rock bottom at [2-6]{ev=record}.`,
+      `## {team=${HUSTLE}}\nYes, rock bottom at [3-5]{ev=record}.`,
+    );
+
+    const result = await draft(dir, deps);
+
+    expect(llm.requests).toHaveLength(3);
+    const text = await readFile(result.path, "utf8");
+    expect(text).toContain(
+      "## Hail Mary Hustle {team=sleeper:9}\nStill rock bottom at [2-6]{ev=record}.\n",
+    );
+    expect(result.problems).toEqual([
+      expect.objectContaining({
+        team: HUSTLE,
+        section: "Hail Mary Hustle",
+        severity: "hard",
+        kind: "wrong",
+        text: "2-6",
+        id: "record",
+        gate: true,
+      }),
+    ]);
+  });
+
+  test("a word-list hit with swearing off fails the gate and is flagged in the best attempt", async () => {
+    const { dir, deps, llm } = await withLlm(
+      (await week8Reply()).replace("What a week.", "What a damn week."),
+      "## {intro}\nWhat a damn week, again.",
+    );
+
+    const result = await draft(dir, deps);
+
+    expect(llm.requests).toHaveLength(3);
+    expect(toRewrite(llm.requests[1])).toContain(
+      '"damn": on the word list, and swearing is off',
+    );
+    const text = await readFile(result.path, "utf8");
+    expect(text).toMatch(/## Intro \{intro\}\nWhat a damn week\. Week high/);
+    const line = text.split("\n").indexOf("## Intro {intro}") + 2;
+    expect(result.problems).toEqual([
+      {
+        team: null,
+        section: "Intro",
+        severity: "soft",
+        line,
+        text: "damn",
+        kind: "swear",
+        reason: "on the word list, and swearing is off",
+        gate: true,
+      },
+    ]);
+  });
+
+  test("an uncited claim fails the gate, and a retry that leaves the section out keeps it failing", async () => {
+    const { dir, deps, llm } = await withLlm(
+      await withHustle("Lost again, now 1-7 on the year."),
+      "## {intro}\nNot asked for.",
+    );
+
+    const result = await draft(dir, deps);
+
+    expect(llm.requests).toHaveLength(3);
+    expect(toRewrite(llm.requests[1])).toContain(
+      '"1-7": no citation; it matches record (record is 1-7), so cite that',
+    );
+    expect(toRewrite(llm.requests[2])).toContain("Lost again, now 1-7");
+    const text = await readFile(result.path, "utf8");
+    expect(text).not.toContain("Not asked for.");
+    // Written as the LLM wrote it; check then cites the claim it matches.
+    expect(text).toContain("Lost again, now [1-7]{ev=record} on the year.");
+    expect(result.problems).toEqual([]);
   });
 });

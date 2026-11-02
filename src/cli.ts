@@ -56,8 +56,9 @@ function printProblems(problems: Problem[]): void {
   for (const p of problems) {
     const mark = p.severity === "hard" ? "✗" : "·";
     const cause = p.cause ? `, after a ${p.cause}` : "";
+    const gate = p.gate ? ", gate failure" : "";
     console.log(
-      `  ${mark} line ${p.line} ${p.section}: "${p.text}" ${KINDS[p.kind]}${cause}: ${p.reason}`,
+      `  ${mark} line ${p.line} ${p.section}: "${p.text}" ${KINDS[p.kind]}${cause}${gate}: ${p.reason}`,
     );
   }
 }

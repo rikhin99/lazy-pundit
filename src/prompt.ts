@@ -1,5 +1,7 @@
+import { SWEAR_REASON } from "./check.ts";
 import type { DraftContext, Persona } from "./draft-context.ts";
 import type { TeamId } from "./league.ts";
+import type { FailedSection, GateFaults } from "./llm-gate.ts";
 import type { EvidenceValue } from "./validator/types.ts";
 
 /**
@@ -48,9 +50,16 @@ export function firstDraftPrompt(ctx: DraftContext): string {
   const teams = ctx.teams.map((t) => {
     const by =
       t.managers.length > 0 ? `, managed by ${t.managers.join(" and ")}` : "";
+    const last = ctx.lastBlurbs?.blurbs[t.id];
     return [
       `### ${t.name} (team id ${t.id})${by}`,
       ...lines(ctx.evidence.teams[t.id] ?? {}),
+      ...(last
+        ? [
+            `Its blurb in the week ${ctx.lastBlurbs?.week} ranking, for continuity only. Its facts are from then: don't repeat them as this week's.`,
+            last,
+          ]
+        : []),
     ].join("\n");
   });
 
@@ -66,6 +75,53 @@ export function firstDraftPrompt(ctx: DraftContext): string {
     "## Teams",
     teams.join("\n\n"),
   ].join("\n");
+}
+
+/**
+ * A retry after the LLM gate: the first draft's material, then each failing
+ * section as it was written with the validator's complaints, asking for
+ * those sections alone.
+ */
+export function rewritePrompt(
+  ctx: DraftContext,
+  failing: FailedSection[],
+): string {
+  const names = new Map(ctx.teams.map((t) => [t.id, t.name]));
+  const sections = failing.map((f) => {
+    const which =
+      f.key === "intro"
+        ? "The week intro, section {intro}"
+        : `${names.get(f.key)} (team id ${f.key}), section {team=${f.key}}`;
+    return [
+      `### ${which}`,
+      "You wrote:",
+      f.text,
+      "The check found:",
+      ...complaints(f).map((c) => `- ${c}`),
+    ].join("\n");
+  });
+  return [
+    firstDraftPrompt(ctx),
+    "",
+    "## Sections to rewrite",
+    "Your draft's other sections passed the check. These didn't. Rewrite each one so every claim is cited and matches its evidence, keeping to the persona, and reply with only these sections in the reply format.",
+    "",
+    sections.join("\n\n"),
+  ].join("\n");
+}
+
+/** Each fault in a section, as the LLM is told it on a retry. */
+function complaints(f: GateFaults): string[] {
+  return [
+    ...f.claims.map((c) => {
+      if (c.tagged)
+        return `"${c.text}" (cites ${c.id}): ${c.status}, ${c.reason}`;
+      return c.status === "verified" && c.id
+        ? `"${c.text}": no citation; it matches ${c.id} (${c.reason}), so cite that`
+        : `"${c.text}": no citation, and ${c.reason}`;
+    }),
+    ...f.swears.map((s) => `"${s.word}": ${SWEAR_REASON}`),
+  ];
 }
 
 /** The persona as instructions. */
