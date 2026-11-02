@@ -8,14 +8,19 @@ export class WorkspaceFileError extends Error {
 }
 
 /**
+ * The front-matter key a workspace file carries its version under: `format`,
+ * or the file's own name for it (`league.md`'s `league`, `lore.md`'s `lore`).
+ */
+export type VersionKey = "format" | "league" | "lore";
+
+/**
  * Splits a Markdown file into its YAML front matter and body, refusing any
- * file whose version (`format`, or the key the file names it by, such as
- * `league.md`'s `league`) isn't the one this build reads.
+ * file whose version, under `versionKey`, isn't the one this build reads.
  */
 export function readFrontMatter(
   file: string,
   text: string,
-  versionKey = "format",
+  versionKey: VersionKey,
 ): { data: Record<string, unknown>; body: string; bodyLine: number } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
   if (!match) {

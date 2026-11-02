@@ -1,18 +1,19 @@
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { readFrontMatter } from "./front-matter.ts";
+import { readFrontMatter, type VersionKey } from "./front-matter.ts";
 
 /**
  * Writes a workspace Markdown file. Refuses text whose front matter lacks this
- * build's format version, so every file the tool writes can be read back.
- * With `exclusive`, an existing file is left alone and EEXIST is thrown.
+ * build's version under `versionKey` (`format` unless the file names its own,
+ * such as `league.md`'s `league`), so every file the tool writes can be read
+ * back. With `exclusive`, an existing file is left alone and EEXIST is thrown.
  */
 export async function writeWorkspaceFile(
   path: string,
   text: string,
-  opts: { exclusive?: boolean } = {},
+  opts: { exclusive?: boolean; versionKey?: VersionKey } = {},
 ): Promise<void> {
-  readFrontMatter(basename(path), text);
+  readFrontMatter(basename(path), text, opts.versionKey ?? "format");
   await writeFile(path, text, opts.exclusive ? { flag: "wx" } : {});
 }
 

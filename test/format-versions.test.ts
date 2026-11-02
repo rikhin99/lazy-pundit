@@ -18,6 +18,10 @@ import { workspaceSchema } from "../src/workspace.ts";
  * schemas' JSON Schema. A schema change fails here until its version is bumped
  * and the new version's hash is added. Released entries are never edited:
  * a file written by that version must still be recognised by its number.
+ * A version is released once a git tag contains it; until then (no tags yet,
+ * so FORMAT 1 today) replace its hash rather than bumping.
+ * Keep these schemas convertible to JSON Schema: no `.transform()`. Parse a
+ * value in a helper and check it with `.refine()`, as persona.ts's length does.
  */
 const RECORDED = {
   FORMAT: {

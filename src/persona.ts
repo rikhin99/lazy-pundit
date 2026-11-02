@@ -203,7 +203,11 @@ export async function loadPersona(
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     return { persona: BROADCAST, warnings: [] };
   }
-  const { data, body, bodyLine } = readFrontMatter("persona.md", text);
+  const { data, body, bodyLine } = readFrontMatter(
+    "persona.md",
+    text,
+    "format",
+  );
   const parsed = personaSchema.safeParse(data);
   if (!parsed.success) {
     throw new WorkspaceFileError(

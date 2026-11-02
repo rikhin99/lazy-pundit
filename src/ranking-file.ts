@@ -123,7 +123,7 @@ const TAGGED = /^(.*?)\s*\{([^{}]*)\}$/;
 
 /** Reads a ranking file, refusing an unknown format version. */
 export function parseRanking(file: string, text: string): RankingFile {
-  const { data, body, bodyLine } = readFrontMatter(file, text);
+  const { data, body, bodyLine } = readFrontMatter(file, text, "format");
   const meta = metaSchema.safeParse(data);
   if (!meta.success) {
     throw new WorkspaceFileError(`${file}: ${z.prettifyError(meta.error)}`);

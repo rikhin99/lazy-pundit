@@ -39,7 +39,7 @@ export async function readWorkspace(dir: string): Promise<Workspace> {
   } catch (cause) {
     throw new WorkspaceFileError(`No workspace.md in ${dir}`, { cause });
   }
-  const { data } = readFrontMatter("workspace.md", text);
+  const { data } = readFrontMatter("workspace.md", text, "format");
   const parsed = workspaceSchema.safeParse(data);
   if (!parsed.success) {
     throw new WorkspaceFileError(
