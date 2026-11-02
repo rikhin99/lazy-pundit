@@ -115,9 +115,19 @@ export function snapshotsDir(ws: Workspace): string {
   return join(ws.dir, ".snapshots");
 }
 
+/** The pundit's own folder: their persona and their rankings by season. */
+export function punditDir(ws: Workspace): string {
+  return join(ws.dir, "pundits", ws.pundit);
+}
+
 /** The folder holding the pundit's ranking files for the season. */
 export function rankingsDir(ws: Workspace): string {
-  return join(ws.dir, "pundits", ws.pundit, ws.season.year);
+  return join(punditDir(ws), ws.season.year);
+}
+
+/** The latest season's shared folder, holding its `league.md`. */
+export function seasonDir(ws: Workspace): string {
+  return join(ws.dir, "seasons", ws.season.year);
 }
 
 /** `week-08` */

@@ -54,6 +54,10 @@ _Avoid_: Voice, tone (for the whole thing)
 A named, ready-made persona: a set of tone-control values plus a short style note. A pundit picks one and can override any part of it.
 _Avoid_: Template, standard persona
 
+**Preset sample**:
+A short, fixed blurb written in one preset's voice, shown so a pundit can hear a preset before picking it. It is the same for every league and is never written by the LLM.
+_Avoid_: Example blurb, sample persona
+
 **Tone control**:
 One dial on a persona: swearing (off, mild, on), teasing (none, light, roast) or formality (formal, casual, unhinged).
 
@@ -61,7 +65,7 @@ One dial on a persona: swearing (off, mild, on), teasing (none, light, roast) or
 The free text in a persona that describes the voice beyond the tone controls. It may name lore sections or managers but never copies lore.
 
 **Family league**:
-A league setting saying that people of any age may read what is published. While it is on, personas are held to no swearing and light teasing unless a pundit deliberately relaxes their own persona. A relaxed persona has no limit, and the tool flags it on every load and asks the pundit to confirm before publishing with it for the first time. It belongs to the league workspace, not to lore or a persona.
+A league setting saying that people of any age may read what is published. While it is on, a persona that asks for more is lowered to no swearing and at most light teasing, with a warning, unless the pundit deliberately relaxes their own persona. A relaxed persona has no limit: the tool flags it on every load and asks the pundit to confirm before publishing with it the first time and whenever the persona changes. It is set per season, alongside the stakes, and belongs to the league workspace, not to lore or a persona.
 
 **Blurb shape**:
 Whether a persona writes a team's blurb as prose or as bullets, and about how long it is. The validator treats each bullet like a sentence.

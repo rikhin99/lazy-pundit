@@ -22,6 +22,8 @@ const ENFORCED = [
   "voice",
   "tone",
   "standard persona",
+  "example blurb",
+  "sample persona",
   "playoff odds",
   "magic number",
   "in the hunt",

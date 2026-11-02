@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { checkDraft, type Problem, withGateFailures } from "./check.ts";
 import {
@@ -19,7 +19,8 @@ import { type DraftData, draftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
 import { type CallSetup, LlmStopped, llmAsk } from "./llm-call.ts";
 import { type FailedSection, type GatedProse, gatedProse } from "./llm-gate.ts";
-import { type DraftProse, parseRanking, renderDraft } from "./ranking-file.ts";
+import { loadPersona, type Persona, personaRecord } from "./persona.ts";
+import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
 import { fetchSleeperSnapshot } from "./sleeper/fetcher.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
@@ -76,11 +77,14 @@ export async function draft(
   const path = join(dir, `${weekStem(week)}.md`);
   const order = startingOrder(league, week);
   const data = draftData(league, week);
-  const { anthropicApiKey, warnings } = await loadCredentials(deps);
+  const { anthropicApiKey, warnings: credentialWarnings } =
+    await loadCredentials(deps);
+  const { persona, warnings: personaWarnings } = await loadPersona(ws, league);
+  const warnings = [...credentialWarnings, ...personaWarnings];
   const began = deps.clock.now();
   const { prose, failed, fallback } = anthropicApiKey
     ? await llmProse(
-        draftContext(league, data, await lastBlurbs(dir, week)),
+        draftContext(league, data, persona, await lastBlurbs(dir, week)),
         data,
         {
           deps,
@@ -89,7 +93,7 @@ export async function draft(
         },
       )
     : {
-        prose: statLines(data),
+        prose: statLines(data, persona),
         failed: [],
         fallback: `No Anthropic key, so the LLM didn't run: set ANTHROPIC_API_KEY, or add anthropic_api_key to ${credentialsPath(deps)}${STAT_LINES}`,
       };
@@ -104,6 +108,7 @@ export async function draft(
       snapshot: id,
       data_hash: dataHash(league, week),
       starting_order: order,
+      persona: personaRecord(persona),
       created_at: now,
     },
     league,
@@ -139,23 +144,12 @@ async function lastBlurbs(
   dir: string,
   week: number,
 ): Promise<LastBlurbs | undefined> {
-  const files = await readdir(dir).catch(() => [] as string[]);
-  const last = files
-    .map((name) => ({
-      name,
-      week: Number(/^week-(\d+)\.published\.md$/.exec(name)?.[1]),
-    }))
-    .filter((f) => f.week < week)
-    .sort((a, b) => b.week - a.week)[0];
+  const last = await lastPublished(dir, week);
   if (!last) return undefined;
-  const ranking = parseRanking(
-    last.name,
-    await readFile(join(dir, last.name), "utf8"),
-  );
   return {
     week: last.week,
     blurbs: Object.fromEntries(
-      ranking.entries.flatMap((e) =>
+      last.ranking.entries.flatMap((e) =>
         e.kind === "team" && e.blurb ? [[e.team, stripTags(e.blurb)]] : [],
       ),
     ),
@@ -186,7 +180,7 @@ async function llmProse(
   const config =
     (await readConfig(setup.deps)) ??
     configSchema.parse({ format: CONFIG_FORMAT });
-  const lines = statLines(data);
+  const lines = statLines(data, ctx.persona);
   let gated: GatedProse;
   try {
     gated = await gatedProse(ctx, llmAsk({ ...setup, config }));
@@ -211,10 +205,13 @@ async function llmProse(
   };
 }
 
-/** A new draft's prose without an LLM: the league stat line and each team's stat line. */
-function statLines(data: DraftData): DraftProse {
+/**
+ * A new draft's prose without an LLM: the league stat line (unless the
+ * persona turns the week intro off) and each team's stat line.
+ */
+function statLines(data: DraftData, persona: Persona): DraftProse {
   return {
-    intro: data.intro,
+    intro: persona.intro ? data.intro : "",
     blurbs: Object.fromEntries(
       Object.entries(data.teams).map(([id, t]) => [id, t.statLine]),
     ),

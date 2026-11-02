@@ -13,6 +13,7 @@ import {
   draft,
   FetchError,
   findWorkspace,
+  type PersonaRecord,
   type Problem,
   publish,
   systemDeps,
@@ -76,23 +77,36 @@ function report(problems: Problem[]): void {
 }
 
 /**
- * Publish anyway / Back to editing, defaulting to Back to editing. Closed
- * input, as in a script, is Back to editing too.
+ * Asks `question` and says whether the answer matches `yes`. Anything else,
+ * including closed input as in a script, is the default answer: false.
  */
-async function confirmPublish(): Promise<boolean> {
+async function ask(question: string, yes: RegExp): Promise<boolean> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const closed = new Promise<string>((resolve) =>
     rl.once("close", () => resolve("")),
   );
   try {
-    const answer = await Promise.race([
-      rl.question("Publish anyway, or Back to editing? [p/B] "),
-      closed,
-    ]);
-    return /^p(ublish)?( anyway)?$/i.test(answer.trim());
+    const answer = await Promise.race([rl.question(question), closed]);
+    return yes.test(answer.trim());
   } finally {
     rl.close();
   }
+}
+
+/** Publish anyway / Back to editing, defaulting to Back to editing. */
+function confirmPublish(): Promise<boolean> {
+  return ask(
+    "Publish anyway, or Back to editing? [p/B] ",
+    /^p(ublish)?( anyway)?$/i,
+  );
+}
+
+/** Publish with a relaxed family-league persona, defaulting to No. */
+function confirmRelaxed(persona: PersonaRecord): Promise<boolean> {
+  console.log(
+    `The family league is on, and this draft's persona relaxes it: swearing ${persona.swearing}, teasing ${persona.teasing}.`,
+  );
+  return ask("Publish with it? [y/N] ", /^y(es)?$/i);
 }
 
 program
@@ -126,7 +140,10 @@ program
 program
   .command("publish")
   .description("Check and freeze the latest draft and write the plain text.")
-  .option("-y, --yes", "publish even with hard problems, without asking")
+  .option(
+    "-y, --yes",
+    "publish even with hard problems or a relaxed family-league persona, without asking",
+  )
   .action(async (opts) => {
     let asked = false;
     const deps = systemDeps();
@@ -138,9 +155,14 @@ program
         printProblems(hard);
         return confirmPublish();
       },
+      confirmRelaxed,
     });
     if (!result.published) {
-      console.log("Back to editing; nothing was published.");
+      console.log(
+        result.stoppedBy === "relaxed"
+          ? "Not published, so nothing was written. Publish again to confirm, or lower the persona in persona.md and draft again."
+          : "Back to editing; nothing was published.",
+      );
       process.exitCode = 1;
       return;
     }

@@ -1,7 +1,8 @@
 import { SWEAR_REASON } from "./check.ts";
-import type { DraftContext, Persona } from "./draft-context.ts";
+import type { DraftContext } from "./draft-context.ts";
 import type { TeamId } from "./league.ts";
 import type { FailedSection, GateFaults } from "./llm-gate.ts";
+import { type Persona, PRESETS } from "./persona.ts";
 import type { EvidenceValue } from "./validator/types.ts";
 
 /**
@@ -9,7 +10,7 @@ import type { EvidenceValue } from "./validator/types.ts";
  * say and the reply format. It holds nothing about the league, so it stays
  * the same from call to call.
  */
-export const FIRST_DRAFT_SYSTEM = `You write the blurbs for a fantasy football league's weekly power ranking: one short blurb per team, plus a week intro about the whole league. A pundit in the league edits your draft, decides the order and publishes it to the league's group chat.
+export const FIRST_DRAFT_SYSTEM = `You write the blurbs for a fantasy football league's weekly power ranking: one short blurb per team, plus a week intro about the whole league unless the persona turns it off. A pundit in the league edits your draft, decides the order and publishes it to the league's group chat.
 
 Claims must be cited
 - A claim is any checkable statement of fact: a number, a score, a record, a rank, a streak, a result ("beat", "lost to"), a margin, a player's points, or a superlative ("the league's top scorer", "worst defence").
@@ -32,7 +33,7 @@ Reading the evidence
 Reply format
 Reply with nothing but the sections below, each a heading line then its text, in any order:
 ## {intro}
-<the week intro>
+<the week intro, left out with its heading when the persona turns it off>
 ## {team=<team id>}
 <that team's blurb>
 Write one section for every team listed, using its team id exactly as given.`;
@@ -141,11 +142,29 @@ function personaInstructions(p: Persona): string {
     casual: "Keep it conversational.",
     unhinged: "Go as wild as you like.",
   }[p.formality];
+  const what = p.intro ? "each blurb and the intro" : "each blurb";
+  const count =
+    p.length.min === p.length.max
+      ? `${p.length.min}`
+      : `${p.length.min} to ${p.length.max}`;
   const shape =
     p.shape === "prose"
-      ? `Write each blurb and the intro as prose, ${p.length.min} to ${p.length.max} sentences.`
-      : `Write each blurb and the intro as ${p.length.min} to ${p.length.max} bullets, each starting "- ".`;
-  return [p.styleNote, swearing, teasing, formality, shape].join(" ");
+      ? `Write ${what} as prose, ${count} sentences.`
+      : `Write ${what} as ${count} bullets, each starting "- ".`;
+  const intro = p.intro
+    ? ""
+    : "Write no week intro: leave out the {intro} section.";
+  return [
+    PRESETS[p.preset].styleNote,
+    p.styleNote,
+    swearing,
+    teasing,
+    formality,
+    shape,
+    intro,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /** The blurbs and intro a reply holds, by section. */
@@ -158,8 +177,9 @@ const SECTION = /^##\s*\{(intro|team=([^}\s]+))\}\s*$/;
 
 /**
  * Reads a reply in the format the prompt asks for. Text before the first
- * heading, a team that isn't in the league and an empty section are dropped;
- * when a section comes twice, the first stands.
+ * heading, a team that isn't in the league, an intro the persona turns off
+ * and an empty section are dropped; when a section comes twice, the first
+ * stands.
  */
 export function readReply(text: string, ctx: DraftContext): WrittenProse {
   const known = new Set<string>(ctx.teams.map((t) => t.id));
@@ -173,8 +193,9 @@ export function readReply(text: string, ctx: DraftContext): WrittenProse {
   for (const { key, lines } of sections) {
     const body = lines.join("\n").trim();
     if (!body) continue;
-    if (key === "intro") written.intro ??= body;
-    else if (known.has(key)) written.teams[key as TeamId] ??= body;
+    if (key === "intro") {
+      if (ctx.persona.intro) written.intro ??= body;
+    } else if (known.has(key)) written.teams[key as TeamId] ??= body;
   }
   return written;
 }

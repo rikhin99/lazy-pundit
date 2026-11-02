@@ -9,11 +9,13 @@ export class WorkspaceFileError extends Error {
 
 /**
  * Splits a Markdown file into its YAML front matter and body, refusing any
- * file whose `format` isn't the one this build reads.
+ * file whose version (`format`, or the key the file names it by, such as
+ * `league.md`'s `league`) isn't the one this build reads.
  */
 export function readFrontMatter(
   file: string,
   text: string,
+  versionKey = "format",
 ): { data: Record<string, unknown>; body: string; bodyLine: number } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
   if (!match) {
@@ -31,11 +33,12 @@ export function readFrontMatter(
     throw new WorkspaceFileError(`${file}: the front matter isn't a mapping`);
   }
   const record = data as Record<string, unknown>;
-  if (record.format !== FORMAT) {
+  const version = record[versionKey];
+  if (version !== FORMAT) {
     throw new WorkspaceFileError(
-      record.format === undefined
-        ? `${file} has no format version; this version of Lazy Pundit reads format ${FORMAT}`
-        : `${file} is format ${String(record.format)}, but this version of Lazy Pundit reads only format ${FORMAT}`,
+      version === undefined
+        ? `${file} has no ${versionKey} version; this version of Lazy Pundit reads ${versionKey} ${FORMAT}`
+        : `${file} is ${versionKey} ${String(version)}, but this version of Lazy Pundit reads only ${versionKey} ${FORMAT}`,
     );
   }
   const bodyLine = match[0].split("\n").length;

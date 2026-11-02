@@ -86,9 +86,6 @@ export interface CheckedDraft extends CheckResult {
   league: League;
 }
 
-/** Swearing is allowed until a persona sets it (#54), so the word list doesn't run yet. */
-const SWEARING_ALLOWED = "on" as const;
-
 /** Reads, checks and auto-tags the latest draft in the workspace's season. */
 export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
   const ws = await readWorkspace(workspaceDir);
@@ -150,7 +147,8 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
       order,
       nicknames,
       sections: { lore: [], stakes: [], log: [] },
-      swearing: SWEARING_ALLOWED,
+      // The persona the draft was written in, not today's persona.md.
+      swearing: ranking.meta.persona.swearing,
       before: { order: startingOrder },
     });
     const at = {
@@ -218,10 +216,9 @@ function byHardThenLine(a: Problem, b: Problem): number {
 
 /**
  * A new draft's problems list with each fault of prose that never passed the
- * LLM gate marked as a gate failure. A claim the check lists is marked where
- * it stands; a word-list hit, which the check doesn't look for until the
- * persona sets swearing (#54), joins the list. A claim the check auto-tagged
- * now cites its evidence and is verified, so it isn't one.
+ * LLM gate marked as a gate failure where the check lists it: a claim by its
+ * text, a word-list hit by its word. A claim the check auto-tagged now cites
+ * its evidence and is verified, so it isn't one.
  */
 export function withGateFailures(
   checked: CheckedDraft,
@@ -229,48 +226,17 @@ export function withGateFailures(
 ): Problem[] {
   if (failed.length === 0) return checked.problems;
   const team = (key: SectionKey) => (key === "intro" ? null : key);
-  const problems = checked.problems.map((p) =>
+  return checked.problems.map((p) =>
     failed.some(
-      (f) => team(f.key) === p.team && f.claims.some((c) => c.text === p.text),
+      (f) =>
+        team(f.key) === p.team &&
+        (p.kind === "swear"
+          ? f.swears.some((w) => w.word === p.text)
+          : f.claims.some((c) => c.text === p.text)),
     )
       ? { ...p, gate: true as const }
       : p,
   );
-  for (const f of failed) {
-    const start = sectionStart(checked.ranking, team(f.key));
-    if (start === undefined) continue;
-    const line = checked.text.slice(0, start).split("\n").length;
-    const section =
-      f.key === "intro"
-        ? "Intro"
-        : (checked.league.teams.find((t) => t.id === f.key)?.name ?? f.key);
-    for (const w of f.swears) {
-      problems.push({
-        team: team(f.key),
-        section,
-        severity: "soft",
-        // Auto-tags never add a line, so the line holds in the checked text.
-        line: line + f.text.slice(0, w.start).split("\n").length - 1,
-        text: w.word,
-        kind: "swear",
-        reason: SWEAR_REASON,
-        gate: true,
-      });
-    }
-  }
-  return problems.sort(byHardThenLine);
-}
-
-/** Where a section's text starts in the ranking file. */
-function sectionStart(
-  ranking: RankingFile,
-  team: TeamId | null,
-): number | undefined {
-  if (team === null) return ranking.introStart;
-  const entry = ranking.entries.find(
-    (e) => e.kind === "team" && e.team === team,
-  );
-  return entry?.kind === "team" ? entry.blurbStart : undefined;
 }
 
 /** Each team's place and group, read from the draft's current order. */

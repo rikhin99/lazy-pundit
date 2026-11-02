@@ -1,7 +1,10 @@
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { checkDraft, type Problem } from "./check.ts";
 import type { Deps } from "./deps.ts";
+import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
+import { lastPublished } from "./ranking-file.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -12,6 +15,12 @@ export interface PublishOptions {
    * false is Back to editing. With no one to ask, it's Back to editing.
    */
   confirm?: (hard: Problem[]) => Promise<boolean>;
+  /**
+   * Asked when the draft's persona relaxes the family league and differs from
+   * the persona of the last ranking published (or none was): true publishes.
+   * With no one to ask, it's No. `yes` skips it too.
+   */
+  confirmRelaxed?: (persona: PersonaRecord) => Promise<boolean>;
 }
 
 export type PublishResult =
@@ -30,8 +39,10 @@ export type PublishResult =
       problems: Problem[];
     }
   | {
-      /** Back to editing: the draft had hard problems and nothing was written. */
+      /** Nothing was written. */
       published: false;
+      /** Hard problems, or a relaxed persona the pundit didn't confirm. */
+      stoppedBy: "hard" | "relaxed";
       week: number;
       problems: Problem[];
     };
@@ -52,7 +63,18 @@ export async function publish(
 
   const hard = problems.filter((p) => p.severity === "hard");
   if (hard.length > 0 && !opts.yes && !(await opts.confirm?.(hard))) {
-    return { published: false, week, problems };
+    return { published: false, stoppedBy: "hard", week, problems };
+  }
+  const { persona } = checked.ranking.meta;
+  if (persona.family_league_relaxed && !opts.yes) {
+    // This week's own frozen copy counts, so a republish isn't asked again.
+    const last = await lastPublished(dir, week + 1);
+    const unchanged =
+      last !== undefined &&
+      isDeepStrictEqual(last.ranking.meta.persona, persona);
+    if (!unchanged && !(await opts.confirmRelaxed?.(persona))) {
+      return { published: false, stoppedBy: "relaxed", week, problems };
+    }
   }
 
   const publishedPath = join(dir, `${stem}.published.md`);

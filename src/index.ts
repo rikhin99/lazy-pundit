@@ -51,6 +51,13 @@ export type {
 } from "./league.ts";
 export { BENCH, isStarter } from "./league.ts";
 export { bestLineupPoints } from "./lineup.ts";
+export {
+  type Persona,
+  type PersonaRecord,
+  PRESETS,
+  type Preset,
+  type PresetName,
+} from "./persona.ts";
 export { type PublishOptions, type PublishResult, publish } from "./publish.ts";
 export { RankingFileError } from "./ranking-file.ts";
 export {

@@ -1,33 +1,7 @@
 import type { DraftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
-import type { EvidencePack, Swearing } from "./validator/types.ts";
-
-/**
- * The persona LLM prose is written in. Until `persona.md` exists (#54), every
- * draft uses the Broadcast preset.
- */
-export interface Persona {
-  preset: "Broadcast";
-  swearing: Swearing;
-  teasing: "none" | "light" | "roast";
-  formality: "formal" | "casual" | "unhinged";
-  shape: "prose" | "bullets";
-  /** How long a blurb runs, in sentences (or bullets). */
-  length: { min: number; max: number };
-  /** The preset's own style note. */
-  styleNote: string;
-}
-
-export const BROADCAST: Persona = {
-  preset: "Broadcast",
-  swearing: "off",
-  teasing: "light",
-  formality: "formal",
-  shape: "prose",
-  length: { min: 2, max: 3 },
-  styleNote:
-    "A studio host calling the week: crisp, confident and even-handed, with the odd dry line.",
-};
+import type { Persona } from "./persona.ts";
+import type { EvidencePack } from "./validator/types.ts";
 
 /**
  * Everything the LLM may be told about a league-week, gathered once when a
@@ -64,6 +38,7 @@ export interface LastBlurbs {
 export function draftContext(
   league: League,
   data: DraftData,
+  persona: Persona,
   lastBlurbs?: LastBlurbs,
 ): DraftContext {
   return {
@@ -76,7 +51,7 @@ export function draftContext(
       managers: t.managers.map((m) => m.displayName),
     })),
     evidence: data.evidence,
-    persona: BROADCAST,
+    persona,
     ...(lastBlurbs ? { lastBlurbs } : {}),
   };
 }

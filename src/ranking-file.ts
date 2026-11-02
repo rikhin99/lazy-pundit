@@ -1,3 +1,5 @@
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
 import {
   readFrontMatter,
@@ -5,6 +7,7 @@ import {
   writeFrontMatter,
 } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
+import { personaRecordSchema } from "./persona.ts";
 
 /**
  * A ranking file: a draft (`week-NN.md`) or its frozen copy
@@ -51,6 +54,8 @@ export const metaSchema = z.object({
   /** The data hash of the snapshot through the ranking week (`dataHash`). */
   data_hash: z.string().regex(/^[0-9a-f]{64}$/),
   starting_order: z.array(z.string()),
+  /** The persona the draft was written in. */
+  persona: personaRecordSchema,
   created_at: z.string(),
 });
 
@@ -65,6 +70,27 @@ export class RankingFileError extends WorkspaceFileError {
     super(`${file}:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
     this.problems = problems;
   }
+}
+
+/**
+ * The season's last published ranking (`week-NN.published.md`) of a week
+ * before `before`, or none before the first publish.
+ */
+export async function lastPublished(
+  dir: string,
+  before: number,
+): Promise<{ week: number; ranking: RankingFile } | undefined> {
+  const files = await readdir(dir).catch(() => [] as string[]);
+  const last = files
+    .map((name) => ({
+      name,
+      week: Number(/^week-(\d+)\.published\.md$/.exec(name)?.[1]),
+    }))
+    .filter((f) => f.week < before)
+    .sort((a, b) => b.week - a.week)[0];
+  if (!last) return undefined;
+  const text = await readFile(join(dir, last.name), "utf8");
+  return { week: last.week, ranking: parseRanking(last.name, text) };
 }
 
 /** What a new draft's sections hold: the week intro and each team's blurb. */
