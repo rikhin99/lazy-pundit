@@ -19,6 +19,7 @@ Read this before opening source files. It says which file owns what, so you can 
 | `workspace.ts` | `workspace.md`, season folders, file naming | `readWorkspace`, `rankingsDir`, `snapshotsDir`, `weekStem` |
 | `front-matter.ts`, `workspace-files.ts` | Front matter with the FORMAT version; writing workspace files and outputs | `readFrontMatter`, `writeWorkspaceFile`, `writeOutput` |
 | `cache.ts` | The person-level cache (players file) | `readCacheEntry`, `writeCacheEntry` |
+| `sleeper/api.ts` | Sleeper's API base and players URLs | `SLEEPER_API`, `SLEEPER_PLAYERS_URL` |
 | `sleeper/fetcher.ts` | Fetching every Sleeper payload into a snapshot | `fetchSleeperSnapshot` |
 | `snapshot.ts` (300) | Snapshot manifest and blobs on disk | `readSnapshot`, `readManifest`, `readBlob` |
 | `sleeper/normalizer.ts` (470) | Sleeper payloads → the platform-neutral `League` | `normalizeSleeper` |
@@ -38,7 +39,7 @@ Read this before opening source files. It says which file owns what, so you can 
 | `validator/extract.ts` (440) | Splitting text into units and finding claim shapes | `units` |
 | `validator/judge.ts` (325) | Deciding each claim's status and reason | `judge` |
 | `validator/evidence.ts` | Resolving an evidence ID; whether words agree with a fact | `resolve`, `agrees` |
-| `validator/tags.ts`, `names.ts`, `numbers.ts`, `swears.ts` | Tag syntax and auto-tag writing, team-name matching, number words, the word list | `TAG`, `stripTags`, `applyAutoTags` (re-exported by `validator.ts`) |
+| `validator/tags.ts`, `validator/names.ts`, `validator/numbers.ts`, `validator/swears.ts` | Tag syntax and auto-tag writing, team-name matching, number words, the word list | `TAG`, `stripTags`, `applyAutoTags` (re-exported by `validator.ts`) |
 
 ## Tests (`test/`)
 
