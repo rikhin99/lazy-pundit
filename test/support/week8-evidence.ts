@@ -8,7 +8,7 @@ import type {
 /**
  * Fear The Turtle 2025 through week 8, as the evidence pack will hold it.
  * Hand-checked against the committed week-8 snapshot (`npm run fixture:show
- * -- 8 rosters`, `-- 8 matchups/8`): records, points for and against and the
+ * -- 8 --model`): records, points for and against and the
  * week-8 scores come straight from the payloads; all-play, luck, form, ranks
  * and streaks were worked out by hand in the grounding prototype from the
  * same weeks. Team names and managers are the scrubbed fakes.

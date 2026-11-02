@@ -7,6 +7,7 @@ import {
   type ValidationResult,
   validate,
 } from "../src/index.ts";
+import { CLAIM_HEAVY, PLAIN_PROSE } from "./support/plain-prose.ts";
 import { blurb, corrected, week8Evidence } from "./support/week8-evidence.ts";
 
 /** What the pundit sees per claim: its text and status. */
@@ -785,4 +786,40 @@ test("plain 'new' about a new team is verified", () => {
     ["new", "verified", "move"],
   ]);
   expect(only(2, "A new high for the bench.", { order })).toEqual([]);
+});
+
+describe("invariants over a corpus", () => {
+  const TEAMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, null];
+
+  test.each(PLAIN_PROSE)(
+    "no false hard problem, in any section: %s",
+    (text) => {
+      for (const team of TEAMS) {
+        const hard = validate(blurb(team, text)).claims.filter((c) =>
+          isHard(c.status),
+        );
+        expect(hard, `section ${team}`).toEqual([]);
+      }
+    },
+  );
+
+  const isWord = (ch: string | undefined) => !!ch && /\w/.test(ch);
+
+  test.each([...PLAIN_PROSE, ...CLAIM_HEAVY])(
+    "every auto-tag sits on word boundaries, in any section: %s",
+    (text) => {
+      for (const team of TEAMS) {
+        for (const t of validate(blurb(team, text)).autoTags) {
+          const where = `section ${team}, ${text.slice(t.start, t.end)}`;
+          expect(
+            isWord(text[t.start - 1]) && isWord(text[t.start]),
+            where,
+          ).toBe(false);
+          expect(isWord(text[t.end - 1]) && isWord(text[t.end]), where).toBe(
+            false,
+          );
+        }
+      }
+    },
+  );
 });

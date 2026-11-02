@@ -4,6 +4,9 @@
  *   npm run fixture:show -- <week>            lists the week's payload paths
  *   npm run fixture:show -- <week> <path>     prints one, e.g. rosters, matchups/8, players/nfl
  *   npm run fixture:show -- <week> ""         prints the league payload
+ *   npm run fixture:show -- <week> --model    prints the normalized model:
+ *     teams (scrubbed names, managers, standings) and every week's scores,
+ *     the values hand-checked test literals should come from
  *
  * --league <folder> picks another league under fixtures/sleeper
  * (default fear-the-turtle-2025).
@@ -11,17 +14,22 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { formatRecord } from "../src/league.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
-import { readBlob, readManifest } from "../src/snapshot.ts";
+import { normalizeSleeper } from "../src/sleeper/normalizer.ts";
+import { readBlob, readManifest, readSnapshot } from "../src/snapshot.ts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { league: { type: "string", default: "fear-the-turtle-2025" } },
+  options: {
+    league: { type: "string", default: "fear-the-turtle-2025" },
+    model: { type: "boolean", default: false },
+  },
 });
 const [week, rawPath] = positionals;
 if (!week) {
   console.error(
-    "usage: npm run fixture:show -- <week> [path] [--league <folder>]",
+    "usage: npm run fixture:show -- <week> [path | --model] [--league <folder>]",
   );
   process.exit(2);
 }
@@ -43,6 +51,35 @@ if (!id) {
   );
   process.exit(1);
 }
+if (values.model) {
+  const league = normalizeSleeper(await readSnapshot(dir, id));
+  console.log(
+    `${league.name} ${league.season}, week ${week} snapshot ${id}: last scored week ${league.lastScoredWeek}`,
+  );
+  const names = new Map(league.teams.map((t) => [t.id, t.name]));
+  for (const t of league.teams) {
+    const s = t.standing;
+    const managers = t.managers.map((m) => m.displayName).join(", ");
+    console.log(
+      `  ${t.id}  ${t.name} (${managers || "no manager"})  ${formatRecord(s)}  pf ${s.pointsFor}  pa ${s.pointsAgainst}`,
+    );
+  }
+  for (const w of league.weeks) {
+    console.log(`week ${w.week}${w.scored ? "" : " (in progress)"}`);
+    for (const m of w.matchups) {
+      const [a, b] = m.sides;
+      const side = (x: typeof a) =>
+        `${names.get(x.team)} ${x.score}${x.result ? ` ${x.result}` : ""}`;
+      const kind = m.kind === "regular" ? "" : `  [${m.kind} r${m.round}]`;
+      console.log(`  ${side(a)}  v  ${side(b)}${kind}`);
+    }
+    if (w.byes.length) {
+      console.log(`  byes: ${w.byes.map((t) => names.get(t)).join(", ")}`);
+    }
+  }
+  process.exit(0);
+}
+
 const manifest = await readManifest(dir, id);
 const base = `${SLEEPER_API}/league/${manifest.league_id}`;
 
