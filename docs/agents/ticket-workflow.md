@@ -6,6 +6,8 @@ The steps around `/implement <ticket>`, in order. Each ends on the condition tha
 
 List every domain noun the ticket brings or renames: a file, a setting, a role, a command, a state. Run `/domain-modeling` for each one that `GLOSSARY.md` doesn't define, at the same time as agreeing the test seams. Then name files, fields and functions after the glossary terms.
 
+Read the ticket and the spec sections it cites. To find where a neighbouring ticket's scope begins, ask an Explore subagent for a short brief rather than reading the ticket. To find code, start from the module map's exports column and read only the functions you need, not whole files.
+
 Done when every noun on the list has a glossary entry. The code and tickets then use those names from the start. In #51 the glossary came last, which forced a code rename (`usage.yaml` → `spend.yaml`) and a second pass over 10 tickets and comments.
 
 ## 2. Build and review
@@ -21,7 +23,7 @@ Hand the sweep to one subagent, so the main session doesn't spend tokens reading
 > Read every open ticket in full (body and comments), not only keyword matches, plus the closed tickets and spec sections this one refines. Then:
 > - Add an "Input from #<n> (<sha>)" section to each open ticket the build changes.
 > - Comment "Refined by #<n> (<sha>): …" on each closed ticket whose decision it refined.
-> - Comment on #<n> with what was built, then close it.
+> - Comment on #<n> with what was built, then close it. For one part of a split ticket, keep it open and say what the next part still owes.
 >
 > Rules:
 > - Every identifier you cite (function, file, field, command) must exist in <sha>; check it with `git grep`. Describe anything not built yet in words ("a function that adds to the month's spend"), never as a made-up name.

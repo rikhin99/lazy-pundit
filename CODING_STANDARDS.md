@@ -12,13 +12,13 @@ Read during review. Each rule is a judgement call; the mechanical rules are test
 
 ## Names
 
-- Code and comments use `GLOSSARY.md` terms. A glossary _Avoid_ term appears only as a platform's own field name (`owner_id`), never as our identifier or prose: say _manager_, _place_, _team_, _matchup_. The test covers the unambiguous terms; the reviewer covers the rest, such as _player_ for a manager or _roster_ for a team, and prose in strings.
+- Code and comments use `GLOSSARY.md` terms. A glossary _Avoid_ term appears only as a platform's own field name (`owner_id`), never as our identifier or prose: say _manager_, _place_, _team_, _matchup_. `test/glossary-terms.test.ts` enforces the terms in its `ENFORCED` list; the reviewer judges those in `REVIEWED`, such as _player_ for a manager or _roster_ for a team, and prose in strings outside `src/prompt.ts`.
 - A domain noun the diff introduces (a file, a setting, a role, a command) has a `GLOSSARY.md` entry, and the code names it with that term. Source: `docs/agents/ticket-workflow.md`, step 1.
 - Team identity follows ADR 0001: `<platform>:<team id>`, scoped to one season.
 
 ## Tests
 
-- Tests sit at the agreed seams (spec #37, Testing Decisions): **Seam 1**, the library API against a temp workspace, built with `test/support/workspace.ts` (file transport over the committed fixtures, fixed clock, recording clipboard); **Seam 2a**, normalizer from snapshot to model; **Seam 2b**, the validator.
+- Tests sit at the seams listed under "Tests" in `docs/agents/module-map.md`, and use that section's helpers: no live network, no real home directory, no real LLM.
 - Assert on what a pundit or league member could observe: files written, text published, what was copied, the problems returned.
 - Expected values come from an independent source: a hand-checked literal from the fixture payloads (`npm run fixture:show`), the spec, a worked example.
 - Fixtures are real scrubbed payloads replayed as snapshots. A variant is a real payload patched through a wrapping transport, never a hand-built model.

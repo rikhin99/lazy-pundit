@@ -12,7 +12,7 @@ import { standingsThrough } from "./standings.ts";
  * counts as "data changed" changes it.
  *
  * Snapshot IDs end with this hash, so changing what it covers changes every
- * committed fixture ID: regenerate them (see fixtures/sleeper/README.md).
+ * committed fixture ID: rebuild them (see fixtures/sleeper/README.md).
  */
 export function dataHash(league: League, throughWeek: number): string {
   const covered = {

@@ -16,7 +16,7 @@ Read this before opening source files. It says which file owns what, so you can 
 | `cli.ts` | Arg parsing, the publish prompt and printing the problems list; no logic | commander program |
 | `deps.ts` | Injected outside world: transport, LLM, clock, clipboard, cache, config and workspaces folders, environment overrides; the only reader of `process.env` | `Deps`, `Environment`, `systemDeps` |
 | `config.ts` | The operator's files: `config.yaml`, `credentials.yaml` (0600), `spend.yaml`, with `CONFIG_FORMAT` | `readConfig`, `loadCredentials`, `saveCredentials`, `dropWorkspaces` |
-| `anthropic.ts` | Anthropic's API base, the live key check, the `Llm` interface and its Messages API client | `ANTHROPIC_API`, `checkAnthropicKey`, `Llm`, `anthropicLlm` |
+| `anthropic.ts` | Anthropic's API base, the live key check, the `Llm` interface and its Messages API client. Raw HTTP through the transport (ADR 0002): copy it for a new call, and open the `claude-api` skill only for an endpoint or feature it doesn't use yet | `ANTHROPIC_API`, `checkAnthropicKey`, `Llm`, `anthropicLlm` |
 | `doctor.ts` | The `doctor` command: each check with its fix | `doctor`, `DoctorCheck` |
 | `transport.ts`, `file-transport.ts`, `clock.ts`, `clipboard.ts` | The adapters behind `Deps`; only these touch network, time or other processes | `httpTransport`, `fileTransport`, `systemClipboard`, `noClipboard` |
 | `workspace.ts` | `workspace.md`, finding a workspace (`--league` or upwards from the current folder), season folders, file naming | `readWorkspace`, `findWorkspace`, `rankingsDir`, `snapshotsDir`, `weekStem` |

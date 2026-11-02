@@ -36,7 +36,7 @@ export const configSchema = z.object({
   /** The operator's pundit name, the default for each new workspace. */
   name: z.string().min(1).optional(),
   model: z.string().min(1).default("claude-sonnet-5-5"),
-  /** The hard cap on LLM spend per calendar month, across every league. */
+  /** The spend cap: the most LLM spend per calendar month, across every league. */
   spend_cap_usd: z.number().nonnegative().default(5),
   /** Prices that replace or add to the table shipped with the tool, by model. */
   prices: z.record(z.string(), priceSchema).default({}),
