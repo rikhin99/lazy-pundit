@@ -21,5 +21,5 @@ Read during review. Each rule is a judgement call; the mechanical rules are test
 - Assert on what a pundit or league member could observe: files written, text published, what was copied, the problems returned.
 - Expected values come from an independent source: a hand-checked literal from the fixture payloads (`npm run fixture:show`), the spec, a worked example.
 - Fixtures are real scrubbed payloads replayed as snapshots. A variant is a real payload patched through a wrapping transport, never a hand-built model.
-- Seam 2b is the exception: the validator's input is an evidence pack, not a payload, so its tests may use a literal pack whose values are hand-checked against a fixture week (`test/support/week8-evidence.ts`). Once the evidence-pack builder exists (#42), take packs from it or assert the literal against it.
+- Seam 2b is the exception: the validator's input is an evidence pack, not a payload, so its tests may use a literal pack whose values are hand-checked against a fixture week (`test/support/week8-evidence.ts`). `test/stats.test.ts` asserts the evidence-pack builder against that literal, so keep the two in step.
 - Validator behaviour on ordinary prose is pinned by `test/support/plain-prose.ts`: a sentence that tripped the validator in review goes there, so it can never come back hard.

@@ -217,6 +217,9 @@ Actual wins minus the wins expected from the all-play record.
 **Form**:
 A team's average points over its most recent weeks.
 
+**Close matchup**:
+A matchup decided by less than 5 points.
+
 **Lineup efficiency**:
 Points scored divided by the points of the best possible lineup from the same roster.
 _Avoid_: Coaching efficiency, max points

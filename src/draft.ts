@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
+import { draftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
 import { renderDraft } from "./ranking-file.ts";
 import { fetchSleeperSnapshot } from "./sleeper/fetcher.ts";
@@ -67,6 +68,7 @@ export async function draft(
     },
     league,
     order,
+    draftData(league, week),
   );
   await mkdir(dir, { recursive: true });
   try {

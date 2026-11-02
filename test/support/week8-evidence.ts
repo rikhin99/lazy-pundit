@@ -11,7 +11,8 @@ import type {
  * -- 8 --model`): records, points for and against and the
  * week-8 scores come straight from the payloads; all-play, luck, form, ranks
  * and streaks were worked out by hand in the grounding prototype from the
- * same weeks. Team names and managers are the scrubbed fakes.
+ * same weeks. Team names and managers are the scrubbed fakes. The
+ * evidence-pack builder is asserted against it (`test/stats.test.ts`).
  */
 interface Row {
   name: string;
@@ -148,7 +149,8 @@ const ROWS: Record<number, Row> = {
     luck: -1.09,
     pfRank: 4,
     paRank: 2,
-    allplayRank: 7,
+    // Level with Gus Bus at 45-43, so both are 6th.
+    allplayRank: 6,
     formRank: 5,
     weekRank: 7,
     standing: 9,
@@ -363,7 +365,14 @@ export function week8Evidence(): EvidencePack {
   return {
     week: 8,
     teams,
-    league: { "wk.high": 133.22, "wk.low": 70.32, "wk.margin_max": 55 },
+    league: {
+      "wk.high": 133.22,
+      "wk.high_team": id(1),
+      "wk.low": 70.32,
+      "wk.low_team": id(9),
+      "wk.margin_max": 55,
+      "wk.margin_max_team": id(1),
+    },
   };
 }
 

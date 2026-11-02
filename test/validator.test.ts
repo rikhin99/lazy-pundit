@@ -382,6 +382,20 @@ describe("nicknames lend stats", () => {
     expect(only(1, "Area 51 rolls on.", over)).toEqual([]);
   });
 
+  test("a league item's team is checked by name", () => {
+    const r = validate(
+      blurb(
+        null,
+        "Week high: [Gus Bus]{ev=wk.high_team} [133.22]{ev=wk.high}. Week low: [Bench Mob]{ev=wk.low_team}.",
+      ),
+    );
+    expect(r.claims.map((c) => [c.text, c.status, c.reason])).toEqual([
+      ["Gus Bus", "verified", expect.any(String)],
+      ["133.22", "verified", expect.any(String)],
+      ["Bench Mob", "wrong", "wk.low_team is Hail Mary Hustle"],
+    ]);
+  });
+
   test("a week intro has no section team: only named teams count", () => {
     expect(only(null, "Bench Mob are 7-1 and Hal is 1-7.")).toEqual([
       ["7-1", "verified", "sleeper:3/record"],

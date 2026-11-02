@@ -10,12 +10,19 @@ export function statOf(id: string): string {
   return id.replace(/^w\d+\./, "");
 }
 
+/**
+ * Stats whose value is a team ID, checked by the team's names: an opponent,
+ * a trade partner, and league items such as `wk.high_team` or `wk.upset`.
+ */
+const TEAM_STATS =
+  /^(opponent|trade\.\d+\.with|wk\.\w+_team|wk\.upset|wk\.upset_over|wk\.robbed)$/;
+
 export function kindOf(id: string, value: EvidenceValue): Kind {
   const stat = statOf(id);
   if (stat === "record" || stat === "allplay") return "record";
   if (stat === "streak") return "streak";
   if (stat === "result") return "result";
-  if (stat === "opponent") return "team";
+  if (TEAM_STATS.test(stat)) return "team";
   if (stat === "place" || stat === "standing" || stat === "seed")
     return "ordinal";
   if (stat === "rank" || stat.endsWith("_rank")) return "ordinal";

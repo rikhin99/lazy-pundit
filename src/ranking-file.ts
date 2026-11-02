@@ -1,10 +1,11 @@
 import { z } from "zod";
+import type { DraftData } from "./draft-data.ts";
 import {
   readFrontMatter,
   WorkspaceFileError,
   writeFrontMatter,
 } from "./front-matter.ts";
-import { formatRecord, type League, type TeamId } from "./league.ts";
+import type { League, TeamId } from "./league.ts";
 
 /**
  * A ranking file: a draft (`week-NN.md`) or its frozen copy
@@ -63,24 +64,25 @@ export class RankingFileError extends WorkspaceFileError {
   }
 }
 
-/** A new draft: the starting order, each team with its stat line. */
+/**
+ * A new draft: the league stat line as the intro, then the starting order,
+ * each team with its stat line.
+ */
 export function renderDraft(
   meta: RankingMeta,
   league: League,
   order: TeamId[],
+  data: DraftData,
 ): string {
   const teams = new Map(league.teams.map((t) => [t.id, t]));
   const sections = order.map((id) => {
     const team = teams.get(id);
     if (!team) throw new Error(`No team ${id} in the league`);
-    return `## ${team.name} {team=${id}}\n${statLine(formatRecord(team.standing))}\n`;
+    const line = data.teams[id]?.statLine;
+    return `## ${team.name} {team=${id}}\n${line ? `${line}\n` : ""}`;
   });
+  if (data.intro) sections.unshift(`## Intro {intro}\n${data.intro}\n`);
   return `${writeFrontMatter({ ...meta }, ["starting_order"])}\n${sections.join("\n")}`;
-}
-
-/** A blurb made only of checked stats. For now, the record. */
-function statLine(record: string): string {
-  return `Record: [${record}]{ev=record}.`;
 }
 
 const HEADING = /^(#{1,2})\s+(.*?)\s*$/;

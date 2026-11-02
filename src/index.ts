@@ -2,6 +2,7 @@ export { type Clipboard, systemClipboard } from "./clipboard.ts";
 export { type Clock, systemClock } from "./clock.ts";
 export { type Deps, systemDeps } from "./deps.ts";
 export { DraftExistsError, type DraftResult, draft } from "./draft.ts";
+export { type DraftData, draftData, type StatSet } from "./draft-data.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 export type {

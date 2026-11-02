@@ -40,14 +40,13 @@ describe("draft", () => {
     expect(fm.starting_order).toEqual(order);
     expect(existsSync(join(dir, ".snapshots", result.snapshot))).toBe(true);
 
-    // One section per team, in the starting order, each with a record stat line.
+    // The league stat line as the intro, then one section per team in the
+    // starting order, each with its stat line.
+    expect(text).toMatch(/\n---\n\n## Intro \{intro\}\nWeek high: /);
     const headings = [...text.matchAll(/^## (.+) \{team=(sleeper:\d+)\}$/gm)];
     expect(headings.map((h) => h[2])).toEqual(order);
     expect(text).toContain(
-      "## Bench Mob {team=sleeper:3}\nRecord: [7-1]{ev=record}.\n",
-    );
-    expect(text).toContain(
-      "## Hail Mary Hustle {team=sleeper:9}\nRecord: [1-7]{ev=record}.\n",
+      "## Hail Mary Hustle {team=sleeper:9}\n[10th]{ev=pf_rank} in points · [lost 4 straight]{ev=streak} · [lost to]{ev=w8.result} [Tank Brigade]{ev=w8.opponent} by [31.3]{ev=w8.margin}\n",
     );
   });
 
@@ -79,41 +78,43 @@ describe("draft", () => {
 const WEEK_8_TEXT = `🏈 FEAR THE TURTLE POWER RANKINGS
 after Week 8 · by rikhin
 
+Week high: Gus Bus 133.22 · Week low: Hail Mary Hustle 70.32 · Biggest margin: Gus Bus by 55 · Closest matchup: Bench Mob by 2.71
+
 1. Bench Mob · 7-1
-Record: 7-1.
+1st in points · won 7 straight · beat Snap Judgement by 2.71
 
 2. Bye Bye Bea · 6-2
-Record: 6-2.
+2nd in points · won 6 straight · beat Baron Von Trade by 19.95
 
 3. Red Zone Rascals · 5-3
-Record: 5-3.
+7th in points · lost to Kim Possible Kicks by 6.18
 
 4. Frank's FAAB Fund · 5-3
-Record: 5-3.
+8th in points · beat Wendy's Wire by 9.27
 
 5. Snap Judgement · 4-4
-Record: 4-4.
+5th in points · lost 2 straight · lost to Bench Mob by 2.71
 
 6. Gus Bus · 4-4
-Record: 4-4.
+6th in points · beat Pylon Patrol by 55
 
 7. Tank Brigade · 4-4
-Record: 4-4.
+12th in points · won 3 straight · beat Hail Mary Hustle by 31.3
 
 8. Wendy's Wire · 3-5
-Record: 3-5.
+3rd in points · lost 2 straight · lost to Frank's FAAB Fund by 9.27
 
 9. Baron Von Trade · 3-5
-Record: 3-5.
+4th in points · lost to Bye Bye Bea by 19.95
 
 10. Kim Possible Kicks · 3-5
-Record: 3-5.
+9th in points · won 2 straight · beat Red Zone Rascals by 6.18
 
 11. Pylon Patrol · 3-5
-Record: 3-5.
+11th in points · lost 3 straight · lost to Gus Bus by 55
 
 12. Hail Mary Hustle · 1-7
-Record: 1-7.
+10th in points · lost 4 straight · lost to Tank Brigade by 31.3
 
 Stats: Sleeper · made with Lazy Pundit
 `;
@@ -148,8 +149,7 @@ describe("publish", () => {
     const { dir, deps } = await fearTheTurtle(8);
     const { path } = await draft(dir, deps);
     const text = await readFile(path, "utf8");
-    const last =
-      "## Hail Mary Hustle {team=sleeper:9}\nRecord: [1-7]{ev=record}.\n";
+    const last = text.slice(text.indexOf("## Hail Mary Hustle"));
     await writeFile(
       path,
       text
@@ -163,14 +163,15 @@ describe("publish", () => {
     const { text: published } = await publish(dir, deps);
 
     expect(published).toContain(
-      "after Week 8 · by rikhin\n\n1. Hail Mary Hustle · 1-7\nRecord: 1-7.\n\n2. Bench Mob · 7-1\nRecord: 7-1.\n\n3. Bye Bye Bea · 6-2\n",
+      "by 2.71\n\n1. Hail Mary Hustle · 1-7\n10th in points · lost 4 straight · lost to Tank Brigade by 31.3\n\n2. Bench Mob · 7-1\n1st in points · won 7 straight · beat Snap Judgement by 2.71\n\n3. Bye Bye Bea · 6-2\n",
     );
     expect(published).toContain(
-      "12. Pylon Patrol · 3-5\nRecord: 3-5.\n\nStats: Sleeper",
+      "12. Pylon Patrol · 3-5\n11th in points · lost 3 straight · lost to Gus Bus by 55\n\nStats: Sleeper",
     );
   });
 
-  const GUS = "## Gus Bus {team=sleeper:1}\nRecord: [4-4]{ev=record}.\n";
+  const GUS =
+    "## Gus Bus {team=sleeper:1}\n[6th]{ev=pf_rank} in points · [beat]{ev=w8.result} [Pylon Patrol]{ev=w8.opponent} by [55]{ev=w8.margin}\n";
   test.each([
     [
       "missing",
@@ -215,8 +216,12 @@ describe("publish: intro and groups", () => {
       path,
       (await readFile(path, "utf8"))
         .replace(
+          /## Intro \{intro\}\n.*\n/,
+          "## Intro {intro}\nEight weeks in and [Bench Mob]{ev=sleeper:3/record} still can't lose.\n",
+        )
+        .replace(
           "## Bench Mob {team=sleeper:3}",
-          "## Intro {intro}\nEight weeks in and [Bench Mob]{ev=sleeper:3/record} still can't lose.\n\n# Contenders\n\n## Bench Mob {team=sleeper:3}",
+          "# Contenders\n\n## Bench Mob {team=sleeper:3}",
         )
         .replace(
           "## Frank's FAAB Fund {team=sleeper:4}",
@@ -230,7 +235,7 @@ describe("publish: intro and groups", () => {
       "after Week 8 · by rikhin\n\nEight weeks in and Bench Mob still can't lose.\n\n— CONTENDERS —\n\n1. Bench Mob · 7-1\n",
     );
     expect(text).toContain(
-      "3. Red Zone Rascals · 5-3\nRecord: 5-3.\n\n— THE REST —\n\n4. Frank's FAAB Fund · 5-3\n",
+      "3. Red Zone Rascals · 5-3\n7th in points · lost to Kim Possible Kicks by 6.18\n\n— THE REST —\n\n4. Frank's FAAB Fund · 5-3\n",
     );
   });
 
