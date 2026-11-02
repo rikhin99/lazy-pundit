@@ -278,6 +278,9 @@ _Avoid_: rank, for a team's place in the pundit's ranking. A team's rank is its 
 The deterministic check of every claim in a blurb against the evidence pack, and of the blurb's words against the persona when swearing is off. It gates LLM drafts before they're written and reports on the pundit's edits without rejecting them.
 _Avoid_: Fact-checker
 
+**Word list**:
+The fixed list of swear words the validator looks for in a blurb or week intro while the persona's swearing is off. Each hit is a soft problem.
+
 **LLM gate**:
 The validator's pass-or-fail on LLM prose before it's written: a blurb or week intro passes only if every claim is cited and verified and, when swearing is off, the word list is clean. One that fails goes back to the LLM with the validator's complaints, up to twice. If it still fails, its best attempt is written anyway, with a gate failure for each fault.
 

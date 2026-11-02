@@ -4,18 +4,12 @@ import { describe, expect, test } from "vitest";
 import {
   draft,
   draftData,
-  fileTransport,
   type LlmRequest,
   publish,
   saveCredentials,
 } from "../src/index.ts";
 import { scriptedLlm } from "./support/llm.ts";
-import {
-  committed,
-  FIXTURES,
-  fearTheTurtle,
-  WEEKS,
-} from "./support/workspace.ts";
+import { atWeek, committed, fearTheTurtle } from "./support/workspace.ts";
 
 const KEY = "sk-ant-api03-test-key";
 
@@ -155,8 +149,7 @@ describe("draft with an Anthropic key", () => {
     await publish(week7.dir, week7.deps, { yes: true });
     const llm = scriptedLlm(await week8Reply());
     const deps = {
-      ...week7.deps,
-      transport: fileTransport(FIXTURES, WEEKS["8"] as string),
+      ...atWeek(week7.deps, 8),
       llm,
       env: { ...week7.deps.env, anthropicApiKey: KEY },
     };

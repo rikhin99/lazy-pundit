@@ -1,6 +1,6 @@
 # Module map
 
-Read this before opening source files. It says which file owns what, so you can open only the files the ticket touches, and use `sed -n`/`grep` on the rest. Line counts are rough sizes.
+Read this before opening source files. It says which file owns what. Within a file, `npm run outline -- <file>…` lists each declaration's line range and doc line: read the ranges you need with `sed -n`, and open a whole file only when you'll rewrite most of it. Line counts are rough sizes.
 
 ## The pipeline
 
@@ -51,7 +51,7 @@ Read this before opening source files. It says which file owns what, so you can 
 
 The seams, and the helpers each one uses:
 
-- **Library API against a temp workspace** (`draft-publish`, `llm-draft`, `check`, `config`, `doctor`): `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request) and `deps.env.anthropicApiKey`.
+- **Library API against a temp workspace** (`draft-publish`, `llm-draft`, `check`, `config`, `doctor`): `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request) and `deps.env.anthropicApiKey`.
 - **LLM client** (`anthropic-llm`): `anthropicLlm` against a transport that records requests and answers with a canned Messages API body.
 - **Validator** (`validator`): `blurb()` and `week8Evidence()` in `support/week8-evidence.ts` hold literal week-8 evidence; `support/plain-prose.ts` lists sentences that must never come back hard.
 - **League model and stats** (`sleeper-normalizer`, `standings`, `stats`, `data-hash`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.

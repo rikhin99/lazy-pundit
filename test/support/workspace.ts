@@ -69,15 +69,19 @@ seasons:
 # Fear The Turtle
 `,
   );
+  const clipboard = recordingClipboard();
+  const deps: Deps = { ...(await operator()), clipboard };
+  return { dir, deps: atWeek(deps, week), clipboard };
+}
+
+/**
+ * The same deps replaying the committed snapshot for `week` instead, so a
+ * test can publish one week in a workspace and then draft a later one.
+ */
+export function atWeek(deps: Deps, week: number): Deps {
   const snapshot = WEEKS[String(week)];
   if (!snapshot) throw new Error(`no committed snapshot for week ${week}`);
-  const clipboard = recordingClipboard();
-  const deps: Deps = {
-    ...(await operator()),
-    transport: fileTransport(FIXTURES, snapshot),
-    clipboard,
-  };
-  return { dir, deps, clipboard };
+  return { ...deps, transport: fileTransport(FIXTURES, snapshot) };
 }
 
 /**

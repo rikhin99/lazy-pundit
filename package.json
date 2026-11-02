@@ -29,7 +29,8 @@
     "scrub:sleeper": "node scripts/scrub-sleeper.ts",
     "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x",
     "fixture:show": "node scripts/show-fixture.ts",
-    "fixture:workspace": "node scripts/fixture-workspace.ts"
+    "fixture:workspace": "node scripts/fixture-workspace.ts",
+    "outline": "node scripts/outline.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
