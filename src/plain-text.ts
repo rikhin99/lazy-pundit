@@ -1,5 +1,6 @@
 import { formatRecord, type League, type TeamId } from "./league.ts";
 import type { RankingFile } from "./ranking-file.ts";
+import { stripTags } from "./validator.ts";
 
 const PLATFORM_NAMES: Record<League["platform"], string> = {
   sleeper: "Sleeper",
@@ -39,9 +40,4 @@ export function renderPlainText(ranking: RankingFile, league: League): string {
     `Stats: ${PLATFORM_NAMES[league.platform]} · made with Lazy Pundit`,
   );
   return `${blocks.join("\n\n")}\n`;
-}
-
-/** `[7-1]{ev=record}` → `7-1`: claim tags are for the tool, not the league. */
-function stripTags(text: string): string {
-  return text.replace(/\[([^\]]*)\]\{[^{}]*\}/g, "$1");
 }

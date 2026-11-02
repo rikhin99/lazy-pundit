@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { checkDraft, type Problem } from "./check.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
 import { draftData } from "./draft-data.ts";
@@ -24,6 +25,8 @@ export interface DraftResult {
   week: number;
   /** The snapshot the draft was built from. */
   snapshot: string;
+  /** The new draft's problems list, hard first. */
+  problems: Problem[];
 }
 
 export class DraftExistsError extends Error {
@@ -32,7 +35,7 @@ export class DraftExistsError extends Error {
 
 /**
  * Fetches the workspace's latest season and writes a new draft for its
- * ranking week, starting in standings order.
+ * ranking week, starting in standings order, and checks it.
  */
 export async function draft(
   workspaceDir: string,
@@ -79,7 +82,8 @@ export async function draft(
       `${weekStem(week)}.md already exists, so it was left as it is`,
     );
   }
-  return { path, week, snapshot: id };
+  const { problems } = await checkDraft(workspaceDir);
+  return { path, week, snapshot: id, problems };
 }
 
 /**

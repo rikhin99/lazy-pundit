@@ -8,13 +8,14 @@ import { expect, test } from "vitest";
 const CLI = join(import.meta.dirname, "..", "src", "cli.ts");
 const run = promisify(execFile);
 
-test("the CLI imports only the library and the arg parser", async () => {
+test("the CLI imports only the library, the arg parser and the prompt", async () => {
   const text = await readFile(CLI, "utf8");
   const imports = [...text.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
   expect(imports.sort()).toEqual([
     "./index.ts",
     "@commander-js/extra-typings",
     "node:path",
+    "node:readline/promises",
   ]);
 });
 

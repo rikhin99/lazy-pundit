@@ -198,7 +198,8 @@ export function validate(input: ValidatorInput): ValidationResult {
         autoTags.push({
           ...written(
             from + (words.length - words.trimStart().length),
-            to - (words.length - words.trimEnd().length),
+            // Trailing punctuation reads as the sentence's, not the claim's.
+            to - (/[\s,;:.!?]*$/.exec(words)?.[0].length ?? 0),
           ),
           id: idFor(ctx, h),
         });

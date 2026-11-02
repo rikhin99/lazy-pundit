@@ -684,6 +684,14 @@ describe("auto-tag", () => {
     );
   });
 
+  test("an auto-tag leaves punctuation after the claim outside the tag", () => {
+    const text = "Gus Bus won by 55, and nobody saw it coming.";
+    const r = validate(blurb(1, text));
+    expect(applyAutoTags(text, r.autoTags)).toBe(
+      "Gus Bus won by [55]{ev=w8.margin}, and nobody saw it coming.",
+    );
+  });
+
   test("an ambiguous match stays untagged: first in the standings and in the ranking", () => {
     const r = validate(blurb(3, "Bench Mob sit in first."));
     expect(statuses(r)).toEqual([["first", "verified"]]);

@@ -3,7 +3,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { parse as parseYaml } from "yaml";
-import { draft, publish, RankingFileError } from "../src/index.ts";
+import { type Deps, draft, publish, RankingFileError } from "../src/index.ts";
 import { fearTheTurtle, rankingsDir } from "./support/workspace.ts";
 
 /** The YAML front matter of a Markdown file. */
@@ -22,6 +22,8 @@ describe("draft", () => {
     const path = join(rankingsDir(dir), "week-08.md");
     expect(result.path).toBe(path);
     expect(result.week).toBe(8);
+    // Every stat line checks out against the evidence pack.
+    expect(result.problems).toEqual([]);
     const text = await readFile(path, "utf8");
     const fm = frontMatter(text);
     expect(fm).toMatchObject({
@@ -119,12 +121,19 @@ Week high: Gus Bus 133.22 · Week low: Hail Mary Hustle 70.32 · Biggest margin:
 Stats: Sleeper · made with Lazy Pundit
 `;
 
+/** Publishes and expects it to go through. */
+async function published(dir: string, deps: Deps) {
+  const result = await publish(dir, deps);
+  if (!result.published) throw new Error("held back to editing");
+  return result;
+}
+
 describe("publish", () => {
   test("freezes the draft and writes and copies the plain text", async () => {
     const { dir, deps, clipboard } = await fearTheTurtle(8);
     const drafted = await draft(dir, deps);
 
-    const result = await publish(dir, deps);
+    const result = await published(dir, deps);
 
     const ranking = rankingsDir(dir);
     expect(result.week).toBe(8);
@@ -160,12 +169,12 @@ describe("publish", () => {
         ),
     );
 
-    const { text: published } = await publish(dir, deps);
+    const { text: out } = await published(dir, deps);
 
-    expect(published).toContain(
+    expect(out).toContain(
       "by 2.71\n\n1. Hail Mary Hustle · 1-7\n10th in points · lost 4 straight · lost to Tank Brigade by 31.3\n\n2. Bench Mob · 7-1\n1st in points · won 7 straight · beat Snap Judgement by 2.71\n\n3. Bye Bye Bea · 6-2\n",
     );
-    expect(published).toContain(
+    expect(out).toContain(
       "12. Pylon Patrol · 3-5\n11th in points · lost 3 straight · lost to Gus Bus by 55\n\nStats: Sleeper",
     );
   });
@@ -217,7 +226,7 @@ describe("publish: intro and groups", () => {
       (await readFile(path, "utf8"))
         .replace(
           /## Intro \{intro\}\n.*\n/,
-          "## Intro {intro}\nEight weeks in and [Bench Mob]{ev=sleeper:3/record} still can't lose.\n",
+          "## Intro {intro}\nEight weeks in and Bench Mob are [7-1]{ev=sleeper:3/record}.\n",
         )
         .replace(
           "## Bench Mob {team=sleeper:3}",
@@ -229,10 +238,10 @@ describe("publish: intro and groups", () => {
         ),
     );
 
-    const { text } = await publish(dir, deps);
+    const { text } = await published(dir, deps);
 
     expect(text).toContain(
-      "after Week 8 · by rikhin\n\nEight weeks in and Bench Mob still can't lose.\n\n— CONTENDERS —\n\n1. Bench Mob · 7-1\n",
+      "after Week 8 · by rikhin\n\nEight weeks in and Bench Mob are 7-1.\n\n— CONTENDERS —\n\n1. Bench Mob · 7-1\n",
     );
     expect(text).toContain(
       "3. Red Zone Rascals · 5-3\n7th in points · lost to Kim Possible Kicks by 6.18\n\n— THE REST —\n\n4. Frank's FAAB Fund · 5-3\n",

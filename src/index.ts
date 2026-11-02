@@ -1,3 +1,4 @@
+export { type CheckResult, check, type Problem } from "./check.ts";
 export { type Clipboard, systemClipboard } from "./clipboard.ts";
 export { type Clock, systemClock } from "./clock.ts";
 export { type Deps, systemDeps } from "./deps.ts";
@@ -27,7 +28,7 @@ export type {
 } from "./league.ts";
 export { BENCH, isStarter } from "./league.ts";
 export { bestLineupPoints } from "./lineup.ts";
-export { type PublishResult, publish } from "./publish.ts";
+export { type PublishOptions, type PublishResult, publish } from "./publish.ts";
 export { RankingFileError } from "./ranking-file.ts";
 export {
   type FetchSleeperOptions,

@@ -16,6 +16,8 @@ import type { League, TeamId } from "./league.ts";
 export interface RankingFile {
   meta: RankingMeta;
   intro?: string;
+  /** Where the intro starts in the file text. */
+  introStart?: number;
   entries: Entry[];
 }
 
@@ -34,6 +36,8 @@ export interface TeamEntry {
   team: string;
   label: string;
   blurb: string;
+  /** Where the blurb starts in the file text. */
+  blurbStart: number;
   line: number;
 }
 
@@ -98,13 +102,24 @@ export function parseRanking(file: string, text: string): RankingFile {
 
   const problems: string[] = [];
   const entries: Entry[] = [];
-  /** Lines of the intro and of each team's blurb, as they're read. */
-  const lines = new Map<Entry | "intro", string[]>();
+  /** Each section's lines as written, and where its first line starts. */
+  const sections = new Map<
+    Entry | "intro",
+    { from: number; lines: string[] }
+  >();
   let current: string[] | undefined;
+  let offset = text.length - body.length;
 
-  body.split(/\r?\n/).forEach((raw, i) => {
+  // Split on "\n" alone so a section's lines rejoin to the file text exactly.
+  body.split("\n").forEach((raw, i) => {
     const line = bodyLine + i;
+    const next = offset + raw.length + 1;
     const heading = HEADING.exec(raw);
+    const open = (key: Entry | "intro") => {
+      current = [];
+      sections.set(key, { from: next, lines: current });
+    };
+    offset = next;
     if (!heading) {
       if (current) current.push(raw);
       else if (raw.trim()) {
@@ -120,14 +135,13 @@ export function parseRanking(file: string, text: string): RankingFile {
     }
     const [, label = rest, tag = ""] = TAGGED.exec(rest) ?? [];
     if (tag.trim() === "intro") {
-      if (entries.length > 0 || lines.has("intro")) {
+      if (entries.length > 0 || sections.has("intro")) {
         problems.push(
           `line ${line}: the intro goes once, before the first team or group`,
         );
         return;
       }
-      current = [];
-      lines.set("intro", current);
+      open("intro");
       return;
     }
     const team = /^team=(\S+)$/.exec(tag.trim())?.[1];
@@ -137,22 +151,35 @@ export function parseRanking(file: string, text: string): RankingFile {
       );
       return;
     }
-    const entry: TeamEntry = { kind: "team", team, label, blurb: "", line };
+    const entry: TeamEntry = {
+      kind: "team",
+      team,
+      label,
+      blurb: "",
+      blurbStart: 0,
+      line,
+    };
     entries.push(entry);
-    current = [];
-    lines.set(entry, current);
+    open(entry);
   });
 
   if (problems.length > 0) throw new RankingFileError(file, problems);
-  const joined = (key: Entry | "intro") =>
-    (lines.get(key) ?? []).join("\n").trim();
-  const intro = joined("intro");
+  /** A section's text, trimmed, and where it starts in the file text. */
+  const content = (key: Entry | "intro") => {
+    const s = sections.get(key);
+    const joined = (s?.lines ?? []).join("\n");
+    const lead = joined.length - joined.trimStart().length;
+    return { text: joined.trim(), start: (s?.from ?? 0) + lead };
+  };
+  const intro = content("intro");
   return {
     meta: meta.data,
-    ...(intro ? { intro } : {}),
-    entries: entries.map((e) =>
-      e.kind === "team" ? { ...e, blurb: joined(e) } : e,
-    ),
+    ...(intro.text ? { intro: intro.text, introStart: intro.start } : {}),
+    entries: entries.map((e) => {
+      if (e.kind !== "team") return e;
+      const { text: blurb, start: blurbStart } = content(e);
+      return { ...e, blurb, blurbStart };
+    }),
   };
 }
 

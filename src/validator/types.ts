@@ -16,8 +16,12 @@ export interface EvidencePack {
 /** A team's place, movement and group, read from the draft's current order. */
 export interface OrderEvidence {
   place: number;
-  /** Places climbed since the movement baseline (negative for a fall), or `new`. */
-  move: number | "new";
+  /**
+   * Places climbed since the movement baseline (negative for a fall), or
+   * `new`. Absent until movement is measured (#45), so movement wording is
+   * unchecked rather than wrong.
+   */
+  move?: number | "new";
   /** The text of the enclosing group heading, if any. */
   group?: string;
 }

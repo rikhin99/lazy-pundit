@@ -1,81 +1,75 @@
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { checkDraft, type Problem } from "./check.ts";
 import type { Deps } from "./deps.ts";
-import { WorkspaceFileError } from "./front-matter.ts";
 import { renderPlainText } from "./plain-text.ts";
-import { checkOrder, parseRanking } from "./ranking-file.ts";
-import { normalizeSleeper } from "./sleeper/normalizer.ts";
-import { readSnapshot } from "./snapshot.ts";
-import {
-  rankingsDir,
-  readWorkspace,
-  snapshotsDir,
-  weekStem,
-} from "./workspace.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
-export interface PublishResult {
-  week: number;
-  /** The frozen copy. */
-  publishedPath: string;
-  /** The plain text file. */
-  textPath: string;
-  /** The plain text, as written and copied. */
-  text: string;
-  /** Whether the text reached a clipboard. */
-  copied: boolean;
+export interface PublishOptions {
+  /** Publish even with hard problems, without asking (`--yes`). */
+  yes?: boolean;
+  /**
+   * Asked once when the draft has hard problems: true is Publish anyway,
+   * false is Back to editing. With no one to ask, it's Back to editing.
+   */
+  confirm?: (hard: Problem[]) => Promise<boolean>;
 }
 
+export type PublishResult =
+  | {
+      published: true;
+      week: number;
+      /** The frozen copy. */
+      publishedPath: string;
+      /** The plain text file. */
+      textPath: string;
+      /** The plain text, as written and copied. */
+      text: string;
+      /** Whether the text reached a clipboard. */
+      copied: boolean;
+      /** The problems published with, hard first. */
+      problems: Problem[];
+    }
+  | {
+      /** Back to editing: the draft had hard problems and nothing was written. */
+      published: false;
+      week: number;
+      problems: Problem[];
+    };
+
 /**
- * Freezes the latest draft as `week-NN.published.md`, renders the plain text from the
- * frozen copy into `week-NN.txt`, and copies it to the clipboard.
+ * Checks the latest draft, then freezes it as `week-NN.published.md`, renders
+ * the plain text from the frozen copy into `week-NN.txt`, and copies it to
+ * the clipboard. Hard problems are put to `confirm` first; soft ones are only
+ * returned.
  */
 export async function publish(
   workspaceDir: string,
   deps: Deps,
+  opts: PublishOptions = {},
 ): Promise<PublishResult> {
-  const ws = await readWorkspace(workspaceDir);
-  const dir = rankingsDir(ws);
-  const week = await latestDraftWeek(dir);
-  const stem = weekStem(week);
+  const checked = await checkDraft(workspaceDir);
+  const { week, problems, dir, stem } = checked;
 
-  const draftText = await readDraft(join(dir, `${stem}.md`), `${stem}.md`);
-  const ranking = parseRanking(`${stem}.md`, draftText);
-  const league = normalizeSleeper(
-    await readSnapshot(snapshotsDir(ws), ranking.meta.snapshot),
-  );
-  checkOrder(`${stem}.md`, ranking, league);
+  const hard = problems.filter((p) => p.severity === "hard");
+  if (hard.length > 0 && !opts.yes && !(await opts.confirm?.(hard))) {
+    return { published: false, week, problems };
+  }
 
   const publishedPath = join(dir, `${stem}.published.md`);
-  await writeWorkspaceFile(publishedPath, draftText);
-  // The frozen copy is the draft verbatim, so the parsed draft renders it.
-  const text = renderPlainText(ranking, league);
+  await writeWorkspaceFile(publishedPath, checked.text);
+  // The frozen copy is the checked draft verbatim, so its parse renders it.
+  const text = renderPlainText(checked.ranking, checked.league);
   const textPath = join(dir, `${stem}.txt`);
   await writeOutput(textPath, text);
   const copied = await deps.clipboard.write(text);
 
-  return { week, publishedPath, textPath, text, copied };
-}
-
-/** The highest ranking week with a draft in the folder. */
-async function latestDraftWeek(dir: string): Promise<number> {
-  const names = await readdir(dir).catch(() => []);
-  const weeks = names
-    .map((n) => /^week-(\d+)\.md$/.exec(n)?.[1])
-    .filter((w) => w !== undefined)
-    .map(Number);
-  if (weeks.length === 0) {
-    throw new WorkspaceFileError(
-      `No draft to publish in ${dir}; run \`lazy-pundit draft\` first`,
-    );
-  }
-  return Math.max(...weeks);
-}
-
-async function readDraft(path: string, name: string): Promise<string> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (cause) {
-    throw new WorkspaceFileError(`No draft ${name} to publish`, { cause });
-  }
+  return {
+    published: true,
+    week,
+    publishedPath,
+    textPath,
+    text,
+    copied,
+    problems,
+  };
 }
