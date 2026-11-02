@@ -246,8 +246,37 @@ _Avoid_: rank, for a team's place in the pundit's ranking. A team's rank is its 
 The deterministic check of every claim in a blurb against the evidence pack, and of the blurb's words against the persona when swearing is off. It gates LLM drafts before they're written and reports on the pundit's edits without rejecting them.
 _Avoid_: Fact-checker
 
+**Auto-tag**:
+The evidence ID the tool adds to an untagged claim of the pundit's that clearly matches exactly one stat, without changing a word. From then on the claim is checked like any cited one, so a later refresh or reorder can make it stale.
+
+**Wrong claim**:
+A claim that disagrees with the evidence it cites or clearly matches. A claim that was never true is wrong, not stale.
+
 **Stale claim**:
-A claim that was true when written and is no longer true after a refresh or after the pundit reorders the teams.
+A claim that was true when written and is no longer true after a refresh or after the pundit reorders the teams. Its cause names which of the two broke it.
+
+**Loose claim**:
+An untagged claim whose words match a stat, but not clearly enough to say which one.
+
+**Unchecked claim**:
+A claim with no evidence to check it against, such as movement before there is a previous published ranking.
+
+## Problems
+
+**Problems list**:
+Everything in a draft the pundit should see before publishing: each claim that isn't verified, each word-list hit and each flag, placed at its team and line. Every surface shows the same list, hard problems first.
+_Avoid_: Errors, issues, warnings (for the whole list)
+
+**Hard problem**:
+A problem that would put something false or garbled in front of the league: a wrong or stale claim, a cited evidence ID that doesn't exist, or a tag the tool can't read. Publishing with one asks the pundit first.
+
+**Soft problem**:
+A problem worth a look that doesn't make the ranking false: a loose or unchecked claim, a word-list hit or a flag. It is listed but never asked about.
+_Avoid_: Warning (for a soft problem alone)
+
+**Publish confirm**:
+The one question publishing asks when the draft has hard problems: Publish anyway or Back to editing, with Back to editing the answer whenever nobody says otherwise. A draft with no hard problems publishes without it. It never rejects a ranking outright.
+_Avoid_: Override, force publish
 
 **Eval harness**:
 The builder's own measure of LLM prose quality, run on prepared leagues rather than on any pundit's real weeks. It looks for what the validator can't see by design, such as untagged superlatives or invented facts, and decides which model is the default. Pundits never run it.

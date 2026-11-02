@@ -28,7 +28,8 @@
     "test": "vitest run",
     "scrub:sleeper": "node scripts/scrub-sleeper.ts",
     "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x",
-    "fixture:show": "node scripts/show-fixture.ts"
+    "fixture:show": "node scripts/show-fixture.ts",
+    "fixture:workspace": "node scripts/fixture-workspace.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

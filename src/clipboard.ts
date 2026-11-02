@@ -27,6 +27,9 @@ export const systemClipboard: Clipboard = {
   },
 };
 
+/** No clipboard: copies nothing, as on a machine without one. */
+export const noClipboard: Clipboard = { write: async () => false };
+
 /** Pipes text into a command. Resolves false if it's missing or fails. */
 function pipeTo(command: string, args: string[], text: string) {
   return new Promise<boolean>((resolve) => {
