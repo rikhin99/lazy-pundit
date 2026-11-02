@@ -14,6 +14,8 @@ Done when every noun on the list has a glossary entry. The code and tickets then
 
 `/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`.
 
+While building, run only the affected test files. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
+
 ## 3. Sweep the tickets in one subagent
 
 Hand the sweep to one subagent, so the main session doesn't spend tokens reading tickets. Give it this prompt, with the blanks filled:
