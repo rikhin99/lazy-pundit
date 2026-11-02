@@ -29,23 +29,27 @@ test("outside a workspace, publish prints the library's message and fails", asyn
   expect(stderr).toMatch(/No workspace\.md in .* or any folder above it/);
 });
 
+/** The only variables the CLI under test sees from the developer's shell. */
+const INHERITED = ["PATH", "TMPDIR", "NODE_OPTIONS"];
+
 /**
  * Runs the CLI in `cwd`, writes `input` and closes stdin, as a script or a
  * pundit at the prompt would. The clipboard is off so nothing is copied, and
  * HOME and the XDG folders are `home` (a fresh temp folder by default), so
- * the real home directory is never read.
+ * the real home directory is never read. The environment starts from
+ * `INHERITED` alone, so no key or setting in the developer's shell leaks in.
  */
 async function cli(cwd: string, args: string[], input = "", home?: string) {
   const h = home ?? (await mkdtemp(join(tmpdir(), "lazy-pundit-home-")));
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...Object.fromEntries(
+      INHERITED.filter((k) => process.env[k]).map((k) => [k, process.env[k]]),
+    ),
     LAZY_PUNDIT_CLIPBOARD: "off",
     HOME: h,
     XDG_CONFIG_HOME: join(h, ".config"),
     XDG_CACHE_HOME: join(h, ".cache"),
   };
-  delete env.ANTHROPIC_API_KEY;
-  delete env.LAZY_PUNDIT_ESPN_S2;
   return new Promise<{ code: number | null; stdout: string; stderr: string }>(
     (resolve) => {
       const child = spawn(process.execPath, [CLI, ...args], { cwd, env });

@@ -15,3 +15,7 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 ### Code layout
 
 Before reading source files, read `docs/agents/module-map.md`: which module owns what, the test seams and their helpers.
+
+### Implementing a ticket
+
+Follow `docs/agents/ticket-workflow.md`: glossary before the first test, then build, sweep and measure.
