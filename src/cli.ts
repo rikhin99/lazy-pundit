@@ -8,6 +8,7 @@ import {
   type Deps,
   type DoctorCheck,
   DraftExistsError,
+  deleteTranscripts,
   doctor,
   draft,
   FetchError,
@@ -101,6 +102,7 @@ program
     const deps = systemDeps();
     const result = await draft(await workspace(deps), deps);
     for (const w of result.warnings) console.error(`${MARKS.warn} ${w}`);
+    if (result.fallback) console.error(`${MARKS.warn} ${result.fallback}`);
     console.log(
       `Drafted week ${result.week}: ${shown(result.path)} (snapshot ${result.snapshot})`,
     );
@@ -153,6 +155,21 @@ program
       result.copied
         ? "Copied the text to the clipboard."
         : "No clipboard found; paste from the .txt file.",
+    );
+  });
+
+program
+  .command("transcripts")
+  .description("Manage the workspace's LLM transcripts.")
+  .command("delete")
+  .description("Delete every LLM transcript in the workspace.")
+  .action(async () => {
+    const deps = systemDeps();
+    const { path, files } = await deleteTranscripts(await workspace(deps));
+    console.log(
+      files > 0
+        ? `Deleted ${files} LLM transcript${files === 1 ? "" : "s"} in ${shown(path)}.`
+        : "No LLM transcripts to delete.",
     );
   });
 

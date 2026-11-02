@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   ANTHROPIC_API,
   anthropicLlm,
+  LlmError,
   type TransportRequest,
 } from "../src/index.ts";
 
@@ -122,4 +123,82 @@ test("a reply that isn't a Messages API body throws naming the URL", async () =>
       `${ANTHROPIC_API}/messages answered with something that isn't a Messages API reply`,
     );
   }
+});
+
+/** The error `write` throws for one canned answer. */
+async function errorFor(status: number, body: unknown): Promise<LlmError> {
+  const { transport } = answering(status, body);
+  const err = await anthropicLlm(transport)
+    .write({
+      key: "k",
+      model: "claude-sonnet-5-5",
+      system: "s",
+      prompt: "p",
+      maxTokens: 10,
+    })
+    .catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(LlmError);
+  return err as LlmError;
+}
+
+test.each([401, 403])("a %i answer is an invalid key", async (status) => {
+  const err = await errorFor(status, {
+    type: "error",
+    error: { type: "authentication_error", message: "invalid x-api-key" },
+  });
+  expect(err.kind).toBe("invalid-key");
+});
+
+test("a 400 saying the credit balance is too low is no credits", async () => {
+  const err = await errorFor(400, {
+    type: "error",
+    error: {
+      type: "invalid_request_error",
+      message:
+        "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+    },
+  });
+  expect(err.kind).toBe("no-credits");
+});
+
+test("any other error answer, a body that isn't a reply, or a network failure is a provider error", async () => {
+  expect((await errorFor(529, "overloaded")).kind).toBe("provider");
+  expect(
+    (
+      await errorFor(400, {
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          message: "max_tokens: too big",
+        },
+      })
+    ).kind,
+  ).toBe("provider");
+  expect((await errorFor(200, "<html>proxy page</html>")).kind).toBe(
+    "provider",
+  );
+
+  const err = await anthropicLlm({
+    request: async () => {
+      throw new Error("getaddrinfo ENOTFOUND api.anthropic.com");
+    },
+  })
+    .write({ key: "k", model: "m", system: "s", prompt: "p", maxTokens: 10 })
+    .catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(LlmError);
+  expect(err).toMatchObject({
+    kind: "provider",
+    message: expect.stringContaining("ENOTFOUND"),
+    usage: undefined,
+  });
+});
+
+test("a cut-off reply is a provider error carrying the usage it was billed for", async () => {
+  const err = await errorFor(200, {
+    content: [{ type: "text", text: "## {intro}\nHalf a" }],
+    stop_reason: "max_tokens",
+    usage: { input_tokens: 7000, output_tokens: 16000 },
+  });
+  expect(err.kind).toBe("provider");
+  expect(err.usage).toEqual({ inputTokens: 7000, outputTokens: 16000 });
 });

@@ -63,45 +63,83 @@ const messageSchema = z.object({
 });
 
 /**
- * Anthropic's Messages API through the transport. Throws on an error answer,
- * and on a reply cut off at the token limit or refused, so a half-written
- * blurb never reaches a draft.
+ * Why an LLM call failed: Anthropic refused the key (401 or 403), the
+ * account has no credits left, or anything else went wrong with the provider.
+ */
+export type LlmErrorKind = "invalid-key" | "no-credits" | "provider";
+
+/**
+ * A failed LLM call. `usage` is set when the API billed the call anyway, as
+ * for a reply cut off at the token limit.
+ */
+export class LlmError extends Error {
+  override name = "LlmError";
+  readonly kind: LlmErrorKind;
+  readonly usage: LlmReply["usage"] | undefined;
+  constructor(kind: LlmErrorKind, message: string, usage?: LlmReply["usage"]) {
+    super(message);
+    this.kind = kind;
+    this.usage = usage;
+  }
+}
+
+/**
+ * Anthropic's Messages API through the transport. Throws an `LlmError` on an
+ * error answer, a network failure, and a reply cut off at the token limit or
+ * refused, so a half-written blurb never reaches a draft.
  */
 export function anthropicLlm(transport: Transport): Llm {
   return {
     async write(req) {
       const url = `${ANTHROPIC_API}/messages`;
-      const res = await transport.request({
-        url,
-        method: "POST",
-        headers: {
-          "x-api-key": req.key,
-          "anthropic-version": ANTHROPIC_VERSION,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: req.model,
-          max_tokens: req.maxTokens,
-          system: req.system,
-          messages: [{ role: "user", content: req.prompt }],
-        }),
-      });
+      let res: Awaited<ReturnType<Transport["request"]>>;
+      try {
+        res = await transport.request({
+          url,
+          method: "POST",
+          headers: {
+            "x-api-key": req.key,
+            "anthropic-version": ANTHROPIC_VERSION,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: req.model,
+            max_tokens: req.maxTokens,
+            system: req.system,
+            messages: [{ role: "user", content: req.prompt }],
+          }),
+        });
+      } catch (err) {
+        throw new LlmError(
+          "provider",
+          `Couldn't reach Anthropic: ${(err as Error).message}`,
+        );
+      }
       const text = new TextDecoder().decode(res.body);
       if (res.status !== 200) {
-        throw new Error(
-          `Anthropic answered ${res.status}${errorMessage(text)}`,
+        const detail = errorMessage(text);
+        throw new LlmError(
+          errorKind(res.status, detail),
+          `Anthropic answered ${res.status}${detail ? `: ${detail}` : ""}`,
         );
       }
       const parsed = messageSchema.safeParse(parseJson(text));
       if (!parsed.success) {
-        throw new Error(
+        throw new LlmError(
+          "provider",
           `${url} answered with something that isn't a Messages API reply; check that nothing on this network intercepts requests to Anthropic`,
         );
       }
       const message = parsed.data;
+      const usage = {
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+      };
       if (message.stop_reason !== "end_turn") {
-        throw new Error(
+        throw new LlmError(
+          "provider",
           `Anthropic's reply stopped early (${message.stop_reason}), so it wasn't used`,
+          usage,
         );
       }
       return {
@@ -109,21 +147,27 @@ export function anthropicLlm(transport: Transport): Llm {
           .filter((b) => b.type === "text")
           .map((b) => b.text ?? "")
           .join(""),
-        usage: {
-          inputTokens: message.usage.input_tokens,
-          outputTokens: message.usage.output_tokens,
-        },
+        usage,
       };
     },
   };
 }
 
+/** What an error answer's status and message say went wrong. */
+function errorKind(status: number, message: string): LlmErrorKind {
+  if (status === 401 || status === 403) return "invalid-key";
+  if (status === 400 && /credit balance is too low/i.test(message)) {
+    return "no-credits";
+  }
+  return "provider";
+}
+
 const errorSchema = z.object({ error: z.object({ message: z.string() }) });
 
-/** `: <message>` from an Anthropic error body, or nothing. */
+/** The message in an Anthropic error body, or "". */
 function errorMessage(body: string): string {
   const parsed = errorSchema.safeParse(parseJson(body));
-  return parsed.success ? `: ${parsed.data.error.message}` : "";
+  return parsed.success ? parsed.data.error.message : "";
 }
 
 /** The JSON in `text`, or undefined when it isn't JSON. */

@@ -1,5 +1,6 @@
 import type { DraftContext } from "./draft-context.ts";
 import type { TeamId } from "./league.ts";
+import { LlmStopped } from "./llm-call.ts";
 import {
   FIRST_DRAFT_SYSTEM,
   firstDraftPrompt,
@@ -39,13 +40,17 @@ export interface GatedProse {
   written: WrittenProse;
   /** Each section written as its best attempt, never having passed. */
   failed: FailedSection[];
+  /** Why a retry was stopped, and how many replies came before it. */
+  stopped?: { reason: LlmStopped; replies: number };
 }
 
 /**
  * The LLM's prose for a draft, through the LLM gate: the first draft writes
  * every section, and each retry asks only for the sections still failing,
  * with the validator's complaints. A section that never passes keeps its
- * best attempt. `ask` sends one prompt and returns the reply's text.
+ * best attempt. `ask` sends one prompt and returns the reply's text. When
+ * `ask` throws `LlmStopped` on a retry, the gate stops there and keeps what
+ * it has; on the first draft, it throws.
  */
 export async function gatedProse(
   ctx: DraftContext,
@@ -66,12 +71,18 @@ export async function gatedProse(
     if (failed) failing.set(key, { latest: failed, best: failed });
   }
 
+  let stopped: GatedProse["stopped"];
   for (let retry = 1; retry <= GATE_RETRIES && failing.size > 0; retry++) {
     const asked = [...failing.values()].map((f) => f.latest);
-    const reply = readReply(
-      await ask(FIRST_DRAFT_SYSTEM, rewritePrompt(ctx, asked)),
-      ctx,
-    );
+    let text: string;
+    try {
+      text = await ask(FIRST_DRAFT_SYSTEM, rewritePrompt(ctx, asked));
+    } catch (err) {
+      if (!(err instanceof LlmStopped)) throw err;
+      stopped = { reason: err, replies: retry };
+      break;
+    }
+    const reply = readReply(text, ctx);
     for (const [key, text] of sectionsOf(reply)) {
       const was = failing.get(key);
       if (!was) continue;
@@ -88,7 +99,7 @@ export async function gatedProse(
 
   const failed = [...failing.values()].map((f) => f.best);
   for (const f of failed) setSection(written, f.key, f.text);
-  return { written, failed };
+  return { written, failed, ...(stopped && { stopped }) };
 }
 
 /** A section's faults, or undefined when it passes the gate. */

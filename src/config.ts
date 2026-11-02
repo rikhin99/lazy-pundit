@@ -197,6 +197,37 @@ export async function saveCredentials(
   return path;
 }
 
+/** `2025-10`: the calendar month in local time that spend is counted under. */
+export function spendMonth(d: Date): string {
+  return localDate(d).slice(0, 7);
+}
+
+/** The spend counted for `month` in `spend.yaml`: 0 with no file or entry. */
+export async function monthSpend(
+  deps: Pick<Deps, "configDir">,
+  month: string,
+): Promise<number> {
+  const spend = await readConfigFile(spendPath(deps), spendSchema);
+  return spend?.months[month] ?? 0;
+}
+
+/** Adds `usd` to `month` in `spend.yaml`, keeping every other month. */
+export async function addSpend(
+  deps: Pick<Deps, "configDir">,
+  month: string,
+  usd: number,
+): Promise<void> {
+  const path = spendPath(deps);
+  const spend = (await readConfigFile(path, spendSchema)) ?? {
+    format: CONFIG_FORMAT,
+    months: {},
+  };
+  const total = (spend.months[month] ?? 0) + usd;
+  // Rounded to a millionth of a dollar, so float noise never piles up.
+  spend.months[month] = Math.round(total * 1e6) / 1e6;
+  await writeConfigFile(path, stringify(spendSchema.parse(spend)), 0o600);
+}
+
 /** `2025-10-28`, in local time. */
 function localDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");

@@ -4,6 +4,7 @@ import { checkDraft, type Problem, withGateFailures } from "./check.ts";
 import {
   CONFIG_FORMAT,
   configSchema,
+  credentialsPath,
   loadCredentials,
   readConfig,
 } from "./config.ts";
@@ -16,7 +17,8 @@ import {
 } from "./draft-context.ts";
 import { type DraftData, draftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
-import { type FailedSection, gatedProse } from "./llm-gate.ts";
+import { type CallSetup, LlmStopped, llmAsk } from "./llm-call.ts";
+import { type FailedSection, type GatedProse, gatedProse } from "./llm-gate.ts";
 import { type DraftProse, parseRanking, renderDraft } from "./ranking-file.ts";
 import { fetchSleeperSnapshot } from "./sleeper/fetcher.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
@@ -42,6 +44,8 @@ export interface DraftResult {
   problems: Problem[];
   /** Anything the operator should fix, such as a credentials file others can read. */
   warnings: string[];
+  /** Why the LLM didn't run or stopped partway, and what the draft has instead. */
+  fallback?: string;
 }
 
 export class DraftExistsError extends Error {
@@ -73,15 +77,23 @@ export async function draft(
   const order = startingOrder(league, week);
   const data = draftData(league, week);
   const { anthropicApiKey, warnings } = await loadCredentials(deps);
-  const { prose, failed } = anthropicApiKey
+  const began = deps.clock.now();
+  const { prose, failed, fallback } = anthropicApiKey
     ? await llmProse(
         draftContext(league, data, await lastBlurbs(dir, week)),
         data,
-        anthropicApiKey.value,
-        deps,
+        {
+          deps,
+          key: anthropicApiKey.value,
+          transcript: { ws, week, at: began },
+        },
       )
-    : { prose: statLines(data), failed: [] };
-  const now = deps.clock.now().toISOString();
+    : {
+        prose: statLines(data),
+        failed: [],
+        fallback: `No Anthropic key, so the LLM didn't run: set ANTHROPIC_API_KEY, or add anthropic_api_key to ${credentialsPath(deps)}${STAT_LINES}`,
+      };
+  const now = began.toISOString();
   const text = renderDraft(
     {
       season: Number(league.season),
@@ -109,7 +121,14 @@ export async function draft(
   }
   const checked = await checkDraft(workspaceDir);
   const problems = withGateFailures(checked, failed);
-  return { path, week, snapshot: id, problems, warnings };
+  return {
+    path,
+    week,
+    snapshot: id,
+    problems,
+    warnings,
+    ...(fallback && { fallback }),
+  };
 }
 
 /**
@@ -143,38 +162,52 @@ async function lastBlurbs(
   };
 }
 
-/** Room for a league-week's blurbs and intro, with the model's thinking. */
-const MAX_TOKENS = 16000;
+/** The end of a fallback reason when the LLM never replied. */
+const STAT_LINES = "; the draft has stat lines.";
+
+/** A new draft's prose, its gate failures and any fallback reason. */
+interface ProseOutcome {
+  prose: DraftProse;
+  failed: FailedSection[];
+  /** The fallback reason, when the LLM didn't run or stopped partway. */
+  fallback?: string;
+}
 
 /**
  * The LLM's intro and blurbs through the LLM gate, from the draft context
- * alone. A team or intro the first reply leaves out keeps its stat line.
+ * alone. A team or intro the first reply leaves out keeps its stat line, and
+ * an LLM that stops before its first reply leaves every stat line.
  */
 async function llmProse(
   ctx: DraftContext,
   data: DraftData,
-  key: string,
-  deps: Deps,
-): Promise<{ prose: DraftProse; failed: FailedSection[] }> {
+  setup: Omit<CallSetup, "config">,
+): Promise<ProseOutcome> {
   const config =
-    (await readConfig(deps)) ?? configSchema.parse({ format: CONFIG_FORMAT });
-  const { written, failed } = await gatedProse(ctx, async (system, prompt) => {
-    const reply = await deps.llm.write({
-      key,
-      model: config.model,
-      system,
-      prompt,
-      maxTokens: MAX_TOKENS,
-    });
-    return reply.text;
-  });
-  const fallback = statLines(data);
+    (await readConfig(setup.deps)) ??
+    configSchema.parse({ format: CONFIG_FORMAT });
+  const lines = statLines(data);
+  let gated: GatedProse;
+  try {
+    gated = await gatedProse(ctx, llmAsk({ ...setup, config }));
+  } catch (err) {
+    if (!(err instanceof LlmStopped)) throw err;
+    return {
+      prose: lines,
+      failed: [],
+      fallback: `${err.message}${STAT_LINES}`,
+    };
+  }
+  const { written, failed, stopped } = gated;
   return {
     prose: {
-      intro: written.intro ?? fallback.intro,
-      blurbs: { ...fallback.blurbs, ...written.teams },
+      intro: written.intro ?? lines.intro,
+      blurbs: { ...lines.blurbs, ...written.teams },
     },
     failed,
+    ...(stopped && {
+      fallback: `${stopped.reason.message}; the LLM gate stopped after ${stopped.replies} repl${stopped.replies === 1 ? "y" : "ies"}, so the draft has the LLM's prose so far, each failing section at its best attempt.`,
+    }),
   };
 }
 

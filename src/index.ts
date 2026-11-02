@@ -2,6 +2,8 @@ export {
   ANTHROPIC_API,
   anthropicLlm,
   type Llm,
+  LlmError,
+  type LlmErrorKind,
   type LlmReply,
   type LlmRequest,
 } from "./anthropic.ts";
@@ -70,6 +72,7 @@ export {
   type TeamStanding,
   type Tiebreak,
 } from "./standings.ts";
+export { deleteTranscripts } from "./transcripts.ts";
 export {
   httpTransport,
   type Transport,

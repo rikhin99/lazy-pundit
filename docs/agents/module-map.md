@@ -4,7 +4,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 ## The pipeline
 
-`draft`: fetch (`sleeper/fetcher.ts`) → snapshot on disk (`snapshot.ts`) → League model (`sleeper/normalizer.ts`) → stats and evidence (`draft-data.ts`) → with an Anthropic key, the draft context (`draft-context.ts`, with last week's published blurbs read in `draft.ts`), the prompt (`prompt.ts`) and the LLM gate (`llm-gate.ts`: one call, then up to 2 retries for failing sections) → Markdown (`ranking-file.ts` `renderDraft`) → `checkDraft`.
+`draft`: fetch (`sleeper/fetcher.ts`) → snapshot on disk (`snapshot.ts`) → League model (`sleeper/normalizer.ts`) → stats and evidence (`draft-data.ts`) → with an Anthropic key, the draft context (`draft-context.ts`, with last week's published blurbs read in `draft.ts`), the prompt (`prompt.ts`) and the LLM gate (`llm-gate.ts`: one call, then up to 2 retries for failing sections), each call through `llm-call.ts` (price and spend-cap check, LLM transcript, spend) → Markdown (`ranking-file.ts` `renderDraft`) → `checkDraft`.
 
 `check` and `publish` both start from `checkDraft` in `check.ts`: read the latest `week-NN.md`, parse it, rebuild the evidence from its snapshot, validate each blurb, return the problems list and write any auto-tags. `publish` then freezes the checked text and renders plain text.
 
@@ -15,8 +15,8 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `index.ts` | The library's public API; the CLI and tests import only this | re-exports |
 | `cli.ts` | Arg parsing, the publish prompt and printing the problems list; no logic | commander program |
 | `deps.ts` | Injected outside world: transport, LLM, clock, clipboard, cache, config and workspaces folders, environment overrides; the only reader of `process.env` | `Deps`, `Environment`, `systemDeps` |
-| `config.ts` | The operator's files: `config.yaml`, `credentials.yaml` (0600), `spend.yaml`, with `CONFIG_FORMAT` | `readConfig`, `loadCredentials`, `saveCredentials`, `dropWorkspaces` |
-| `anthropic.ts` | Anthropic's API base, the live key check, the `Llm` interface and its Messages API client. Raw HTTP through the transport (ADR 0002): copy it for a new call, and open the `claude-api` skill only for an endpoint or feature it doesn't use yet | `ANTHROPIC_API`, `checkAnthropicKey`, `Llm`, `anthropicLlm` |
+| `config.ts` | The operator's files: `config.yaml`, `credentials.yaml` (0600), `spend.yaml` and its reader and writer, with `CONFIG_FORMAT` | `readConfig`, `loadCredentials`, `saveCredentials`, `dropWorkspaces`, `spendMonth`, `monthSpend`, `addSpend` |
+| `anthropic.ts` | Anthropic's API base, the live key check, the `Llm` interface and its Messages API client, which throws a typed `LlmError` (invalid key, no credits, provider). Raw HTTP through the transport (ADR 0002): copy it for a new call, and open the `claude-api` skill only for an endpoint or feature it doesn't use yet | `ANTHROPIC_API`, `checkAnthropicKey`, `Llm`, `anthropicLlm`, `LlmError` |
 | `doctor.ts` | The `doctor` command: each check with its fix | `doctor`, `DoctorCheck` |
 | `transport.ts`, `file-transport.ts`, `clock.ts`, `clipboard.ts` | The adapters behind `Deps`; only these touch network, time or other processes | `httpTransport`, `fileTransport`, `systemClipboard`, `noClipboard` |
 | `workspace.ts` | `workspace.md`, finding a workspace (`--league` or upwards from the current folder), season folders, file naming | `readWorkspace`, `findWorkspace`, `rankingsDir`, `snapshotsDir`, `weekStem` |
@@ -34,9 +34,12 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `draft-data.ts` | Evidence pack plus the stat lines and intro a draft starts with | `draftData` |
 | `draft-context.ts` | Everything the LLM may be sent for a league-week, and the persona (Broadcast until #54) | `draftContext`, `DraftContext`, `BROADCAST` |
 | `prompt.ts` | The first-draft instructions and prompt, the retry prompt with the gate's complaints, and reading the reply's sections | `FIRST_DRAFT_SYSTEM`, `firstDraftPrompt`, `rewritePrompt`, `readReply` |
-| `llm-gate.ts` | The LLM gate: validating each section, retrying the failing ones, keeping each section's best attempt | `gatedProse`, `GATE_RETRIES`, `FailedSection` |
+| `llm-gate.ts` | The LLM gate: validating each section, retrying the failing ones, keeping each section's best attempt, and stopping with the prose so far when a retry is stopped | `gatedProse`, `GATE_RETRIES`, `FailedSection` |
+| `llm-call.ts` | One LLM call for a draft: no price or past the spend cap stops it unmade; after it, its LLM transcript and spend. Any stop is `LlmStopped`, which `draft.ts` turns into the fallback | `llmAsk`, `LlmStopped`, `MAX_TOKENS` |
+| `prices.ts` | The dated price table, `config.yaml`'s overrides, a call's cost and its ceiling before it's made | `PRICE_TABLE`, `PRICES_AS_OF`, `priceOf`, `costOf`, `ceilingCost` |
+| `transcripts.ts` | LLM transcripts: writing one per call, deleting the folder | `writeTranscript`, `deleteTranscripts` |
 | `ranking-file.ts` | The `week-NN.md` format: render, parse (with text offsets), order checks | `renderDraft`, `parseRanking`, `checkOrder` |
-| `draft.ts` | The `draft` command | `draft` |
+| `draft.ts` | The `draft` command and its fallback reason | `draft` |
 | `check.ts` | The problems list: validates a draft and writes auto-tags; marks a new draft's gate failures | `check`, `checkDraft`, `Problem`, `withGateFailures` |
 | `publish.ts` | Publish confirm, frozen copy, plain text, clipboard | `publish` |
 | `plain-text.ts` | The plain text the league reads | `renderPlainText` |
@@ -51,7 +54,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 The seams, and the helpers each one uses:
 
-- **Library API against a temp workspace** (`draft-publish`, `llm-draft`, `check`, `config`, `doctor`): `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request) and `deps.env.anthropicApiKey`.
+- **Library API against a temp workspace** (`draft-publish`, `llm-draft`, `llm-fallback`, `check`, `config`, `doctor`): `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request; a scripted answer can be text, a reply with token counts, or an `LlmError` to throw) and `deps.env.anthropicApiKey`.
 - **LLM client** (`anthropic-llm`): `anthropicLlm` against a transport that records requests and answers with a canned Messages API body.
 - **Validator** (`validator`): `blurb()` and `week8Evidence()` in `support/week8-evidence.ts` hold literal week-8 evidence; `support/plain-prose.ts` lists sentences that must never come back hard.
 - **League model and stats** (`sleeper-normalizer`, `standings`, `stats`, `data-hash`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.

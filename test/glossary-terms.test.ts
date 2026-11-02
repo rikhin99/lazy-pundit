@@ -36,6 +36,8 @@ const ENFORCED = [
   "regenerate",
   "prompt data",
   "llm input",
+  "llm log",
+  "prompt log",
   "suggested ranking",
   "default ranking",
   "starting order snapshot",

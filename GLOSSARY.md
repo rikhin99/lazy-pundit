@@ -204,6 +204,13 @@ _Avoid_: Rewrite, regenerate
 Everything the LLM may be told about a league-week, gathered once when a draft begins: the evidence pack, the team names and managers' display names, the persona, the lore, the stakes and each team's last published blurb. An LLM draft, a revision and the eval harness all write from it, and nothing outside it is ever sent to the LLM provider.
 _Avoid_: Prompt data, LLM input
 
+**LLM transcript**:
+The record of one LLM call, kept as a file in the league workspace: the model, the token counts and cost, the system text, the prompt and the reply or the error, never the key. A draft writes one per call, and `transcripts delete` removes them all.
+_Avoid_: LLM log, prompt log
+
+**Fallback**:
+What a draft writes when the LLM can't run or stops partway, with a reason saying why: stat lines if it failed before its first reply, otherwise the prose so far. No key, an invalid key, no credits, the spend cap, a model with no price and any provider error all fall back. It is never silent and never half-written.
+
 **Group**:
 An optional label over a run of consecutive places in a ranking, such as a tier or a playoff split into championship and consolation groups. Places are numbered straight through the groups.
 _Avoid_: Bracket, division

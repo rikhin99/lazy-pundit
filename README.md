@@ -26,7 +26,10 @@ lazy-pundit draft     # fetch, then write pundits/<pundit>/<season>/week-NN.md i
 lazy-pundit check     # list the draft's problems and tag clear claims
 lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it
 lazy-pundit doctor    # check Node, your config and credentials, and each listed workspace
+lazy-pundit transcripts delete   # remove the workspace's LLM transcripts
 ```
+
+With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why.
 
 From anywhere, `--league <slug>` acts on a workspace your `config.yaml` lists.
 
@@ -39,12 +42,14 @@ The operator's files live in `$XDG_CONFIG_HOME/lazy-pundit/` (else `~/.config/la
 format: 1
 name: Rikhin
 model: claude-sonnet-5-5     # the default
-spend_cap_usd: 5             # the default
+spend_cap_usd: 5             # the default; a call that could pass it is never made
+prices:                      # optional: add a model, or correct the shipped price (USD per million tokens)
+  claude-sonnet-5-5: { input_per_mtok: 2, output_per_mtok: 10 }
 workspaces:
   fear-the-turtle: /Users/you/lazy-pundit/fear-the-turtle
 ```
 
-`credentials.yaml` holds the Anthropic key and the `espn_s2` cookie at mode 0600; the tool warns if others can read it.
+`spend.yaml` counts LLM spend by local calendar month, across every league. `credentials.yaml` holds the Anthropic key and the `espn_s2` cookie at mode 0600; the tool warns if others can read it.
 
 Environment variables:
 
