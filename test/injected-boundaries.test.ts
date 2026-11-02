@@ -52,8 +52,26 @@ test("no module reaches the network, system clock or other processes except thro
   expect(offences).toEqual([]);
 });
 
-/** The only modules allowed to write files: workspace files, snapshots and the person-level cache. */
-const FILE_WRITERS = new Set(["workspace-files.ts", "snapshot.ts", "cache.ts"]);
+test("only src/deps.ts reads environment variables, the home folder or the Node version", async () => {
+  const offences: string[] = [];
+  for (const file of await sourceFiles(SRC)) {
+    const path = relative(SRC, file);
+    if (path === "deps.ts") continue;
+    const text = await codeOf(file);
+    if (/\bprocess\.(env|version)\b|\bhomedir\b|node:os\b/.test(text)) {
+      offences.push(`${path} reads the environment; add it to Deps`);
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
+/** The only modules allowed to write files: workspace files, snapshots, the person-level cache and config. */
+const FILE_WRITERS = new Set([
+  "workspace-files.ts",
+  "snapshot.ts",
+  "cache.ts",
+  "config.ts",
+]);
 
 test("workspace files are written only through writeWorkspaceFile or writeOutput, which keep the format version", async () => {
   const offences: string[] = [];

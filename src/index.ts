@@ -1,7 +1,21 @@
 export { type CheckResult, check, type Problem } from "./check.ts";
 export { type Clipboard, systemClipboard } from "./clipboard.ts";
 export { type Clock, systemClock } from "./clock.ts";
-export { type Deps, systemDeps } from "./deps.ts";
+export {
+  type Config,
+  ConfigFileError,
+  type Credential,
+  type Credentials,
+  loadCredentials,
+  readConfig,
+  saveCredentials,
+} from "./config.ts";
+export { type Deps, type Environment, systemDeps } from "./deps.ts";
+export {
+  type DoctorCheck,
+  type DoctorResult,
+  doctor,
+} from "./doctor.ts";
 export { DraftExistsError, type DraftResult, draft } from "./draft.ts";
 export { type DraftData, draftData, type StatSet } from "./draft-data.ts";
 export { fileTransport } from "./file-transport.ts";
@@ -72,3 +86,4 @@ export {
   type ValidatorInput,
   validate,
 } from "./validator.ts";
+export { findWorkspace } from "./workspace.ts";

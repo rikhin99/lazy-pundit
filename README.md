@@ -18,13 +18,42 @@ seasons:
 ---
 ```
 
-From inside that folder:
+From inside that folder (or any folder in it):
 
 ```sh
 lazy-pundit draft     # fetch, then write pundits/<pundit>/<season>/week-NN.md in standings order
                       # reorder the ## sections and edit the blurbs
+lazy-pundit check     # list the draft's problems and tag clear claims
 lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it
+lazy-pundit doctor    # check Node, your config and credentials, and each listed workspace
 ```
+
+From anywhere, `--league <slug>` acts on a workspace your `config.yaml` lists.
+
+### Config and credentials
+
+Person-level files live in `$XDG_CONFIG_HOME/lazy-pundit/` (else `~/.config/lazy-pundit/`), never in a workspace:
+
+```yaml
+# config.yaml
+format: 1
+name: Rikhin
+model: claude-sonnet-5-5     # the default
+monthly_cap_usd: 5           # the default
+workspaces:
+  fear-the-turtle: /Users/you/lazy-pundit/fear-the-turtle
+```
+
+`credentials.yaml` holds the Anthropic key and the `espn_s2` cookie at mode 0600; the tool warns if others can read it.
+
+Environment variables:
+
+| Variable | Effect |
+|---|---|
+| `ANTHROPIC_API_KEY` | used instead of the stored Anthropic key |
+| `LAZY_PUNDIT_ESPN_S2` | used instead of the stored `espn_s2` cookie |
+| `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` | where the config and cache folders go |
+| `LAZY_PUNDIT_CLIPBOARD=off` | publish copies nothing, for scripted runs |
 
 ## Development
 
@@ -37,7 +66,7 @@ npm run lint
 npm test
 ```
 
-The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock**, a **clipboard** and a **cache dir** for the players file (`systemDeps()` in production). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
+The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock**, a **clipboard**, the **cache**, **config** and **workspaces** folders, and the environment's overrides (`systemDeps()` in production, the only place that reads `process.env`). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
 
 ### Fixtures
 

@@ -40,6 +40,7 @@ export function recordingClipboard(): Clipboard & { copied: string[] } {
       copied.push(text);
       return true;
     },
+    find: async () => "recording",
   };
 }
 
@@ -71,12 +72,31 @@ seasons:
   if (!snapshot) throw new Error(`no committed snapshot for week ${week}`);
   const clipboard = recordingClipboard();
   const deps: Deps = {
+    ...(await person()),
     transport: fileTransport(FIXTURES, snapshot),
-    clock: fixedClock("2025-10-28T15:00:00.000Z"),
     clipboard,
-    cacheDir: await mkdtemp(join(tmpdir(), "lazy-pundit-cache-")),
   };
   return { dir, deps, clipboard };
+}
+
+/**
+ * Deps for one person on a fresh machine: temp config, cache and workspaces
+ * folders, no environment overrides, Node 24, a fixed clock, a recording
+ * clipboard and a transport that answers 404 to everything.
+ */
+export async function person(): Promise<Deps> {
+  const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
+  return {
+    transport: {
+      request: async () => ({ status: 404, body: new Uint8Array() }),
+    },
+    clock: fixedClock("2025-10-28T15:00:00.000Z"),
+    clipboard: recordingClipboard(),
+    cacheDir: join(home, ".cache", "lazy-pundit"),
+    configDir: join(home, ".config", "lazy-pundit"),
+    workspacesDir: join(home, "lazy-pundit"),
+    env: { nodeVersion: "v24.0.0" },
+  };
 }
 
 /** Where a pundit's ranking files for a season live. */

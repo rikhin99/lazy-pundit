@@ -6,8 +6,8 @@ import { httpTransport, type Transport } from "./transport.ts";
 
 /**
  * What every library entry point is handed instead of reaching the outside
- * world itself. Tests pass a file transport, a fixed clock and a recording
- * clipboard.
+ * world itself. Tests pass a file transport, a fixed clock, a recording
+ * clipboard and temp folders, so nothing touches the real home directory.
  */
 export interface Deps {
   transport: Transport;
@@ -15,24 +15,55 @@ export interface Deps {
   clipboard: Clipboard;
   /** The person-level cache folder for large platform files. */
   cacheDir: string;
+  /** The person-level config folder: `config.yaml`, `credentials.yaml`, `usage.yaml`. */
+  configDir: string;
+  /** The folder new league workspaces go in by default, one per league slug. */
+  workspacesDir: string;
+  /** What the environment overrides or reports. */
+  env: Environment;
+}
+
+export interface Environment {
+  /** `ANTHROPIC_API_KEY`: used instead of the stored Anthropic key. */
+  anthropicApiKey?: string;
+  /** `LAZY_PUNDIT_ESPN_S2`: used instead of the stored `espn_s2` cookie. */
+  espnS2?: string;
+  /** The running Node's version, such as `v24.1.0`. */
+  nodeVersion: string;
 }
 
 /**
- * The real network, system time, system clipboard and XDG cache dir.
- * `LAZY_PUNDIT_CLIPBOARD=off` leaves the clipboard alone, as on a machine
- * without one, so scripted runs don't overwrite the person's clipboard.
+ * The real network, system time and system clipboard, with folders and
+ * overrides read from the environment. This is the only place that reads
+ * environment variables:
+ *
+ *   XDG_CONFIG_HOME        config folder, else ~/.config (then /lazy-pundit)
+ *   XDG_CACHE_HOME         cache folder, else ~/.cache (then /lazy-pundit)
+ *   ANTHROPIC_API_KEY      overrides the stored Anthropic key
+ *   LAZY_PUNDIT_ESPN_S2    overrides the stored espn_s2 cookie
+ *   LAZY_PUNDIT_CLIPBOARD  `off` leaves the clipboard alone, as on a machine
+ *                          without one, so scripted runs don't overwrite it
  */
 export function systemDeps(): Deps {
+  const env = process.env;
+  const home = homedir();
   return {
     transport: httpTransport(),
     clock: systemClock,
     clipboard:
-      process.env.LAZY_PUNDIT_CLIPBOARD === "off"
-        ? noClipboard
-        : systemClipboard,
-    cacheDir: join(
-      process.env.XDG_CACHE_HOME || join(homedir(), ".cache"),
+      env.LAZY_PUNDIT_CLIPBOARD === "off" ? noClipboard : systemClipboard,
+    cacheDir: join(env.XDG_CACHE_HOME || join(home, ".cache"), "lazy-pundit"),
+    configDir: join(
+      env.XDG_CONFIG_HOME || join(home, ".config"),
       "lazy-pundit",
     ),
+    workspacesDir: join(home, "lazy-pundit"),
+    env: {
+      ...(env.ANTHROPIC_API_KEY
+        ? { anthropicApiKey: env.ANTHROPIC_API_KEY }
+        : {}),
+      ...(env.LAZY_PUNDIT_ESPN_S2 ? { espnS2: env.LAZY_PUNDIT_ESPN_S2 } : {}),
+      nodeVersion: process.version,
+    },
   };
 }

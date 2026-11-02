@@ -3,10 +3,15 @@ import { relative } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command } from "@commander-js/extra-typings";
 import {
+  ConfigFileError,
   check,
+  type Deps,
+  type DoctorCheck,
   DraftExistsError,
+  doctor,
   draft,
   FetchError,
+  findWorkspace,
   type Problem,
   publish,
   systemDeps,
@@ -17,10 +22,24 @@ import {
 const program = new Command()
   .name("lazy-pundit")
   .description("Power rankings with checked stats for your fantasy league.")
+  .option("--league <slug>", "act on this league's workspace from anywhere")
   .showHelpAfterError();
 
-const workspace = process.cwd();
-const shown = (path: string) => relative(workspace, path) || path;
+const cwd = process.cwd();
+const shown = (path: string) => relative(cwd, path) || path;
+
+/** The workspace `--league` names, or the one the current folder is in. */
+function workspace(deps: Deps): Promise<string> {
+  const { league } = program.opts();
+  return findWorkspace(deps, { cwd, ...(league ? { league } : {}) });
+}
+
+const MARKS: Record<DoctorCheck["status"], string> = {
+  ok: "✓",
+  note: "·",
+  warn: "!",
+  fail: "✗",
+};
 
 const KINDS: Record<Problem["kind"], string> = {
   wrong: "wrong",
@@ -78,7 +97,8 @@ program
   .command("draft")
   .description("Fetch the league and start a draft for the last scored week.")
   .action(async () => {
-    const result = await draft(workspace, systemDeps());
+    const deps = systemDeps();
+    const result = await draft(await workspace(deps), deps);
     console.log(
       `Drafted week ${result.week}: ${shown(result.path)} (snapshot ${result.snapshot})`,
     );
@@ -89,7 +109,8 @@ program
   .command("check")
   .description("Check the latest draft's claims and add tags to clear ones.")
   .action(async () => {
-    const result = await check(workspace, systemDeps());
+    const deps = systemDeps();
+    const result = await check(await workspace(deps), deps);
     if (result.autoTagged > 0) {
       console.log(
         `Tagged ${result.autoTagged} claim${result.autoTagged === 1 ? "" : "s"} in ${shown(result.path)}.`,
@@ -104,7 +125,8 @@ program
   .option("-y, --yes", "publish even with hard problems, without asking")
   .action(async (opts) => {
     let asked = false;
-    const result = await publish(workspace, systemDeps(), {
+    const deps = systemDeps();
+    const result = await publish(await workspace(deps), deps, {
       yes: opts.yes ?? false,
       confirm: async (hard) => {
         asked = true;
@@ -132,11 +154,24 @@ program
     );
   });
 
+program
+  .command("doctor")
+  .description("Check Node, your config and credentials, and each workspace.")
+  .action(async () => {
+    const result = await doctor(systemDeps());
+    for (const c of result.checks) {
+      console.log(`${MARKS[c.status]} ${c.subject}: ${c.message}`);
+      if (c.fix) console.log(`    Fix: ${c.fix}`);
+    }
+    if (!result.ok) process.exitCode = 1;
+  });
+
 try {
   await program.parseAsync();
 } catch (err) {
   if (
     err instanceof WorkspaceFileError ||
+    err instanceof ConfigFileError ||
     err instanceof DraftExistsError ||
     err instanceof FetchError
   ) {

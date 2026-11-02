@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
 import { type ZodType, z } from "zod";
+import {
+  CONFIG_FORMAT,
+  configSchema,
+  credentialsSchema,
+  usageSchema,
+} from "../src/config.ts";
 import { FORMAT } from "../src/front-matter.ts";
 import { metaSchema } from "../src/ranking-file.ts";
 import { manifestSchema, SNAPSHOT_FORMAT } from "../src/snapshot.ts";
@@ -19,6 +25,9 @@ const RECORDED = {
   SNAPSHOT_FORMAT: {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",
   } as Record<number, string>,
+  CONFIG_FORMAT: {
+    1: "c70830a570780242033203e1635e8e67e6308812218bb30c3cd4ac2b51888e5a",
+  } as Record<number, string>,
 };
 
 function shapeHash(...schemas: ZodType[]): string {
@@ -29,6 +38,11 @@ function shapeHash(...schemas: ZodType[]): string {
 test.each([
   ["FORMAT", FORMAT, shapeHash(metaSchema, workspaceSchema)],
   ["SNAPSHOT_FORMAT", SNAPSHOT_FORMAT, shapeHash(manifestSchema)],
+  [
+    "CONFIG_FORMAT",
+    CONFIG_FORMAT,
+    shapeHash(configSchema, credentialsSchema, usageSchema),
+  ],
 ] as const)(
   "%s %i matches the file shape recorded for it",
   (name, version, hash) => {

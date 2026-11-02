@@ -1,6 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
+import { ConfigFileError, configPath, readConfig } from "./config.ts";
+import type { Deps } from "./deps.ts";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
 
 /** `workspace.md`'s front matter. Its shape is versioned by `FORMAT`. */
@@ -55,6 +57,57 @@ export async function readWorkspace(dir: string): Promise<Workspace> {
     pundit: parsed.data.pundit,
     season: { year, platform: season.platform, leagueId: season.league_id },
   };
+}
+
+/**
+ * The workspace a command acts on: the one `config.yaml` lists under
+ * `league`, or else the folder `cwd` is in that holds a `workspace.md`,
+ * searching upwards as git does.
+ */
+export async function findWorkspace(
+  deps: Pick<Deps, "configDir">,
+  opts: { cwd: string; league?: string },
+): Promise<string> {
+  if (opts.league !== undefined) return listedWorkspace(deps, opts.league);
+  let dir = resolve(opts.cwd);
+  for (;;) {
+    if (await exists(join(dir, "workspace.md"))) return dir;
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  throw new WorkspaceFileError(
+    `No workspace.md in ${opts.cwd} or any folder above it. Run the command inside a league workspace, or pass --league <slug>.`,
+  );
+}
+
+async function listedWorkspace(
+  deps: Pick<Deps, "configDir">,
+  slug: string,
+): Promise<string> {
+  const config = await readConfig(deps);
+  const listed = config?.workspaces ?? {};
+  const dir = listed[slug];
+  if (dir === undefined) {
+    const known = Object.keys(listed).sort();
+    throw new ConfigFileError(
+      `No league "${slug}" in ${configPath(deps)}. ${
+        known.length > 0
+          ? `Its leagues: ${known.join(", ")}.`
+          : "It lists no league workspaces yet; run the command inside the workspace instead."
+      }`,
+    );
+  }
+  return dir;
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The workspace's snapshot folder. */
