@@ -4,6 +4,8 @@ The steps around `/implement <ticket>`, in order. Each ends on the condition tha
 
 ## 1. Glossary first, before the first test
 
+Before reading code, list what the ticket adds. If it adds two or more commands or behaviours with their own seams, propose a split once, naming the line to cut on.
+
 List every domain noun the ticket brings or renames: a file, a setting, a role, a command, a state. Run `/domain-modeling` for each one that `GLOSSARY.md` doesn't define, at the same time as agreeing the test seams. Then name files, fields and functions after the glossary terms.
 
 Read the ticket and the spec sections it cites. To find where a neighbouring ticket's scope begins, ask an Explore subagent for a short brief rather than reading the ticket. To find code, start from the module map's exports column and read only the functions you need, not whole files.

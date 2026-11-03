@@ -161,17 +161,25 @@ export async function committed(week: number): Promise<League> {
 
 /**
  * Replays a committed week with some payloads patched, as a real fetch would
- * have seen them, and normalizes the result. Keys are paths under the league.
+ * have seen them, and normalizes the result. Keys are paths under the league,
+ * and a key that no fetch asked for fails the test.
  */
 export async function patched(
   week: number,
   patches: Record<string, (payload: Json) => void>,
 ): Promise<League> {
   const base = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
+  const unused = new Set(Object.keys(patches));
   const transport = patchingTransport(
     fileTransport(FIXTURES, WEEKS[String(week)] as string),
     Object.fromEntries(
-      Object.entries(patches).map(([p, f]) => [p ? `${base}/${p}` : base, f]),
+      Object.entries(patches).map(([p, f]) => [
+        p ? `${base}/${p}` : base,
+        (payload: Json) => {
+          unused.delete(p);
+          f(payload);
+        },
+      ]),
     ),
   );
   const dir = await mkdtemp(join(tmpdir(), "lazy-pundit-"));
@@ -182,6 +190,11 @@ export async function patched(
     cacheDir: await mkdtemp(join(tmpdir(), "lazy-pundit-cache-")),
     leagueId: FEAR_THE_TURTLE_ID,
   });
+  if (unused.size > 0) {
+    throw new Error(
+      `patched: no fetch asked for ${[...unused].join(", ")}, so the patch changed nothing`,
+    );
+  }
   return normalizeSleeper(await readSnapshot(dir, id));
 }
 

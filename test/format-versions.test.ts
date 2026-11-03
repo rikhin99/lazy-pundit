@@ -53,7 +53,7 @@ test.each([
   (name, version, hash) => {
     expect(
       RECORDED[name][version],
-      `the files ${name} ${version} describes changed shape: bump ${name} and record its hash`,
+      `the files ${name} ${version} describes changed shape: bump ${name} and record its hash, ${hash}`,
     ).toBe(hash);
   },
 );
