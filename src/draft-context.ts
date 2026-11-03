@@ -1,15 +1,18 @@
 import type { DraftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
+import type { SentLore } from "./lore.ts";
 import type { Persona } from "./persona.ts";
 import type { EvidencePack } from "./validator/types.ts";
 
 /**
  * Everything the LLM may be told about a league-week, gathered once when a
  * draft begins. An LLM draft, a revision and the eval harness all write from
- * it, and the prompt is built from nothing else. Lore and stakes join it in
- * later tickets.
+ * it, and the prompt is built from nothing else. Stakes join it in a later
+ * ticket.
  *
- * Never in it: credentials, raw payloads, platform account IDs or emails.
+ * Never in it: credentials, raw payloads, platform account IDs or the
+ * platform's emails. Lore is the pundits' own words, so it can hold what they
+ * wrote; the personal-data warning says so first.
  */
 export interface DraftContext {
   league: string;
@@ -20,7 +23,13 @@ export interface DraftContext {
   teams: { id: TeamId; name: string; managers: string[] }[];
   evidence: EvidencePack;
   persona: Persona;
-  /** Each team's last published blurb, if a ranking was published before. */
+  /** The lore, without what a departed manager's sections or comments hold. */
+  lore: SentLore;
+  /**
+   * Each team's last published blurb, if a ranking was published before. It's
+   * the pundit's published words, so it may repeat lore about a manager who
+   * has since left.
+   */
   lastBlurbs?: LastBlurbs;
 }
 
@@ -39,6 +48,7 @@ export function draftContext(
   league: League,
   data: DraftData,
   persona: Persona,
+  lore: SentLore,
   lastBlurbs?: LastBlurbs,
 ): DraftContext {
   return {
@@ -52,6 +62,7 @@ export function draftContext(
     })),
     evidence: data.evidence,
     persona,
+    lore,
     ...(lastBlurbs ? { lastBlurbs } : {}),
   };
 }

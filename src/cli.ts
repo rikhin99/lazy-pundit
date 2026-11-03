@@ -111,13 +111,18 @@ function confirmRelaxed(persona: PersonaRecord): Promise<boolean> {
   return ask("Publish with it? [y/N] ", /^y(es)?$/i);
 }
 
+function printWarnings(warnings: string[]): void {
+  for (const w of warnings) console.error(`${MARKS.warn} ${w}`);
+}
+
 program
   .command("draft")
   .description("Fetch the league and start a draft for the last scored week.")
   .action(async () => {
     const deps = systemDeps();
-    const result = await draft(await workspace(deps), deps);
-    for (const w of result.warnings) console.error(`${MARKS.warn} ${w}`);
+    const result = await draft(await workspace(deps), deps, {
+      onWarnings: printWarnings,
+    });
     if (result.fallback) console.error(`${MARKS.warn} ${result.fallback}`);
     console.log(
       `Drafted week ${result.week}: ${shown(result.path)} (snapshot ${result.snapshot})`,
@@ -131,6 +136,7 @@ program
   .action(async () => {
     const deps = systemDeps();
     const result = await check(await workspace(deps), deps);
+    printWarnings(result.warnings);
     if (result.autoTagged > 0) {
       console.log(
         `Tagged ${result.autoTagged} claim${result.autoTagged === 1 ? "" : "s"} in ${shown(result.path)}.`,
@@ -147,6 +153,7 @@ program
   .action(async () => {
     const deps = systemDeps();
     const result = await refresh(await workspace(deps), deps);
+    printWarnings(result.warnings);
     if (result.changes.length === 0) {
       console.log(`No changes since ${result.dataAsOf}.`);
     } else {
@@ -180,9 +187,7 @@ program
         return confirmPublish();
       },
       confirmRelaxed,
-      onWarnings: (warnings) => {
-        for (const w of warnings) console.error(`${MARKS.warn} ${w}`);
-      },
+      onWarnings: printWarnings,
     });
     if (!result.published) {
       console.log(

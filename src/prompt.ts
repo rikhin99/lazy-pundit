@@ -18,9 +18,9 @@ Claims must be cited
 - The bracketed words must state the evidence value: the number as given (rounding to one decimal place is fine), the record, the team's or player's name.
 - In a team's blurb a bare ID is that team's stat. Cite another team's stat as <team id>/<id>, such as {ev=sleeper:4/record}, and a league-wide item by its wk. ID. In the week intro, cite every team stat in the <team id>/<id> form.
 - A superlative needs a rank or league item behind it: [the league's top scorer]{ev=pf_rank} only when pf_rank is 1.
-- Never write a claim without a citation, and never state a fact that isn't in the evidence. If the evidence doesn't support something, leave it out.
+- Never write a claim without a citation, and never state a fact that isn't in the evidence or, for a personal fact, in the lore. If they don't support something, leave it out.
 - Don't say where a team sits in this power ranking, how far it rose or fell, or which tier it's in: the pundit hasn't set the order yet. Standings ranks from the evidence (standing, pf_rank and the like) are fine.
-- Say nothing about the managers as people beyond their names: no jobs, families, habits or history. Don't mention money, prizes or punishments.
+- State a personal fact about a manager (a job, family, habit, relationship or history) only from the lore in the prompt, and tag it with the section it came from, as {lore=<section>}: [the league's dentist]{lore=manager:bo}. With no lore on it, say nothing about the managers as people beyond their names. Never invent a personal fact. Don't mention money, prizes or punishments.
 - Opinions, jokes and predictions need no citation, as long as they claim no fact.
 
 Reading the evidence
@@ -68,17 +68,52 @@ export function firstDraftPrompt(ctx: DraftContext): string {
     ].join("\n");
   });
 
+  const lore = loreBlock(ctx);
+
   return [
     `League: ${ctx.league}, ${ctx.season} season, after week ${ctx.week}.`,
     "",
     "## Persona",
     personaInstructions(ctx.persona),
     "",
+    ...(lore ? [lore, ""] : []),
     "## League-wide items",
     ...lines(ctx.evidence.league),
     "",
     "## Teams",
     teams.join("\n\n"),
+  ].join("\n");
+}
+
+/**
+ * The lore as the prompt holds it, or nothing when there's none. A manager's
+ * section says which team they manage, since lore names them by handle.
+ */
+export function loreBlock(ctx: DraftContext): string {
+  const { type, sections } = ctx.lore;
+  if (!type && sections.length === 0) return "";
+  const nameOf = (id: TeamId) => ctx.teams.find((t) => t.id === id)?.name ?? id;
+  const blocks = sections.map((s) => {
+    const about = s.teams.map(nameOf).join(" and ");
+    const heading = !about
+      ? s.name
+      : s.name.startsWith("manager:")
+        ? `${s.name} (manages ${about})`
+        : `${s.name} (${about})`;
+    return [
+      `### ${heading}`,
+      ...(s.nicknames.length > 0
+        ? [`Nicknames: ${s.nicknames.join(", ")}`]
+        : []),
+      ...s.entries.map((e) => `- ${e}`),
+    ].join("\n");
+  });
+  return [
+    "## Lore",
+    "What the pundits have written about the league and its people: the only source for personal facts. A number here is no stat. Cite a section by the name after ###.",
+    ...(type ? [`League type: ${type}`] : []),
+    "",
+    blocks.join("\n\n"),
   ].join("\n");
 }
 

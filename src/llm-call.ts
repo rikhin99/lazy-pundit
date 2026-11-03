@@ -8,7 +8,7 @@ import {
   spendMonth,
 } from "./config.ts";
 import type { Deps } from "./deps.ts";
-import { ceilingCost, costOf, priceOf } from "./prices.ts";
+import { ceilingCost, costOf, priceOf, usd } from "./prices.ts";
 import { type TranscriptPlace, writeTranscript } from "./transcripts.ts";
 
 /** Room for a league-week's blurbs and intro, with the model's thinking. */
@@ -113,11 +113,6 @@ async function stopOnBadFile<T>(f: () => Promise<T>): Promise<T> {
     if (err instanceof ConfigFileError) throw new LlmStopped(err.message);
     throw err;
   }
-}
-
-/** `$0.17` */
-function usd(n: number): string {
-  return `$${n.toFixed(2)}`;
 }
 
 /** Why a failed call stops the LLM, with the fix where there is one. */

@@ -77,6 +77,8 @@ export interface CheckResult {
   problems: Problem[];
   /** How many claims were auto-tagged in the file. */
   autoTagged: number;
+  /** What reading the lore has to say, personal data included. */
+  warnings: string[];
 }
 
 /**
@@ -88,8 +90,9 @@ export async function check(
   workspaceDir: string,
   _deps: Deps,
 ): Promise<CheckResult> {
-  const { week, path, problems, autoTagged } = await checkDraft(workspaceDir);
-  return { week, path, problems, autoTagged };
+  const { week, path, problems, autoTagged, warnings } =
+    await checkDraft(workspaceDir);
+  return { week, path, problems, autoTagged, warnings };
 }
 
 /** A draft as `check` left it, for publish to freeze. */
@@ -170,6 +173,7 @@ export async function checkDraft(
     path,
     problems,
     autoTagged: tagging ? autoTags.length : 0,
+    warnings: lore.warnings,
     stem,
     dir,
     text,

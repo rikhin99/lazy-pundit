@@ -71,7 +71,10 @@ export async function publish(
 ): Promise<PublishResult> {
   const checked = await checkDraft(workspaceDir);
   const { week, problems, dir, stem } = checked;
-  const warnings = await freshDataWarnings(workspaceDir, checked, deps);
+  const warnings = [
+    ...checked.warnings,
+    ...(await freshDataWarnings(workspaceDir, checked, deps)),
+  ];
   opts.onWarnings?.(warnings);
 
   const hard = problems.filter((p) => p.severity === "hard");

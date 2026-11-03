@@ -4,6 +4,7 @@ import { z } from "zod";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
 import type { League } from "./league.ts";
 import { familyLeague } from "./league-file.ts";
+import { type Lore, managerNames } from "./lore.ts";
 import type { Swearing } from "./validator/types.ts";
 import { punditDir, type Workspace } from "./workspace.ts";
 
@@ -195,6 +196,7 @@ export interface LoadedPersona {
 export async function loadPersona(
   ws: Workspace,
   league: League,
+  lore: Lore,
 ): Promise<LoadedPersona> {
   let text: string;
   try {
@@ -260,10 +262,10 @@ export async function loadPersona(
       );
     }
   }
-  const named = managersNamed(held.styleNote, league);
+  const named = managersNamed(held.styleNote, league, lore);
   if (named.length > 0) {
     warnings.push(
-      `persona.md's style note names ${named.join(" and ")}, ${named.length === 1 ? "a manager" : "managers"} in the league. It's sent to the LLM provider with every draft.`,
+      `persona.md's style note names ${named.join(" and ")}, ${named.length === 1 ? "a manager" : "managers"} in the league or its lore. It's sent to the LLM provider with every draft.`,
     );
   }
   return { persona: held, warnings };
@@ -279,11 +281,12 @@ function familyCap(p: Persona): Persona {
 }
 
 /** The league's managers whose display names the text uses, as whole words. */
-function managersNamed(text: string, league: League): string[] {
+function managersNamed(text: string, league: League, lore: Lore): string[] {
   if (!text) return [];
-  const names = new Set(
-    league.teams.flatMap((t) => t.managers.map((m) => m.displayName)),
-  );
+  const names = new Set([
+    ...league.teams.flatMap((t) => t.managers.map((m) => m.displayName)),
+    ...managerNames(lore),
+  ]);
   return [...names].filter((name) =>
     new RegExp(
       `(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`,

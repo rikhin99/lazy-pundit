@@ -36,6 +36,9 @@ _Avoid_: Owner, player
 The league workspace's own short name for a manager, linked to each platform account they have played under. Lore and rivalry weeks name managers by handle. A link between accounts is made only when the pundit confirms it.
 _Avoid_: Username, user ID
 
+**Departed manager**:
+A manager whose handle links to platform accounts, none of them in the current league. Their lore is kept in case they come back, but isn't sent to the LLM provider.
+
 **Lore**:
 What the pundits have written down about a league and its people that the platform data doesn't hold: the league's type and history, facts about each manager, the relationships between them, running jokes, nicknames, and anything else the pundit chooses to add. It belongs to the league workspace and is shared by every pundit in it. Lore is context for the prose, not evidence.
 
@@ -44,6 +47,12 @@ One fact or note in a league's lore, filed under a league, manager, team or othe
 
 **Lore section**:
 One headed part of a league's lore: the league, a manager, a team, relationships, running jokes or anything the pundit makes up. A sentence that uses a lore entry cites the section's name.
+
+**Personal-data warning**:
+A warning, with line numbers, that lore looks like it holds a phone number, an email, a street address, a long run of digits or a date of birth. It comes from a deterministic check each time lore is read, and before any draft sends lore. It warns and doesn't stop the draft.
+
+**Lore size warning**:
+A warning when the lore a draft would send passes about 2,000 tokens, with the draft's estimated cost and lore's share of it against the spend cap.
 
 **League type**:
 What kind of group a league is: work, family, friends or other. It is written in the lore, and setup reads it to preselect the persona and the family-league setting.

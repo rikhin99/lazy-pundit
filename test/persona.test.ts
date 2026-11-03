@@ -380,7 +380,7 @@ describe("the style note", () => {
     const result = await draft(dir, deps);
 
     expect(result.warnings).toEqual([
-      `persona.md's style note names ${named}, a manager in the league. It's sent to the LLM provider with every draft.`,
+      `persona.md's style note names ${named}, a manager in the league or its lore. It's sent to the LLM provider with every draft.`,
     ]);
   });
 });

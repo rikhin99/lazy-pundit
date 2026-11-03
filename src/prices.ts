@@ -38,16 +38,29 @@ export function costOf(price: Price, usage: LlmReply["usage"]): number {
 }
 
 /**
+ * Text's tokens before it's sent, at one token per 3 characters: more tokens
+ * than real text has.
+ */
+export function estimatedTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
+/** `$0.17` */
+export function usd(n: number): string {
+  return `$${n.toFixed(2)}`;
+}
+
+/**
  * The most a call can cost, before it's made: the system text and prompt at
- * one token per 3 characters (more tokens than real text has), and the whole
- * `maxTokens` as output, thinking included. So the cap can't be passed.
+ * their estimated tokens, and the whole `maxTokens` as output, thinking
+ * included. So the cap can't be passed.
  */
 export function ceilingCost(
   price: Price,
   req: Pick<LlmRequest, "system" | "prompt" | "maxTokens">,
 ): number {
   return costOf(price, {
-    inputTokens: Math.ceil((req.system.length + req.prompt.length) / 3),
+    inputTokens: estimatedTokens(req.system + req.prompt),
     outputTokens: req.maxTokens,
   });
 }

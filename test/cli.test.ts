@@ -238,3 +238,19 @@ test("publish --yes doesn't ask", async () => {
   expect(stdout).not.toContain("Publish anyway");
   expect(existsSync(txt)).toBe(true);
 });
+
+test("draft and check each print the personal-data warning once", async () => {
+  const { dir } = await fearTheTurtle(8);
+  await writeFile(
+    join(dir, "lore.md"),
+    "---\nlore: 1\n---\n## Running jokes\n- Bo: 555-123-4567\n",
+  );
+  const warning = "line 5 (phone number)";
+
+  const drafted = await cli(dir, ["draft"]);
+  expect(drafted.code).toBe(0);
+  expect(drafted.stderr.split(warning)).toHaveLength(2);
+
+  const checked = await cli(dir, ["check"]);
+  expect(checked.stderr.split(warning)).toHaveLength(2);
+});

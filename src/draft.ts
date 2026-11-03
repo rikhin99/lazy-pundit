@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { checkDraft, type Problem, withGateFailures } from "./check.ts";
 import {
   CONFIG_FORMAT,
+  type Config,
   configSchema,
   credentialsPath,
   loadCredentials,
@@ -17,15 +18,29 @@ import {
 } from "./draft-context.ts";
 import { type DraftData, draftData } from "./draft-data.ts";
 import type { League } from "./league.ts";
-import { type CallSetup, LlmStopped, llmAsk } from "./llm-call.ts";
-import { type FailedSection, type GatedProse, gatedProse } from "./llm-gate.ts";
+import { type CallSetup, LlmStopped, llmAsk, MAX_TOKENS } from "./llm-call.ts";
+import {
+  type FailedSection,
+  GATE_RETRIES,
+  type GatedProse,
+  gatedProse,
+} from "./llm-gate.ts";
 import {
   loadLore,
   refuseLocal,
+  sentLore,
   type ValidatorNames,
   validatorNames,
 } from "./lore.ts";
 import { loadPersona, type Persona, personaRecord } from "./persona.ts";
+import {
+  ceilingCost,
+  costOf,
+  estimatedTokens,
+  priceOf,
+  usd,
+} from "./prices.ts";
+import { FIRST_DRAFT_SYSTEM, firstDraftPrompt, loreBlock } from "./prompt.ts";
 import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
 import { dataChangedWarning, fetchFresh } from "./refresh.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
@@ -55,6 +70,14 @@ export interface DraftResult {
   fallback?: string;
 }
 
+export interface DraftOptions {
+  /**
+   * Told each warning as it arises, so that one about what the LLM is to be
+   * sent is seen before the call.
+   */
+  onWarnings?: (warnings: string[]) => void;
+}
+
 export class DraftExistsError extends Error {
   override name = "DraftExistsError";
 }
@@ -66,10 +89,17 @@ export class DraftExistsError extends Error {
 export async function draft(
   workspaceDir: string,
   deps: Deps,
+  opts: DraftOptions = {},
 ): Promise<DraftResult> {
+  const warnings: string[] = [];
+  const warn = (more: string[]) => {
+    warnings.push(...more);
+    if (more.length > 0) opts.onWarnings?.(more);
+  };
   const ws = await readWorkspace(workspaceDir);
   const lore = await loadLore(ws);
   refuseLocal(lore);
+  warn(lore.warnings);
   const fetched = await fetchFresh(ws, deps);
   const names = validatorNames(lore, fetched.league, ws.handles);
   const week = fetched.league.lastScoredWeek;
@@ -92,25 +122,48 @@ export async function draft(
   const data = draftData(league, week);
   const { anthropicApiKey, warnings: credentialWarnings } =
     await loadCredentials(deps);
-  const { persona, warnings: personaWarnings } = await loadPersona(ws, league);
-  const warnings = [...credentialWarnings, ...personaWarnings];
+  const { persona, warnings: personaWarnings } = await loadPersona(
+    ws,
+    league,
+    lore,
+  );
+  warn([...credentialWarnings, ...personaWarnings]);
   const began = deps.clock.now();
-  const { prose, failed, fallback } = anthropicApiKey
-    ? await llmProse(
-        draftContext(league, data, persona, await lastBlurbs(dir, week)),
-        names,
-        data,
-        {
-          deps,
-          key: anthropicApiKey.value,
-          transcript: { ws, week, at: began },
-        },
-      )
-    : {
-        prose: statLines(data, persona),
-        failed: [],
-        fallback: `No Anthropic key, so the LLM didn't run: set ANTHROPIC_API_KEY, or add anthropic_api_key to ${credentialsPath(deps)}${STAT_LINES}`,
-      };
+  let outcome: ProseOutcome;
+  if (anthropicApiKey) {
+    const sent = sentLore(lore, league, ws.handles);
+    const ctx = draftContext(
+      league,
+      data,
+      persona,
+      sent.lore,
+      await lastBlurbs(dir, week),
+    );
+    const config =
+      (await readConfig(deps)) ?? configSchema.parse({ format: CONFIG_FORMAT });
+    warn([...sent.warnings, ...loreSizeWarning(ctx, config)]);
+    // The LLM may cite only what it was sent; a pundit may cite any section.
+    const gateNames: ValidatorNames = {
+      ...names,
+      sections: {
+        ...names.sections,
+        lore: sent.lore.sections.map((s) => s.name),
+      },
+    };
+    outcome = await llmProse(ctx, gateNames, data, {
+      deps,
+      config,
+      key: anthropicApiKey.value,
+      transcript: { ws, week, at: began },
+    });
+  } else {
+    outcome = {
+      prose: statLines(data, persona),
+      failed: [],
+      fallback: `No Anthropic key, so the LLM didn't run: set ANTHROPIC_API_KEY, or add anthropic_api_key to ${credentialsPath(deps)}${STAT_LINES}`,
+    };
+  }
+  const { prose, failed, fallback } = outcome;
   const now = began.toISOString();
   const text = renderDraft(
     {
@@ -138,6 +191,16 @@ export async function draft(
   }
   const checked = await checkDraft(workspaceDir);
   const problems = withGateFailures(checked, failed);
+  // The gate knows what was sent and `check` doesn't, so `check` passes these.
+  warn(
+    failed
+      .flatMap((f) => f.claims)
+      .filter((c) => !checked.problems.some((p) => p.text === c.text))
+      .map(
+        (c) =>
+          `The LLM cited lore it wasn't sent, so it may have made this up: "${c.text}".`,
+      ),
+  );
   return {
     path,
     week,
@@ -198,6 +261,35 @@ interface ProseOutcome {
   fallback?: string;
 }
 
+/** Lore's size, in the tokens `ceilingCost` counts, past which a draft warns. */
+const LORE_TOKENS_WARNED = 2000;
+
+/**
+ * The warning for lore past about 2,000 tokens: what it sends, and the most a
+ * draft is estimated to cost against the spend cap. Every call, the retries'
+ * too, repeats the lore.
+ */
+function loreSizeWarning(ctx: DraftContext, config: Config): string[] {
+  const tokens = estimatedTokens(loreBlock(ctx));
+  if (tokens <= LORE_TOKENS_WARNED) return [];
+  const size = `lore.md sends about ${tokens.toLocaleString("en-US")} tokens with every LLM call.`;
+  const price = priceOf(config);
+  if (!price) return [size];
+  const calls = 1 + GATE_RETRIES;
+  const draftCost =
+    calls *
+    ceilingCost(price, {
+      system: FIRST_DRAFT_SYSTEM,
+      prompt: firstDraftPrompt(ctx),
+      maxTokens: MAX_TOKENS,
+    });
+  const loreCost =
+    calls * costOf(price, { inputTokens: tokens, outputTokens: 0 });
+  return [
+    `${size} A draft is estimated at up to ${usd(draftCost)} (${calls} calls at most), ${usd(loreCost)} of it for lore, against your ${usd(config.spend_cap_usd)} spend cap.`,
+  ];
+}
+
 /**
  * The LLM's intro and blurbs through the LLM gate, from the draft context
  * alone. A team or intro the first reply leaves out keeps its stat line, and
@@ -207,15 +299,12 @@ async function llmProse(
   ctx: DraftContext,
   names: ValidatorNames,
   data: DraftData,
-  setup: Omit<CallSetup, "config">,
+  setup: CallSetup,
 ): Promise<ProseOutcome> {
-  const config =
-    (await readConfig(setup.deps)) ??
-    configSchema.parse({ format: CONFIG_FORMAT });
   const lines = statLines(data, ctx.persona);
   let gated: GatedProse;
   try {
-    gated = await gatedProse(ctx, names, llmAsk({ ...setup, config }));
+    gated = await gatedProse(ctx, names, llmAsk(setup));
   } catch (err) {
     if (!(err instanceof LlmStopped)) throw err;
     return {

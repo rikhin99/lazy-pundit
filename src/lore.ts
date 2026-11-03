@@ -29,6 +29,8 @@ export interface Lore {
   sections: LoreSection[];
   /** The lines with a `{local}` on them. */
   localLines: number[];
+  /** Personal data it seems to hold, and text no section holds. */
+  warnings: string[];
 }
 
 /** The names `validate` takes: what a team goes by, and what may be cited. */
@@ -45,7 +47,7 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
     text = await readFile(join(ws.dir, "lore.md"), "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    return { sections: [], localLines: [] };
+    return { sections: [], localLines: [], warnings: [] };
   }
   const { data, body, bodyLine } = readFrontMatter("lore.md", text, "lore");
   const parsed = loreSchema.safeParse(data);
@@ -62,7 +64,10 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
     localLines: body.split(/\r?\n/).flatMap((line, i) => {
       return line.includes("{local}") ? [bodyLine + i] : [];
     }),
+    warnings: [],
   };
+  const personal = personalDataWarning(lines);
+  if (personal) lore.warnings.push(personal);
   let section: LoreSection | undefined;
   for (const { text: line, at } of lines) {
     const heading = HEADING.exec(line)?.[1];
@@ -71,6 +76,7 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
       lore.sections.push(section);
       continue;
     }
+    if (/^(?:[-*_]{3,}|#\s.*)$/.test(line)) continue; // A rule or a title.
     const item = line.replace(/^[-*]\s+/, "");
     const nicknames = /^nicknames:(.*)$/i.exec(item)?.[1];
     if (nicknames !== undefined) {
@@ -79,9 +85,69 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
       lore.type = leagueType(item.slice("type:".length).trim(), lore, at);
     } else if (section && item) {
       section.entries.push(item);
+    } else if (item) {
+      lore.warnings.push(
+        `lore.md line ${at} is above the first ## heading, so it isn't sent. Move it under a heading.`,
+      );
     }
   }
   return lore;
+}
+
+const MONTH =
+  "\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b\\.?";
+const ORDINAL = "(?:st|nd|rd|th)?";
+const BIRTH_WORD =
+  "(?:\\b(?:born|dob|d\\.o\\.b|birthday|birth date|date of birth)\\b|\\bb\\.\\s*\\d)";
+const BIRTH_DATE = `(?:\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?|\\d{1,2}[.-]\\d{1,2}[.-]\\d{2,4}|${MONTH}\\s+\\d{1,2}${ORDINAL}\\b|${MONTH}\\s+\\d{4}\\b|\\b\\d{1,2}${ORDINAL}\\s+(?:of\\s+)?${MONTH})`;
+const STREET_WORDS =
+  "Street|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Crescent";
+
+/**
+ * What the personal-data warning looks for, each shape on its own. They warn
+ * rather than stop, so a date beside "born" counts wherever it sits on the
+ * line, while the shapes of scores and records stay out.
+ */
+const PERSONAL_DATA: { kind: string; shape: RegExp }[] = [
+  {
+    kind: "phone number",
+    shape:
+      /(?<![\d.-])(?:\+\d{1,3}[\s.-]?(?:\d{1,4}[\s.-]?){2,4}\d{2,4}|\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|0\d{3,4}[\s-]\d{5,6}|\d{3}[-.]\d{4})(?![\d-]|\.\d)/,
+  },
+  { kind: "email", shape: /[\w.+-]+@[\w-]+\.[\w.-]+/ },
+  {
+    kind: "street address",
+    // "St." before a capital is a player's name, as in Amon-Ra St. Brown.
+    shape: new RegExp(
+      `\\b\\d{1,6}[A-Za-z]?\\s+(?:\\p{Lu}[\\p{L}.'-]*\\s+){1,3}(?:(?:${STREET_WORDS})\\b|St\\b(?!\\.\\s+\\p{Lu}))|\\b\\d{1,6}\\s+(?:\\p{Ll}+\\s+){1,3}(?:street|avenue|boulevard)\\b`,
+      "u",
+    ),
+  },
+  {
+    kind: "long digit run",
+    shape: /\d{8,}|\b\d{3}-\d{2}-\d{4}\b|\b\d{4}(?:[-\s]\d{4}){3}\b/,
+  },
+  {
+    kind: "date of birth",
+    shape: new RegExp(`^(?=.*${BIRTH_WORD})(?=.*${BIRTH_DATE})`, "i"),
+  },
+];
+
+/**
+ * The personal-data warning for these lines, if any looks like it holds some.
+ * A heading that is a section's own tag holds an ID, not personal data.
+ */
+function personalDataWarning(
+  lines: { text: string; at: number }[],
+): string | undefined {
+  const found = lines.flatMap(({ text, at }) => {
+    if (SECTION_TAG.test(HEADING.exec(text)?.[1] ?? "")) return [];
+    return PERSONAL_DATA.filter(({ shape }) => shape.test(text)).map(
+      ({ kind }) => `line ${at} (${kind})`,
+    );
+  });
+  if (found.length === 0) return undefined;
+  return `lore.md may hold personal data: ${found.join(", ")}. Lore is sent to the LLM provider and copied into each LLM transcript, so remove what shouldn't go there; \`lazy-pundit transcripts delete\` removes the copies.`;
 }
 
 function refuseUnknownTags(lines: { text: string; at: number }[]): void {
@@ -179,6 +245,69 @@ function leagueType(value: string, lore: Lore, at: number): LeagueType {
   return type;
 }
 
+/** A manager section's handle; any other section has none. */
+function handleOf(s: LoreSection): string | undefined {
+  return /^manager:(.*)$/.exec(s.name)?.[1];
+}
+
+/** Every name lore gives a manager: each handle and its nicknames. */
+export function managerNames(lore: Lore): string[] {
+  return lore.sections.flatMap((s) => {
+    const handle = handleOf(s);
+    return handle === undefined ? [] : [handle, ...s.nicknames];
+  });
+}
+
+/** A lore section as the draft context holds it. */
+export interface SentLoreSection {
+  name: string;
+  /** The teams in this league it's about, for a manager or team section. */
+  teams: TeamId[];
+  nicknames: string[];
+  entries: string[];
+}
+
+/** The lore a draft may send. */
+export interface SentLore {
+  type?: LeagueType;
+  sections: SentLoreSection[];
+}
+
+/**
+ * What a draft may send of the lore, and why anything written was held back.
+ * A manager with no team in this league isn't sent: a departed manager's lore
+ * is simply kept, and a handle with no link can't be told from one, nor placed
+ * on a team, so it's held back with a warning. A section with nothing in it
+ * says nothing.
+ */
+export function sentLore(
+  lore: Lore,
+  league: League,
+  handles: Workspace["handles"],
+): { lore: SentLore; warnings: string[] } {
+  const sections: SentLoreSection[] = [];
+  const warnings: string[] = [];
+  for (const s of lore.sections) {
+    if (s.nicknames.length === 0 && s.entries.length === 0) continue;
+    const teams = teamsOf(s, league, handles);
+    const handle = handleOf(s);
+    if (handle !== undefined && teams.length === 0) {
+      if ((handles[handle] ?? []).length === 0) {
+        warnings.push(
+          `lore.md line ${s.line}: ${s.name} isn't sent, because workspace.md's handles link ${handle} to no account. Link it, or the LLM won't see this section.`,
+        );
+      }
+      continue;
+    }
+    const { name, nicknames, entries } = s;
+    sections.push({ name, teams, nicknames, entries });
+  }
+  return {
+    lore: { ...(lore.type && { type: lore.type }), sections },
+    warnings,
+  };
+}
+
 /** Stops a draft on any `{local}`: no entry marked so may reach the LLM. */
 export function refuseLocal(lore: Lore): void {
   if (lore.localLines.length > 0) {
@@ -199,7 +328,7 @@ function teamsOf(
   league: League,
   handles: Workspace["handles"],
 ): TeamId[] {
-  const manager = /^manager:(.*)$/.exec(s.name)?.[1];
+  const manager = handleOf(s);
   if (manager !== undefined) {
     const accounts = handles[manager] ?? [];
     return league.teams

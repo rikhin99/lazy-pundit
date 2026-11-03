@@ -29,6 +29,8 @@ export interface RefreshResult {
   newlyStale: Problem[];
   /** The whole problems list, hard first, moved teams against the new starting order. */
   problems: Problem[];
+  /** What reading the lore has to say, personal data included. */
+  warnings: string[];
 }
 
 /**
@@ -63,6 +65,7 @@ export async function refresh(
       snapshot: meta.snapshot,
       newlyStale: [],
       problems: checked.problems,
+      warnings: checked.warnings,
     };
   }
 
@@ -92,6 +95,7 @@ export async function refresh(
     // Measured on the new text, so its lines match the problems list.
     newlyStale: claimsGoingStale(refreshed, checked.league, fresh.league),
     problems: refreshed.problems,
+    warnings: refreshed.warnings,
   };
 }
 
