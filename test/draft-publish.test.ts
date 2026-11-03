@@ -2,8 +2,10 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { setFrontMatterKey } from "../src/front-matter.ts";
 import { draft, publish, RankingFileError } from "../src/index.ts";
 import {
+  atWeek,
   fearTheTurtle,
   frontMatter,
   published,
@@ -209,6 +211,139 @@ describe("publish", () => {
       expect(clipboard.copied).toEqual([]);
     },
   );
+});
+
+describe("publish: the frozen copy keeps the draft's text", () => {
+  /** Drafts week 8, edits the draft's text and returns it, with the frozen copy's path. */
+  async function editedDraft(edit: (text: string) => string) {
+    const { dir, deps } = await fearTheTurtle(8);
+    const { path } = await draft(dir, deps);
+    const text = edit(await readFile(path, "utf8"));
+    await writeFile(path, text);
+    const frozen = join(rankingsDir(dir), "week-08.published.md");
+    return { dir, deps, text, frozen };
+  }
+
+  const withComment = (text: string) =>
+    text.replace("---\n", "---\n# pundit: rethink the top three\n");
+  /** The draft's text with `edition: 1` as the front matter's last line. */
+  const withFirstEdition = (text: string) =>
+    text.replace("\n---\n", "\nedition: 1\n---\n");
+
+  test("a pundit's comment in the front matter stays", async () => {
+    const { dir, deps, text, frozen } = await editedDraft(withComment);
+
+    await published(dir, deps);
+
+    expect(await readFile(frozen, "utf8")).toBe(withFirstEdition(text));
+  });
+
+  // Not reachable through publish, where the schema refuses these drafts first.
+  test("setting a key whose value is a block never touches the next key", () => {
+    expect(
+      setFrontMatterKey(
+        "week-08.md",
+        "---\nedition: |\n  7\nseason: 2025\n---\nbody\n",
+        "edition",
+        1,
+      ),
+    ).toBe("---\nedition: 1\nseason: 2025\n---\nbody\n");
+  });
+
+  test("setting a key in a file with no front matter is refused", () => {
+    expect(() =>
+      setFrontMatterKey("week-08.md", "just\nbody\n", "edition", 1),
+    ).toThrow("week-08.md has no front matter");
+  });
+
+  test("quoted values, trailing comments and key order stay, and the next week still reads it", async () => {
+    const { dir, deps, text, frozen } = await editedDraft((t) =>
+      t
+        .replace(/^snapshot: (.*)$/m, 'snapshot: "$1" # the Sunday pull')
+        .replace("week: 8\n", "")
+        .replace("format: 1\n", "week: 8\nformat: 1\n"),
+    );
+
+    await published(dir, deps);
+
+    const copy = await readFile(frozen, "utf8");
+    expect(copy).toBe(withFirstEdition(text));
+    const { snapshot } = frontMatter(text);
+    expect(frontMatter(copy)).toMatchObject({
+      format: 1,
+      week: 8,
+      snapshot,
+      edition: 1,
+    });
+    // Week 9's movement reads this frozen copy, so nobody is new.
+    const next = atWeek(deps, 9);
+    await draft(dir, next);
+    const { text: out } = await published(dir, next);
+    expect(out).not.toContain("(new)");
+  });
+
+  test("republishing changes only the edition line", async () => {
+    const { dir, deps, frozen } = await editedDraft(withComment);
+
+    await published(dir, deps);
+    const first = await readFile(frozen, "utf8");
+    await published(dir, deps);
+    const second = await readFile(frozen, "utf8");
+
+    expect(first).toContain("\nedition: 1\n---\n");
+    expect(second).toBe(first.replace("edition: 1", "edition: 2"));
+  });
+
+  test.each(["edition: 7 # note\n", '"edition": 7\n', "edition:\n  7\n"])(
+    "a hand-written %j is replaced where it stands",
+    async (written) => {
+      const { dir, deps, text, frozen } = await editedDraft((t) =>
+        t.replace("season: 2025\n", `${written}season: 2025\n`),
+      );
+
+      await published(dir, deps);
+
+      const copy = await readFile(frozen, "utf8");
+      expect(copy).toBe(text.replace(written, "edition: 1\n"));
+      expect(frontMatter(copy).edition).toBe(1);
+    },
+  );
+
+  test("an edition in a comment or a block scalar isn't the key", async () => {
+    const { dir, deps, text, frozen } = await editedDraft((t) =>
+      t.replace(
+        "season: 2025\n",
+        "# edition: 9\nnote: |\n  edition: 3\nseason: 2025\n",
+      ),
+    );
+
+    await published(dir, deps);
+
+    const copy = await readFile(frozen, "utf8");
+    expect(copy).toBe(withFirstEdition(text));
+    expect(frontMatter(copy)).toMatchObject({
+      edition: 1,
+      note: "edition: 3\n",
+    });
+  });
+
+  test.each([
+    ["no edition", "", "\nedition: 1\r\n---\r\n"],
+    ["an edition", "edition: 7\n", "\nedition: 1\r\nseason: 2025\r\n"],
+  ])("a CRLF draft with %s keeps its line endings", async (_, line, added) => {
+    const { dir, deps, frozen } = await editedDraft((t) =>
+      t
+        .replace("season: 2025\n", `${line}season: 2025\n`)
+        .replace(/\n/g, "\r\n"),
+    );
+
+    await published(dir, deps);
+
+    const copy = await readFile(frozen, "utf8");
+    expect(copy).toContain(added);
+    expect(copy).not.toMatch(/(?<!\r)\n/);
+    expect(frontMatter(copy).edition).toBe(1);
+  });
 });
 
 describe("publish: intro and groups", () => {

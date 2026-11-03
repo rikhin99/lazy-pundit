@@ -1,4 +1,4 @@
-import { Document, parse } from "yaml";
+import { Document, isMap, isNode, isScalar, parse, parseDocument } from "yaml";
 
 /** The format version every workspace file this build writes carries. */
 export const FORMAT = 1;
@@ -13,6 +13,55 @@ export class WorkspaceFileError extends Error {
  */
 export type VersionKey = "format" | "league" | "lore";
 
+const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
+/**
+ * Sets one top-level key in a file's front matter, leaving every other byte of
+ * the text as it is. A new key becomes the last line of the front matter.
+ */
+export function setFrontMatterKey(
+  file: string,
+  text: string,
+  key: string,
+  value: number,
+): string {
+  const yaml = FRONT_MATTER.exec(text)?.[1];
+  if (yaml === undefined) {
+    throw new WorkspaceFileError(`${file} has no front matter`);
+  }
+  const start = text.indexOf("\n") + 1;
+  const end = start + yaml.length;
+  const line = `${key}: ${value}`;
+  const span = keySpan(yaml, key);
+  if (span) {
+    return `${text.slice(0, start + span.from)}${line}${text.slice(start + span.to)}`;
+  }
+  const eol = text.startsWith("\r\n", end) ? "\r\n" : "\n";
+  return `${text.slice(0, end)}${eol}${line}${text.slice(end)}`;
+}
+
+/**
+ * Where a top-level key's entry stands in `yaml`: from the key to the end of
+ * the line its value ends on, so including any trailing comment.
+ */
+function keySpan(
+  yaml: string,
+  key: string,
+): { from: number; to: number } | undefined {
+  const { contents } = parseDocument(yaml);
+  if (!isMap(contents)) return undefined;
+  const pair = contents.items.find(
+    (item) => isScalar(item.key) && item.key.value === key,
+  );
+  if (!isNode(pair?.key)) return undefined;
+  const lastNode = isNode(pair.value) ? pair.value : pair.key;
+  if (!pair.key.range || !lastNode.range) return undefined;
+  // A block value's range runs past its own newline, so step back onto its line.
+  const valueEnd = yaml.slice(0, lastNode.range[1]).trimEnd().length;
+  const lineEnd = /\r?\n|$/.exec(yaml.slice(valueEnd));
+  return { from: pair.key.range[0], to: valueEnd + (lineEnd?.index ?? 0) };
+}
+
 /**
  * Splits a Markdown file into its YAML front matter and body, refusing any
  * file whose version, under `versionKey`, isn't the one this build reads.
@@ -22,7 +71,7 @@ export function readFrontMatter(
   text: string,
   versionKey: VersionKey,
 ): { data: Record<string, unknown>; body: string; bodyLine: number } {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+  const match = FRONT_MATTER.exec(text);
   if (!match) {
     throw new WorkspaceFileError(`${file} has no front matter`);
   }

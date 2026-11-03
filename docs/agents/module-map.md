@@ -20,7 +20,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `doctor.ts` | The `doctor` command: each check with its fix | `doctor`, `DoctorCheck` |
 | `transport.ts`, `file-transport.ts`, `clock.ts`, `clipboard.ts` | The adapters behind `Deps`; only these touch network, time or other processes | `httpTransport`, `fileTransport`, `systemClipboard`, `noClipboard` |
 | `workspace.ts` | `workspace.md`, finding a workspace (`--league` or upwards from the current folder), season folders, file naming | `readWorkspace`, `findWorkspace`, `punditDir`, `rankingsDir`, `seasonDir`, `snapshotsDir`, `weekStem` |
-| `front-matter.ts`, `workspace-files.ts` | Front matter with the FORMAT version; writing workspace files and outputs. Every workspace file goes through `writeWorkspaceFile` or `writeOutput`, with front matter carrying its FORMAT version, from its first draft (the `format-versions` test fails otherwise) | `readFrontMatter`, `writeWorkspaceFile`, `writeOutput` |
+| `front-matter.ts`, `workspace-files.ts` | Front matter with the FORMAT version; writing workspace files and outputs. Every workspace file goes through `writeWorkspaceFile` or `writeOutput`, with front matter carrying its FORMAT version, from its first draft (the `format-versions` test fails otherwise) | `readFrontMatter`, `setFrontMatterKey`, `writeWorkspaceFile`, `writeOutput` |
 | `cache.ts` | The operator's cache (players file) | `readCacheEntry`, `writeCacheEntry` |
 | `sleeper/api.ts` | Sleeper's API base and players URLs | `SLEEPER_API`, `SLEEPER_PLAYERS_URL` |
 | `sleeper/fetcher.ts` | Fetching every Sleeper payload into a snapshot | `fetchSleeperSnapshot` |

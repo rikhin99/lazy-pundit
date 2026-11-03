@@ -181,7 +181,7 @@ export async function published(dir: string, deps: Deps) {
 
 /** The YAML front matter of a Markdown file. */
 export function frontMatter(text: string): Record<string, unknown> {
-  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
   if (!match?.[1]) throw new Error("no front matter");
   return parseYaml(match[1]);
 }

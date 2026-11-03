@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import {
   readFrontMatter,
+  setFrontMatterKey,
   WorkspaceFileError,
   writeFrontMatter,
 } from "./front-matter.ts";
@@ -96,17 +97,16 @@ export async function lastPublished(
 }
 
 /**
- * A frozen copy of a checked draft's `text`: the same file with `edition` set
- * in its front matter.
+ * A frozen copy of a checked draft's `text`: the same text, word for word, with
+ * only the `edition` line added or changed.
  */
 export function frozenCopy(
   file: string,
   text: string,
   edition: number,
 ): string {
-  const { data, body } = readFrontMatter(file, text, "format");
-  const { format: _, ...meta } = data;
-  return `${writeFrontMatter({ ...meta, edition }, ["starting_order"])}${body}`;
+  readFrontMatter(file, text, "format"); // Refuses the wrong format version.
+  return setFrontMatterKey(file, text, "edition", edition);
 }
 
 /** What a new draft's sections hold: the week intro and each team's blurb. */
