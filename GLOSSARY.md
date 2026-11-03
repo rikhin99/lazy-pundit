@@ -105,6 +105,9 @@ The playoff bracket for teams that missed the playoffs. On Sleeper the team with
 Whether a team has clinched a playoff bye, clinched a playoff spot or been eliminated. It is stated only when it holds whatever happens in the remaining matchups and however ties are broken. Otherwise the team has none, and nothing is said. Once the regular season is over points for is known, so it decides a level finish. A league with divisions or median scoring gives no status.
 _Avoid_: Playoff odds, magic number, in the hunt
 
+**Knocked out**:
+A team that has lost a winners-bracket matchup, so it can no longer win the title. A round played over two weeks knocks a team out only in its last week. This is a bracket result, not a playoff status: a team that clinched and was later knocked out still clinched, and a team that missed the playoffs was eliminated but never knocked out. Saying a knocked-out team was eliminated is true. It holds in a league with divisions or median scoring too.
+
 **Snapshot**:
 One complete fetch of a season's data from its platform, kept in the league workspace. Each draft records the snapshot it was built from, so the data it was checked against can be looked at again later. "Data changed" means a scored week's results, scores, lineups, transactions or standings changed, or the league's number of playoff spots or regular-season length changed. A change to injuries, names or ownership doesn't count.
 _Avoid_: Cache, fixture, pull
