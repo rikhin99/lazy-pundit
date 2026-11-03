@@ -45,9 +45,9 @@ export type Tiebreak = "points_for" | "unbroken";
  * starting order has one to start from.
  */
 export function standingsThrough(league: League, week: number): TeamStanding[] {
-  const { median, divisions } = league.settings;
+  const { divisions } = league.settings;
   const sorted = (
-    median || divisions > 0
+    standingsAsReported(league)
       ? league.teams.map((t) => ({ team: t.id, ...t.standing }))
       : recount(league, week)
   ).sort(
@@ -75,6 +75,22 @@ export function standingsThrough(league: League, week: number): TeamStanding[] {
     }
     return standing;
   });
+}
+
+/**
+ * Whether the league's standings are as reported as of the fetch for every
+ * week, not rebuilt through a week: median scoring or divisions.
+ */
+export function standingsAsReported(league: League): boolean {
+  return league.settings.median || league.settings.divisions > 0;
+}
+
+/**
+ * The tool's proposed order: the standings through the ranking week. The
+ * power-score methods replace this later.
+ */
+export function startingOrder(league: League, week: number): TeamId[] {
+  return standingsThrough(league, week).map((s) => s.team);
 }
 
 function winPercentage(s: Standing): number {

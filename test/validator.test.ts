@@ -92,7 +92,7 @@ describe("grounding prototype scenarios, format A (tags in the file)", () => {
     const after = validate(
       blurb(1, text, {
         evidence: corrected(1, 1.8),
-        before: { evidence: week8Evidence() },
+        before: { evidence: [week8Evidence()] },
       }),
     );
     expect(after.claims.map((c) => [c.text, c.status, c.cause])).toEqual([
@@ -229,7 +229,7 @@ describe("grounding prototype scenarios, format B (tags stripped, prose matched)
     const r = validate(
       blurb(1, text, {
         evidence: corrected(1, 1.8),
-        before: { evidence: week8Evidence() },
+        before: { evidence: [week8Evidence()] },
       }),
     );
     expect(r.claims.map((c) => [c.text, c.status, c.cause])).toEqual([

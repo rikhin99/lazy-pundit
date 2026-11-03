@@ -42,10 +42,11 @@ export interface ValidatorInput {
   sections: { lore: string[]; stakes: string[]; log: string[] };
   swearing: Swearing;
   /**
-   * The evidence and order the text was last checked against, when they
-   * differ from now. A claim that held then and fails now is stale.
+   * The evidence and order the text was earlier checked against, when they
+   * differ from now, newest evidence first. A claim that held then and fails
+   * now is stale.
    */
-  before?: { evidence?: EvidencePack; order?: Record<TeamId, OrderEvidence> };
+  before?: { evidence?: EvidencePack[]; order?: Record<TeamId, OrderEvidence> };
 }
 
 export type ClaimStatus =

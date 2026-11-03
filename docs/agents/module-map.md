@@ -6,7 +6,9 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 `draft`: fetch (`sleeper/fetcher.ts`) → snapshot on disk (`snapshot.ts`) → League model (`sleeper/normalizer.ts`) → stats and evidence (`draft-data.ts`) → the persona (`persona.ts`, capped by `league-file.ts`'s family league) → with an Anthropic key, the draft context (`draft-context.ts`, with last week's published blurbs read in `draft.ts`), the prompt (`prompt.ts`) and the LLM gate (`llm-gate.ts`: one call, then up to 2 retries for failing sections), each call through `llm-call.ts` (price and spend-cap check, LLM transcript, spend) → Markdown (`ranking-file.ts` `renderDraft`) → `checkDraft`.
 
-`check` and `publish` both start from `checkDraft` in `check.ts`: read the latest `week-NN.md`, parse it, rebuild the evidence from its snapshot, measure order evidence against the movement baseline (`movement.ts`), validate each blurb, list moved teams, return the problems list and write any auto-tags. `publish` then freezes the checked text with its edition and renders plain text with movement.
+`check`, `publish` and `refresh` all start from `checkDraft` in `check.ts`: read the latest `week-NN.md`, parse it, rebuild the evidence from its snapshot, measure order evidence against the movement baseline (`movement.ts`), validate each blurb, list moved teams, return the problems list and write any auto-tags (`refresh` asks it not to). `publish` then fetches in memory for the data-changed warning (a failed fetch is only a note), freezes the checked text with its edition and renders plain text with movement.
+
+`refresh`: fetch in memory (`refresh.ts` `fetchFresh`) → `diff` against the draft's snapshot (`data-diff.ts`) → no change, `checked_at` only; a change, write the snapshot and set the front matter's values (`setFrontMatterValue`), adding the old snapshot to `earlier_snapshots` → `checkDraft`, which reads those snapshots' evidence so a claim stays stale rather than wrong.
 
 ## Modules (`src/`)
 
@@ -20,17 +22,17 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `doctor.ts` | The `doctor` command: each check with its fix | `doctor`, `DoctorCheck` |
 | `transport.ts`, `file-transport.ts`, `clock.ts`, `clipboard.ts` | The adapters behind `Deps`; only these touch network, time or other processes | `httpTransport`, `fileTransport`, `systemClipboard`, `noClipboard` |
 | `workspace.ts` | `workspace.md`, finding a workspace (`--league` or upwards from the current folder), season folders, file naming | `readWorkspace`, `findWorkspace`, `punditDir`, `rankingsDir`, `seasonDir`, `snapshotsDir`, `weekStem` |
-| `front-matter.ts`, `workspace-files.ts` | Front matter with the FORMAT version; writing workspace files and outputs. Every workspace file goes through `writeWorkspaceFile` or `writeOutput`, with front matter carrying its FORMAT version, from its first draft (the `format-versions` test fails otherwise) | `readFrontMatter`, `setFrontMatterKey`, `writeWorkspaceFile`, `writeOutput` |
+| `front-matter.ts`, `workspace-files.ts` | Front matter with the FORMAT version; writing workspace files and outputs. Every workspace file goes through `writeWorkspaceFile` or `writeOutput`, with front matter carrying its FORMAT version, from its first draft (the `format-versions` test fails otherwise). `setFrontMatterKey` replaces a key's whole line, `setFrontMatterValue` only its value, so a trailing comment stays | `readFrontMatter`, `setFrontMatterKey`, `setFrontMatterValue`, `writeWorkspaceFile`, `writeOutput` |
 | `cache.ts` | The operator's cache (players file) | `readCacheEntry`, `writeCacheEntry` |
 | `sleeper/api.ts` | Sleeper's API base and players URLs | `SLEEPER_API`, `SLEEPER_PLAYERS_URL` |
-| `sleeper/fetcher.ts` | Fetching every Sleeper payload into a snapshot | `fetchSleeperSnapshot` |
+| `sleeper/fetcher.ts` | Fetching every Sleeper payload into a snapshot, or in memory until the caller writes it | `fetchSleeperSnapshot`, `fetchSleeper` |
 | `snapshot.ts` (300) | Snapshot manifest and blobs on disk | `readSnapshot`, `readManifest`, `readBlob` |
 | `sleeper/normalizer.ts` (470) | Sleeper payloads → the platform-neutral `League` | `normalizeSleeper` |
 | `league.ts` | The `League` model types, `TeamId`, record formatting, `isStarter` | types |
-| `standings.ts` | Standings, rank, seed and tiebreaks through a week | `standingsThrough` |
+| `standings.ts` | Standings, rank, seed and tiebreaks through a week, and the starting order they give | `standingsThrough`, `standingsAsReported`, `startingOrder` |
 | `playoff-status.ts` | Each team's settled playoff status from conservative bounds, and who changed in a ranking week | `playoffStatuses`, `settledThisWeek`, `PlayoffStatus` |
 | `lineup.ts` | Best possible lineup points | `bestLineupPoints` |
-| `data-hash.ts` | The hash of the data a ranking stands on | `dataHash` |
+| `data-hash.ts` | The hash of the data a ranking stands on, and that data | `dataHash`, `coveredData` |
 | `evidence-pack.ts` (490) | Every stat under its evidence ID, per team and league | `buildEvidencePack` |
 | `draft-data.ts` | Evidence pack plus the stat lines and intro a draft starts with | `draftData` |
 | `draft-context.ts` | Everything the LLM may be sent for a league-week | `draftContext`, `DraftContext` |
@@ -44,7 +46,9 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `ranking-file.ts` | The `week-NN.md` format: render, parse (with text offsets), order checks, the last published ranking, a frozen copy with its edition | `renderDraft`, `parseRanking`, `checkOrder`, `lastPublished`, `frozenCopy` |
 | `movement.ts` | The movement baseline, each team's order evidence (place, move, group), and the mark after a record: (▲2), (▼1), (—), (new) | `movementBaseline`, `moveOf`, `orderEvidence`, `movementMark` |
 | `draft.ts` | The `draft` command and its fallback reason | `draft` |
-| `check.ts` | The problems list: validates a draft and writes auto-tags; marks a new draft's gate failures | `check`, `checkDraft`, `Problem`, `withGateFailures` |
+| `check.ts` | The problems list: validates a draft and writes auto-tags; marks a new draft's gate failures; the claims a move between two leagues makes stale | `check`, `checkDraft`, `claimsGoingStale`, `Problem`, `withGateFailures` |
+| `refresh.ts` | The `refresh` command, the data-changed warning and the fetch behind it | `refresh`, `dataChangedWarning`, `freshDataWarnings`, `fetchFresh` |
+| `data-diff.ts` | The data changes between two leagues through a week | `diff`, `DataChange` |
 | `publish.ts` | Publish confirms (hard problems; a new or changed relaxed persona), frozen copy and its edition, plain text, clipboard | `publish` |
 | `plain-text.ts` | The plain text the league reads | `renderPlainText` |
 | `validator.ts` | The validator's entry: claims, auto-tags, swears for one blurb | `validate`, `applyAutoTags`, `stripTags`, `isHard` |
@@ -58,11 +62,11 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 The seams, and the helpers each one uses:
 
-- **Library API against a temp workspace** (`draft-publish`, `movement`, `playoff-status`, `llm-draft`, `llm-fallback`, `persona`, `check`, `config`, `doctor`), with `persona.md` at `pundits/rikhin/persona.md` and the family league in `seasons/2025/league.md` when a test writes them: `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace; `published(dir, deps)` publishes and fails the test if it's held back; `frontMatter(text)` parses a file's front matter. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request; a scripted answer can be text, a reply with token counts, or an `LlmError` to throw) and `deps.env.anthropicApiKey`.
+- **Library API against a temp workspace** (`draft-publish`, `refresh`, `movement`, `playoff-status`, `llm-draft`, `llm-fallback`, `persona`, `check`, `config`, `doctor`), with `persona.md` at `pundits/rikhin/persona.md` and the family league in `seasons/2025/league.md` when a test writes them: `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace; `published(dir, deps)` publishes and fails the test if it's held back; `frontMatter(text)` parses a file's front matter. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request; a scripted answer can be text, a reply with token counts, or an `LlmError` to throw) and `deps.env.anthropicApiKey`.
 - **LLM client** (`anthropic-llm`): `anthropicLlm` against a transport that records requests and answers with a canned Messages API body.
 - **Validator** (`validator`): `blurb()` and `week8Evidence()` in `support/week8-evidence.ts` hold literal week-8 evidence; `support/plain-prose.ts` lists sentences that must never come back hard.
-- **League model and stats** (`sleeper-normalizer`, `standings`, `playoff-status`, `stats`, `data-hash`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.
-- **CLI** (`cli`): spawns `src/cli.ts` in a workspace with `LAZY_PUNDIT_CLIPBOARD=off` and HOME and the XDG folders in a temp home; `homeListing()` writes a `config.yaml` for `--league`.
+- **League model and stats** (`sleeper-normalizer`, `standings`, `playoff-status`, `stats`, `data-hash`, `data-diff`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.
+- **CLI** (`cli`): spawns `src/cli.ts` in a workspace with `LAZY_PUNDIT_CLIPBOARD=off`, `LAZY_PUNDIT_REPLAY` on the week-8 snapshot so a fetch stays offline, and HOME and the XDG folders in a temp home; `homeListing()` writes a `config.yaml` for `--league`.
 - **Repo rules** (`injected-boundaries`, `format-versions`, `glossary-terms`, `sleeper-fixtures`).
 - **Direct imports**: a test may import from a `src/` module what `index.ts` doesn't export, when the case can't be set up through the library API. `draft-publish` does this for `setFrontMatterKey`, on front matter that `publish` refuses first.
 

@@ -117,6 +117,19 @@ export function rankingsDir(dir: string, season = "2025", pundit = "rikhin") {
 export type Json = any;
 
 /**
+ * A patch for a matchups payload: a stat correction of `points` for one team's
+ * first starter, by the team's `roster_id`.
+ */
+export function statCorrection(rosterId: number, points: number) {
+  return (payload: Json) => {
+    const side = payload.find((s: Json) => s.roster_id === rosterId);
+    side.points += points;
+    side.starters_points[0] += points;
+    side.players_points[side.starters[0]] += points;
+  };
+}
+
+/**
  * Wraps a transport so each payload whose URL has a patch is changed before
  * it's recorded: a real payload, varied the way a real fetch could see it.
  */

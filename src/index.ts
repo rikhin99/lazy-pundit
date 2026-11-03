@@ -19,6 +19,7 @@ export {
   readConfig,
   saveCredentials,
 } from "./config.ts";
+export { type DataChange, diff } from "./data-diff.ts";
 export { type Deps, type Environment, systemDeps } from "./deps.ts";
 export {
   type DoctorCheck,
@@ -65,6 +66,7 @@ export {
 } from "./playoff-status.ts";
 export { type PublishOptions, type PublishResult, publish } from "./publish.ts";
 export { RankingFileError } from "./ranking-file.ts";
+export { type RefreshResult, refresh } from "./refresh.ts";
 export {
   type FetchSleeperOptions,
   fetchSleeperSnapshot,

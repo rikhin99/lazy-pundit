@@ -5,7 +5,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { draft } from "../src/index.ts";
-import { fearTheTurtle, rankingsDir } from "./support/workspace.ts";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
+import {
+  FEAR_THE_TURTLE_ID,
+  FIXTURES,
+  fearTheTurtle,
+  frontMatter,
+  patchingTransport,
+  rankingsDir,
+  statCorrection,
+  WEEKS,
+} from "./support/workspace.ts";
 
 const CLI = join(import.meta.dirname, "..", "src", "cli.ts");
 
@@ -39,16 +49,24 @@ const INHERITED = ["PATH", "TMPDIR", "NODE_OPTIONS"];
  * the real home directory is never read. The environment starts from
  * `INHERITED` alone, so no key or setting in the developer's shell leaks in.
  */
-async function cli(cwd: string, args: string[], input = "", home?: string) {
+async function cli(
+  cwd: string,
+  args: string[],
+  input = "",
+  home?: string,
+  over: NodeJS.ProcessEnv = {},
+) {
   const h = home ?? (await mkdtemp(join(tmpdir(), "lazy-pundit-home-")));
   const env: NodeJS.ProcessEnv = {
     ...Object.fromEntries(
       INHERITED.filter((k) => process.env[k]).map((k) => [k, process.env[k]]),
     ),
     LAZY_PUNDIT_CLIPBOARD: "off",
+    LAZY_PUNDIT_REPLAY: join(FIXTURES, WEEKS["8"] as string),
     HOME: h,
     XDG_CONFIG_HOME: join(h, ".config"),
     XDG_CACHE_HOME: join(h, ".cache"),
+    ...over,
   };
   return new Promise<{ code: number | null; stdout: string; stderr: string }>(
     (resolve) => {
@@ -158,6 +176,57 @@ test("answering p at the prompt publishes anyway", async () => {
   expect(stdout).toContain("Published week 8:");
   expect(stdout).toContain("No clipboard found; paste from the .txt file.");
   expect(await readFile(txt, "utf8")).toContain("They won by 50 this week.");
+});
+
+test("refresh with no change says so, and updates checked_at", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  const { path } = await draft(dir, deps);
+  const was = frontMatter(await readFile(path, "utf8"));
+
+  const { code, stdout } = await cli(dir, ["refresh"]);
+
+  expect(code).toBe(0);
+  expect(stdout).toBe(`No changes since ${was.data_as_of}.\nNo problems.\n`);
+  const now = frontMatter(await readFile(path, "utf8"));
+  expect(now.checked_at).not.toBe(was.checked_at);
+  expect({ ...now, checked_at: was.checked_at }).toEqual(was);
+});
+
+test("refresh over changed data prints the newly stale claims and the problems list", async () => {
+  // Drafted before a correction: Gus Bus's week 8 is 1.8 short of the replay's.
+  const { dir, deps } = await fearTheTurtle(8);
+  deps.transport = patchingTransport(deps.transport, {
+    [`${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}/matchups/8`]: statCorrection(
+      1,
+      -1.8,
+    ),
+  });
+  const { path } = await draft(dir, deps);
+  const was = frontMatter(await readFile(path, "utf8"));
+
+  const { code, stdout } = await cli(dir, ["refresh"]);
+
+  expect(code).toBe(0);
+  expect(stdout).toContain(
+    `Data changed since ${was.data_as_of}: week 8 now stands on snapshot `,
+  );
+  expect(stdout).toContain("Newly stale:\n");
+  expect(stdout).toMatch(
+    /"53\.2" stale, after a refresh: true when written \(w8\.margin is 53\.2\); now w8\.margin is 55/,
+  );
+  expect(stdout).toMatch(/Problems: \d+ hard, \d+ soft/);
+});
+
+test("publish with a failed fetch says the check didn't happen and still publishes", async () => {
+  const { dir, txt } = await withWrongClaim();
+
+  const { code, stderr } = await cli(dir, ["publish", "--yes"], "", undefined, {
+    LAZY_PUNDIT_REPLAY: join(FIXTURES, "no-such-snapshot"),
+  });
+
+  expect(code).toBe(0);
+  expect(stderr).toMatch(/^! couldn't check for data changes: /);
+  expect(existsSync(txt)).toBe(true);
 });
 
 test("publish --yes doesn't ask", async () => {

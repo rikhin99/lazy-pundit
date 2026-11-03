@@ -17,15 +17,18 @@ import { readSnapshot } from "./snapshot.ts";
 import {
   applyAutoTags,
   type ClaimStatus,
+  type EvidencePack,
   isHard,
   type OrderEvidence,
   stripTags,
+  type ValidatorInput,
   validate,
 } from "./validator.ts";
 import {
   rankingsDir,
   readWorkspace,
   snapshotsDir,
+  type Workspace,
   weekStem,
 } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
@@ -97,8 +100,15 @@ export interface CheckedDraft extends CheckResult {
   baseline?: MovementBaseline;
 }
 
-/** Reads, checks and auto-tags the latest draft in the workspace's season. */
-export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
+/**
+ * Reads, checks and auto-tags the latest draft in the workspace's season.
+ * With `autoTag: false` the file is left alone, and an untagged claim that
+ * could be auto-tagged is simply verified.
+ */
+export async function checkDraft(
+  workspaceDir: string,
+  opts: { autoTag?: boolean } = {},
+): Promise<CheckedDraft> {
   const ws = await readWorkspace(workspaceDir);
   const dir = rankingsDir(ws);
   const week = await latestDraftWeek(dir);
@@ -122,15 +132,110 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
       { place: i + 1, move: moveOf(baseline, team as TeamId, i + 1) },
     ]),
   ) as Record<TeamId, OrderEvidence>;
+  const { problems, autoTags } = reviewProse({
+    text: written,
+    ranking,
+    league,
+    evidence,
+    order,
+    before: {
+      order: startingOrder,
+      evidence: await earlierEvidence(ws, ranking),
+    },
+  });
+  problems.push(
+    ...movedTeams(ranking, order, startingOrder, teamNames(league)),
+  );
+  problems.sort(byHardThenLine);
+
+  const tagging = opts.autoTag !== false && autoTags.length > 0;
+  let text = written;
+  if (tagging) {
+    text = applyAutoTags(written, autoTags);
+    await writeWorkspaceFile(path, text);
+  }
+  return {
+    week,
+    path,
+    problems,
+    autoTagged: tagging ? autoTags.length : 0,
+    stem,
+    dir,
+    text,
+    ranking: tagging ? parseRanking(name, text) : ranking,
+    league,
+    order,
+    ...(baseline ? { baseline } : {}),
+  };
+}
+
+/**
+ * The claims in a checked draft that hold on the data of `from` and fail on the
+ * data of `to`: the ones a move between the two makes stale.
+ */
+export function claimsGoingStale(
+  checked: CheckedDraft,
+  from: League,
+  to: League,
+): Problem[] {
+  const { week } = checked.ranking.meta;
+  const { problems } = reviewProse({
+    text: checked.text,
+    ranking: checked.ranking,
+    league: to,
+    evidence: draftData(to, week).evidence,
+    order: checked.order,
+    before: { evidence: [draftData(from, week).evidence] },
+  });
+  return problems.filter((p) => p.kind === "stale" && p.cause === "refresh");
+}
+
+/**
+ * The evidence from a refreshed draft's earlier snapshots, newest first, so a
+ * claim true when written reads as stale rather than wrong. A snapshot that's
+ * gone or no longer normalizes never blocks a check: it's just left out, and a
+ * claim that only it could vouch for reads as wrong.
+ */
+async function earlierEvidence(
+  ws: Workspace,
+  ranking: RankingFile,
+): Promise<EvidencePack[]> {
+  const packs: EvidencePack[] = [];
+  for (const id of (ranking.meta.earlier_snapshots ?? []).toReversed()) {
+    try {
+      const league = normalizeSleeper(await readSnapshot(snapshotsDir(ws), id));
+      packs.push(draftData(league, ranking.meta.week).evidence);
+    } catch {
+      // Left out, as above.
+    }
+  }
+  return packs;
+}
+
+function teamNames(league: League): Map<string, string> {
+  return new Map(league.teams.map((t) => [t.id, t.name]));
+}
+
+/** Validates the intro and every blurb in a draft's `text` against `evidence`. */
+function reviewProse(input: {
+  text: string;
+  ranking: RankingFile;
+  league: League;
+  evidence: EvidencePack;
+  order: Record<TeamId, OrderEvidence>;
+  before: NonNullable<ValidatorInput["before"]>;
+}): {
+  problems: Problem[];
+  autoTags: { start: number; end: number; id: string }[];
+} {
+  const { text: written, ranking, league, evidence, order, before } = input;
   const nicknames = Object.fromEntries(
     league.teams.map((t) => [
       t.id,
       [t.name, ...t.managers.map((m) => m.displayName)],
     ]),
   ) as Record<TeamId, string[]>;
-  const names = new Map<string, string>(
-    league.teams.map((t) => [t.id, t.name]),
-  );
+  const names = teamNames(league);
 
   const sections: { team: TeamId | null; text: string; start: number }[] = [];
   if (ranking.intro !== undefined) {
@@ -164,7 +269,7 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
       sections: { lore: [], stakes: [], log: [] },
       // The persona the draft was written in, not today's persona.md.
       swearing: ranking.meta.persona.swearing,
-      before: { order: startingOrder },
+      before,
     });
     const at = {
       team: s.team,
@@ -198,27 +303,7 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
       autoTags.push({ ...t, start: s.start + t.start, end: s.start + t.end });
     }
   }
-  problems.push(...movedTeams(ranking, order, startingOrder, names));
-  problems.sort(byHardThenLine);
-
-  let text = written;
-  if (autoTags.length > 0) {
-    text = applyAutoTags(written, autoTags);
-    await writeWorkspaceFile(path, text);
-  }
-  return {
-    week,
-    path,
-    problems,
-    autoTagged: autoTags.length,
-    stem,
-    dir,
-    text,
-    ranking: autoTags.length > 0 ? parseRanking(name, text) : ranking,
-    league,
-    order,
-    ...(baseline ? { baseline } : {}),
-  };
+  return { problems, autoTags };
 }
 
 /** Why a word-list hit is a problem. */

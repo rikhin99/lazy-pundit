@@ -6,6 +6,7 @@ import type { Deps } from "./deps.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
 import { frozenCopy, lastPublished, parseRanking } from "./ranking-file.ts";
+import { freshDataWarnings } from "./refresh.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -22,6 +23,11 @@ export interface PublishOptions {
    * With no one to ask, it's No. `yes` skips it too.
    */
   confirmRelaxed?: (persona: PersonaRecord) => Promise<boolean>;
+  /**
+   * Told the data-changed warning or the failed fetch's note before anything
+   * is asked or written. The result carries them too.
+   */
+  onWarnings?: (warnings: string[]) => void;
 }
 
 export type PublishResult =
@@ -38,6 +44,8 @@ export type PublishResult =
       copied: boolean;
       /** The problems published with, hard first. */
       problems: Problem[];
+      /** The data-changed warning, or a note that the fetch failed. */
+      warnings: string[];
     }
   | {
       /** Nothing was written. */
@@ -46,12 +54,14 @@ export type PublishResult =
       stoppedBy: "hard" | "relaxed";
       week: number;
       problems: Problem[];
+      warnings: string[];
     };
 
 /**
- * Checks the latest draft, then freezes it as `week-NN.published.md`, renders
- * the plain text from the frozen copy into `week-NN.txt`, and copies it to
- * the clipboard. Hard problems are put to `confirm` first; soft ones are only
+ * Checks the latest draft and diffs fresh data against its snapshot, warning
+ * without re-snapshotting. Then it freezes the draft as `week-NN.published.md`,
+ * renders the plain text from the frozen copy into `week-NN.txt`, and copies it
+ * to the clipboard. Hard problems are put to `confirm` first; soft ones are only
  * returned.
  */
 export async function publish(
@@ -61,10 +71,12 @@ export async function publish(
 ): Promise<PublishResult> {
   const checked = await checkDraft(workspaceDir);
   const { week, problems, dir, stem } = checked;
+  const warnings = await freshDataWarnings(workspaceDir, checked, deps);
+  opts.onWarnings?.(warnings);
 
   const hard = problems.filter((p) => p.severity === "hard");
   if (hard.length > 0 && !opts.yes && !(await opts.confirm?.(hard))) {
-    return { published: false, stoppedBy: "hard", week, problems };
+    return { published: false, stoppedBy: "hard", week, problems, warnings };
   }
   const { persona } = checked.ranking.meta;
   if (persona.family_league_relaxed && !opts.yes) {
@@ -74,7 +86,13 @@ export async function publish(
       last !== undefined &&
       isDeepStrictEqual(last.ranking.meta.persona, persona);
     if (!unchanged && !(await opts.confirmRelaxed?.(persona))) {
-      return { published: false, stoppedBy: "relaxed", week, problems };
+      return {
+        published: false,
+        stoppedBy: "relaxed",
+        week,
+        problems,
+        warnings,
+      };
     }
   }
 
@@ -105,6 +123,7 @@ export async function publish(
     text,
     copied,
     problems,
+    warnings,
   };
 }
 

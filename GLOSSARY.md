@@ -112,6 +112,21 @@ A team that has lost a winners-bracket matchup, so it can no longer win the titl
 One complete fetch of a season's data from its platform, kept in the league workspace. Each draft records the snapshot it was built from, so the data it was checked against can be looked at again later. "Data changed" means a scored week's results, scores, lineups, transactions or standings changed, or the league's number of playoff spots or regular-season length changed. A change to injuries, names or ownership doesn't count.
 _Avoid_: Cache, fixture, pull
 
+**Data as of**:
+When the snapshot a draft stands on was fetched.
+
+**Earlier snapshots**:
+The snapshots a draft stood on before each refresh moved it to newer data, kept on record. A claim that held against any of them was true when written, so it is stale rather than wrong.
+
+**Data hash**:
+A fingerprint of the data a ranking stands on: everything "data changed" covers, through the ranking week. It is a record of what a draft was built from. Two snapshots are compared by their data, not by their fingerprints.
+
+**Data change**:
+One difference between two snapshots through a ranking week: a flipped result, a changed score, lineup, pairing or bye, changed standings or seeds, a transaction added or removed, or a changed number of playoff spots or regular-season length.
+
+**Data-changed warning**:
+What a fetching command says when fresh data has data changes against the draft's snapshot: how many claims would go stale, and to refresh. It changes nothing in the draft.
+
 **Players file**:
 The platform's list of every NFL player, with positions, NFL team and injury status. It is fetched rarely and kept in the operator's cache, outside any workspace, and each snapshot keeps only the players its league names. "Cache" means only this person-level store, never a snapshot.
 

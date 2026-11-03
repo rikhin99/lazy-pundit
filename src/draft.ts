@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { access, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { checkDraft, type Problem, withGateFailures } from "./check.ts";
 import {
@@ -16,15 +16,15 @@ import {
   type LastBlurbs,
 } from "./draft-context.ts";
 import { type DraftData, draftData } from "./draft-data.ts";
-import type { League, TeamId } from "./league.ts";
+import type { League } from "./league.ts";
 import { type CallSetup, LlmStopped, llmAsk } from "./llm-call.ts";
 import { type FailedSection, type GatedProse, gatedProse } from "./llm-gate.ts";
 import { loadPersona, type Persona, personaRecord } from "./persona.ts";
 import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
-import { fetchSleeperSnapshot } from "./sleeper/fetcher.ts";
+import { dataChangedWarning, fetchFresh } from "./refresh.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
-import { standingsThrough } from "./standings.ts";
+import { startingOrder } from "./standings.ts";
 import { stripTags } from "./validator.ts";
 import {
   rankingsDir,
@@ -62,19 +62,23 @@ export async function draft(
   deps: Deps,
 ): Promise<DraftResult> {
   const ws = await readWorkspace(workspaceDir);
-  const { id } = await fetchSleeperSnapshot({
-    transport: deps.transport,
-    clock: deps.clock,
-    snapshotsDir: snapshotsDir(ws),
-    cacheDir: deps.cacheDir,
-    leagueId: ws.season.leagueId,
-  });
-  const snapshot = await readSnapshot(snapshotsDir(ws), id);
-  const league = normalizeSleeper(snapshot);
-  const week = league.lastScoredWeek;
-
+  const fetched = await fetchFresh(ws, deps);
+  const week = fetched.league.lastScoredWeek;
   const dir = rankingsDir(ws);
   const path = join(dir, `${weekStem(week)}.md`);
+  // Before the snapshot and the LLM call: a draft in the way needs neither.
+  if (
+    await access(path).then(
+      () => true,
+      () => false,
+    )
+  ) {
+    throw await draftExists(workspaceDir, week, fetched.league);
+  }
+
+  const { id } = await fetched.write();
+  const snapshot = await readSnapshot(snapshotsDir(ws), id);
+  const league = normalizeSleeper(snapshot);
   const order = startingOrder(league, week);
   const data = draftData(league, week);
   const { anthropicApiKey, warnings: credentialWarnings } =
@@ -120,9 +124,7 @@ export async function draft(
     await writeWorkspaceFile(path, text, { exclusive: true });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-    throw new DraftExistsError(
-      `${weekStem(week)}.md already exists, so it was left as it is`,
-    );
+    throw await draftExists(workspaceDir, week, league);
   }
   const checked = await checkDraft(workspaceDir);
   const problems = withGateFailures(checked, failed);
@@ -134,6 +136,25 @@ export async function draft(
     warnings,
     ...(fallback && { fallback }),
   };
+}
+
+/**
+ * The error for a draft in the way, with the data-changed warning when the
+ * draft can be compared. One that can't still gets the plain message.
+ */
+async function draftExists(
+  workspaceDir: string,
+  week: number,
+  fresh: League,
+): Promise<DraftExistsError> {
+  const message = `${weekStem(week)}.md already exists, so it was left as it is`;
+  try {
+    const checked = await checkDraft(workspaceDir, { autoTag: false });
+    const warning = dataChangedWarning(checked, fresh);
+    return new DraftExistsError(warning ? `${message}. ${warning}` : message);
+  } catch {
+    return new DraftExistsError(message);
+  }
 }
 
 /**
@@ -216,12 +237,4 @@ function statLines(data: DraftData, persona: Persona): DraftProse {
       Object.entries(data.teams).map(([id, t]) => [id, t.statLine]),
     ),
   };
-}
-
-/**
- * The tool's proposed order: the standings through the ranking week. The
- * power-score methods replace this later.
- */
-function startingOrder(league: League, week: number): TeamId[] {
-  return standingsThrough(league, week).map((s) => s.team);
 }

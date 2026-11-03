@@ -150,12 +150,10 @@ export function validate(input: ValidatorInput): ValidationResult {
     let cause: CheckedClaim["cause"];
     if (verdict.status === "wrong" && input.before) {
       const tries: [Ctx | null, "refresh" | "reorder"][] = [
-        [
-          input.before.evidence
-            ? ctxFor(input.before.evidence, input.order)
-            : null,
+        ...(input.before.evidence ?? []).map((earlier): [Ctx, "refresh"] => [
+          ctxFor(earlier, input.order),
           "refresh",
-        ],
+        ]),
         [
           input.before.order
             ? ctxFor(input.evidence, input.before.order)

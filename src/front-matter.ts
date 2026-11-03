@@ -1,4 +1,12 @@
-import { Document, isMap, isNode, isScalar, parse, parseDocument } from "yaml";
+import {
+  Document,
+  isMap,
+  isNode,
+  isScalar,
+  isSeq,
+  parse,
+  parseDocument,
+} from "yaml";
 
 /** The format version every workspace file this build writes carries. */
 export const FORMAT = 1;
@@ -25,19 +33,78 @@ export function setFrontMatterKey(
   key: string,
   value: number,
 ): string {
-  const yaml = FRONT_MATTER.exec(text)?.[1];
-  if (yaml === undefined) {
-    throw new WorkspaceFileError(`${file} has no front matter`);
-  }
+  return setKeyLine(file, text, key, `${key}: ${value}`);
+}
+
+function setKeyLine(
+  file: string,
+  text: string,
+  key: string,
+  line: string,
+): string {
+  const yaml = frontMatterYaml(file, text);
   const start = text.indexOf("\n") + 1;
   const end = start + yaml.length;
-  const line = `${key}: ${value}`;
   const span = keySpan(yaml, key);
   if (span) {
     return `${text.slice(0, start + span.from)}${line}${text.slice(start + span.to)}`;
   }
   const eol = text.startsWith("\r\n", end) ? "\r\n" : "\n";
   return `${text.slice(0, end)}${eol}${line}${text.slice(end)}`;
+}
+
+/**
+ * Sets one top-level key's value in a file's front matter, leaving every other
+ * byte of the text as it is, the old value's trailing comment included. A new
+ * key becomes the last line of the front matter. A string that YAML would
+ * misread is quoted, and a list is written on one line (`[a, b, c]`).
+ */
+export function setFrontMatterValue(
+  file: string,
+  text: string,
+  key: string,
+  value: string | string[],
+): string {
+  const rendered = renderValue(value);
+  const span = valueSpan(frontMatterYaml(file, text), key);
+  if (!span) return setKeyLine(file, text, key, `${key}: ${rendered}`);
+  const start = text.indexOf("\n") + 1;
+  return `${text.slice(0, start + span.from)}${rendered}${text.slice(start + span.to)}`;
+}
+
+function frontMatterYaml(file: string, text: string): string {
+  const yaml = FRONT_MATTER.exec(text)?.[1];
+  if (yaml === undefined) {
+    throw new WorkspaceFileError(`${file} has no front matter`);
+  }
+  return yaml;
+}
+
+/** A top-level key's entry in `yaml`, when `yaml` is a map holding it. */
+function topLevelPair(yaml: string, key: string) {
+  const { contents } = parseDocument(yaml);
+  if (!isMap(contents)) return undefined;
+  return contents.items.find(
+    (item) => isScalar(item.key) && item.key.value === key,
+  );
+}
+
+function renderValue(value: string | string[]): string {
+  const doc = new Document(value);
+  if (isSeq(doc.contents)) doc.contents.flow = true;
+  return doc.toString({ lineWidth: 0, flowCollectionPadding: false }).trimEnd();
+}
+
+/** Where a top-level key's non-empty value stands in `yaml`, without any comment. */
+function valueSpan(
+  yaml: string,
+  key: string,
+): { from: number; to: number } | undefined {
+  const pair = topLevelPair(yaml, key);
+  if (!isNode(pair?.value) || !pair.value.range) return undefined;
+  const [from, end] = pair.value.range;
+  const to = yaml.slice(0, end).trimEnd().length;
+  return to > from ? { from, to } : undefined;
 }
 
 /**
@@ -48,11 +115,7 @@ function keySpan(
   yaml: string,
   key: string,
 ): { from: number; to: number } | undefined {
-  const { contents } = parseDocument(yaml);
-  if (!isMap(contents)) return undefined;
-  const pair = contents.items.find(
-    (item) => isScalar(item.key) && item.key.value === key,
-  );
+  const pair = topLevelPair(yaml, key);
   if (!isNode(pair?.key)) return undefined;
   const lastNode = isNode(pair.value) ? pair.value : pair.key;
   if (!pair.key.range || !lastNode.range) return undefined;

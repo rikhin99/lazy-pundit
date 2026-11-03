@@ -52,6 +52,8 @@ export const metaSchema = z.object({
   data_as_of: z.string(),
   checked_at: z.string(),
   snapshot: z.string(),
+  /** The snapshots the draft stood on before each refresh moved it, oldest first. */
+  earlier_snapshots: z.array(z.string()).optional(),
   /** The data hash of the snapshot through the ranking week (`dataHash`). */
   data_hash: z.string().regex(/^[0-9a-f]{64}$/),
   starting_order: z.array(z.string()),

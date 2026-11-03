@@ -1,8 +1,9 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { anthropicLlm, type Llm } from "./anthropic.ts";
 import { type Clipboard, noClipboard, systemClipboard } from "./clipboard.ts";
 import { type Clock, systemClock } from "./clock.ts";
+import { fileTransport } from "./file-transport.ts";
 import { httpTransport, type Transport } from "./transport.ts";
 
 /**
@@ -46,14 +47,21 @@ export interface Environment {
  *   LAZY_PUNDIT_ESPN_S2    overrides the stored espn_s2 cookie
  *   LAZY_PUNDIT_CLIPBOARD  `off` leaves the clipboard alone, as on a machine
  *                          without one, so scripted runs don't overwrite it
+ *   LAZY_PUNDIT_REPLAY     a snapshot's folder: league fetches replay it, not
+ *                          the network, so scripted runs stay offline
  */
 export function systemDeps(): Deps {
   const env = process.env;
   const home = homedir();
-  const transport = httpTransport();
+  const http = httpTransport();
   return {
-    transport,
-    llm: anthropicLlm(transport),
+    transport: env.LAZY_PUNDIT_REPLAY
+      ? fileTransport(
+          dirname(env.LAZY_PUNDIT_REPLAY),
+          basename(env.LAZY_PUNDIT_REPLAY),
+        )
+      : http,
+    llm: anthropicLlm(http),
     clock: systemClock,
     clipboard:
       env.LAZY_PUNDIT_CLIPBOARD === "off" ? noClipboard : systemClipboard,

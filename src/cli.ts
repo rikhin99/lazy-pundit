@@ -16,6 +16,7 @@ import {
   type PersonaRecord,
   type Problem,
   publish,
+  refresh,
   systemDeps,
   WorkspaceFileError,
 } from "./index.ts";
@@ -139,6 +140,28 @@ program
   });
 
 program
+  .command("refresh")
+  .description(
+    "Refetch the league and move the latest draft onto any new data, leaving your order and words.",
+  )
+  .action(async () => {
+    const deps = systemDeps();
+    const result = await refresh(await workspace(deps), deps);
+    if (result.changes.length === 0) {
+      console.log(`No changes since ${result.dataAsOf}.`);
+    } else {
+      console.log(
+        `Data changed since ${result.dataAsOf}: week ${result.week} now stands on snapshot ${result.snapshot}.`,
+      );
+      if (result.newlyStale.length > 0) {
+        console.log("Newly stale:");
+        printProblems(result.newlyStale);
+      }
+    }
+    report(result.problems);
+  });
+
+program
   .command("publish")
   .description("Check and freeze the latest draft and write the plain text.")
   .option(
@@ -157,6 +180,9 @@ program
         return confirmPublish();
       },
       confirmRelaxed,
+      onWarnings: (warnings) => {
+        for (const w of warnings) console.error(`${MARKS.warn} ${w}`);
+      },
     });
     if (!result.published) {
       console.log(

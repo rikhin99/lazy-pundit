@@ -15,7 +15,14 @@ import { standingsThrough } from "./standings.ts";
  * committed fixture ID: rebuild them (see fixtures/sleeper/README.md).
  */
 export function dataHash(league: League, throughWeek: number): string {
-  const covered = {
+  return createHash("sha256")
+    .update(canonicalJson(coveredData(league, throughWeek)))
+    .digest("hex");
+}
+
+/** The data a ranking for `throughWeek` stands on, which the data hash covers. */
+export function coveredData(league: League, throughWeek: number) {
+  return {
     playoffTeams: league.settings.playoffTeams,
     regularSeasonWeeks: league.settings.regularSeasonWeeks,
     standings: standingsThrough(league, throughWeek),
@@ -38,7 +45,6 @@ export function dataHash(league: League, throughWeek: number): string {
       })),
     transactions: league.transactions.filter((t) => t.week <= throughWeek),
   };
-  return createHash("sha256").update(canonicalJson(covered)).digest("hex");
 }
 
 /** JSON with every object's keys sorted, so equal data gives equal text. */

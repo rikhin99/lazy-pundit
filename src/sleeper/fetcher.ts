@@ -2,6 +2,7 @@ import { z } from "zod";
 import { readCacheEntry, writeCacheEntry } from "../cache.ts";
 import type { Clock } from "../clock.ts";
 import { dataHash } from "../data-hash.ts";
+import type { League } from "../league.ts";
 import { FetchError, type Manifest, SnapshotRecorder } from "../snapshot.ts";
 import type { Transport } from "../transport.ts";
 import { SLEEPER_API, SLEEPER_PLAYERS_URL } from "./api.ts";
@@ -35,6 +36,13 @@ export interface FetchSleeperOptions {
   headers?: Record<string, string>;
 }
 
+/** A complete fetch held in memory: nothing is on disk until `write`. */
+export interface FetchedSleeper {
+  league: League;
+  /** Writes the fetch as a snapshot. */
+  write(): Promise<{ id: string; manifest: Manifest }>;
+}
+
 /**
  * Fetches one Sleeper league season through the transport and writes it as a
  * snapshot. Every request must succeed, or nothing is written.
@@ -42,6 +50,16 @@ export interface FetchSleeperOptions {
 export async function fetchSleeperSnapshot(
   opts: FetchSleeperOptions,
 ): Promise<{ id: string; manifest: Manifest }> {
+  return (await fetchSleeper(opts)).write();
+}
+
+/**
+ * Fetches one Sleeper league season through the transport and normalizes it,
+ * writing no snapshot unless the caller asks. Every request must succeed.
+ */
+export async function fetchSleeper(
+  opts: FetchSleeperOptions,
+): Promise<FetchedSleeper> {
   const recorder = new SnapshotRecorder(opts.transport, opts.headers);
   const base = `${SLEEPER_API}/league/${encodeURIComponent(opts.leagueId)}`;
 
@@ -92,14 +110,18 @@ export async function fetchSleeperSnapshot(
       season: league.season,
     }),
   );
-  return recorder.write({
-    snapshotsDir: opts.snapshotsDir,
-    clock: opts.clock,
-    platform: "sleeper",
-    leagueId: league.league_id,
-    season: league.season,
-    idHash: dataHash(normalized, normalized.lastScoredWeek),
-  });
+  return {
+    league: normalized,
+    write: () =>
+      recorder.write({
+        snapshotsDir: opts.snapshotsDir,
+        clock: opts.clock,
+        platform: "sleeper",
+        leagueId: league.league_id,
+        season: league.season,
+        idHash: dataHash(normalized, normalized.lastScoredWeek),
+      }),
+  };
 }
 
 /**
