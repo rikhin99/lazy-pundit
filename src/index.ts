@@ -58,6 +58,11 @@ export {
   type Preset,
   type PresetName,
 } from "./persona.ts";
+export {
+  type PlayoffStatus,
+  playoffStatuses,
+  settledThisWeek,
+} from "./playoff-status.ts";
 export { type PublishOptions, type PublishResult, publish } from "./publish.ts";
 export { RankingFileError } from "./ranking-file.ts";
 export {

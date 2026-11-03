@@ -571,6 +571,58 @@ describe("playoff words", () => {
     ]);
   });
 
+  test.each([
+    ["[Clinched a bye]{ev=playoffs}", "clinched_bye", "verified"],
+    ["[Clinched a bye]{ev=playoffs}", "clinched", "wrong"],
+    ["[Clinched a playoff spot]{ev=playoffs}", "clinched_bye", "verified"],
+    ["[Eliminated]{ev=playoffs}", "eliminated", "verified"],
+    ["[Eliminated]{ev=playoffs}", "clinched", "wrong"],
+    ["[Bye Bye Bea clinched]{ev=playoffs}", "clinched", "verified"],
+  ])("the tag %s against %s is %s", (text, value, status) => {
+    const r = validate(blurb(3, text, settled(value)));
+    expect(r.claims.map((c) => c.status)).toEqual([status]);
+  });
+
+  test.each([
+    ["[clinched a first round bye]{ev=playoffs}", "clinched", "wrong"],
+    ["[clinched a first round bye]{ev=playoffs}", "clinched_bye", "verified"],
+    ["They clinched a first round bye.", "clinched", "wrong"],
+    ["[won out]{ev=playoffs}", "eliminated", "wrong"],
+    ["[mathematically out]{ev=playoffs}", "eliminated", "verified"],
+    ["[playoff lock]{ev=playoffs}", "clinched", "unchecked"],
+    ["[in the hunt]{ev=playoffs}", "clinched", "unchecked"],
+  ])("%s against %s is %s", (text, value, status) => {
+    const r = validate(blurb(3, text, settled(value)));
+    expect(r.claims.map((c) => c.status)).toEqual([status]);
+  });
+
+  test("a tagged loose phrase is unchecked even with no settled status", () => {
+    const r = validate(blurb(3, "[playoff lock]{ev=playoffs}"));
+    expect(r.claims.map((c) => c.status)).toEqual(["unchecked"]);
+  });
+
+  describe("a tag on wk.clinched, which can hold several teams", () => {
+    const clinched = () => {
+      const evidence = week8Evidence();
+      evidence.league["wk.clinched"] = "sleeper:3,sleeper:11";
+      return { evidence };
+    };
+    test.each([
+      ["[Bench Mob and Bye Bye Bea]{ev=wk.clinched}", "verified"],
+      ["[Bye Bye Bea]{ev=wk.clinched}", "verified"],
+      ["[Bench Mob and Gus Bus]{ev=wk.clinched}", "wrong"],
+      ["[Gus Bus]{ev=wk.clinched}", "wrong"],
+    ])("%s is %s", (text, status) => {
+      const r = validate(blurb(null, text, clinched()));
+      expect(r.claims.map((c) => c.status)).toEqual([status]);
+    });
+
+    test("a wrong claim's reason names the teams", () => {
+      const r = validate(blurb(null, "[Gus Bus]{ev=wk.clinched}", clinched()));
+      expect(r.claims[0]?.reason).toBe("wk.clinched is Bench Mob, Bye Bye Bea");
+    });
+  });
+
   test("a matching playoff claim is auto-tagged", () => {
     const r = validate(
       blurb(3, "They clinched a bye.", settled("clinched_bye")),

@@ -28,7 +28,8 @@ Reading the evidence
 - Every rank counts from the highest value: rank 1 has the most (for pa_rank, the most points scored against it). standing is the place in the league standings.
 - w<N>. IDs are that week's stats; w<N>.top, .zeros and .benchmiss name players, with their points under _points.
 - luck is actual wins minus the wins expected from all-play; form3 averages the last three weeks played.
-- A value that names a team is shown as the team's name.
+- A value that names a team is shown as the team's name. wk.clinched and wk.eliminated can name several: the teams whose playoff status changed this week.
+- playoffs is clinched_bye, clinched or eliminated, and is there only when settled. A team with no playoffs ID has no status to state: playoff words about it are wrong claims. Say only clinched a spot, clinched a bye or eliminated; looser phrases such as "playoff lock" or "on the bubble" can never pass.
 
 Reply format
 Reply with nothing but the sections below, each a heading line then its text, in any order:
@@ -41,10 +42,13 @@ Write one section for every team listed, using its team id exactly as given.`;
 /** The material for one first draft: the persona, the teams and their evidence. */
 export function firstDraftPrompt(ctx: DraftContext): string {
   const names = new Map(ctx.teams.map((t) => [t.id, t.name]));
-  const shown = (v: EvidenceValue) =>
-    typeof v === "string" && names.has(v as TeamId)
-      ? names.get(v as TeamId)
+  const shown = (v: EvidenceValue) => {
+    if (typeof v !== "string") return v;
+    const ids = v.split(",") as TeamId[];
+    return ids.every((id) => names.has(id))
+      ? ids.map((id) => names.get(id)).join(", ")
       : v;
+  };
   const lines = (ev: Record<string, EvidenceValue>) =>
     Object.entries(ev).map(([id, v]) => `${id}: ${shown(v)}`);
 

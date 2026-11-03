@@ -9,6 +9,7 @@ import {
   type TeamId,
 } from "./league.ts";
 import { bestLineupPoints } from "./lineup.ts";
+import { playoffStatuses, settledThisWeek } from "./playoff-status.ts";
 import { standingsThrough } from "./standings.ts";
 import type { EvidencePack, EvidenceValue } from "./validator/types.ts";
 
@@ -67,8 +68,16 @@ export function buildEvidencePack(league: League, week: number): EvidencePack {
     injuries(league, team.id, ev);
   }
   activity(league, week, played, teams);
+  for (const [team, status] of playoffStatuses(league, week)) {
+    (teams[team] as Record<string, EvidenceValue>).playoffs = status;
+  }
 
-  return { week, teams, league: leagueItems(league, week, played) };
+  const items = leagueItems(league, week, played);
+  const { clinched, eliminated } = settledThisWeek(league, week);
+  if (clinched.length > 0) items["wk.clinched"] = clinched.join(",");
+  if (eliminated.length > 0) items["wk.eliminated"] = eliminated.join(",");
+
+  return { week, teams, league: items };
 }
 
 /** Every team's played weeks through `week`, oldest first. */
@@ -480,7 +489,7 @@ function round(x: number): number {
 }
 
 /** "A", "A and B", "A, B and C". */
-function list(names: string[]): string {
+export function list(names: string[]): string {
   return names.length <= 1
     ? (names[0] ?? "")
     : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;

@@ -1,4 +1,5 @@
 import type { TeamId } from "../league.ts";
+import { playoffWant } from "./extract.ts";
 import { namesTeam } from "./names.ts";
 import { firstNum, hedgeBefore, numMatch } from "./numbers.ts";
 import type { Ctx, EvidenceValue, Kind, Resolved } from "./types.ts";
@@ -17,8 +18,12 @@ export function statOf(id: string): string {
 const TEAM_STATS =
   /^(opponent|trade\.\d+\.with|wk\.\w+_team|wk\.upset|wk\.upset_over|wk\.robbed)$/;
 
+/** League items whose value is a comma-separated list of team IDs. */
+const TEAM_LIST_STATS = /^wk\.(clinched|eliminated)$/;
+
 export function kindOf(id: string, value: EvidenceValue): Kind {
   const stat = statOf(id);
+  if (TEAM_LIST_STATS.test(stat)) return "teams";
   if (stat === "record" || stat === "allplay") return "record";
   if (stat === "streak") return "streak";
   if (stat === "result") return "result";
@@ -86,6 +91,20 @@ export function agrees(ctx: Ctx, r: Resolved, words: string): boolean {
     }
     case "team":
       return namesTeam(ctx, String(value) as TeamId, t);
+    case "teams": {
+      // Naming some of the list is true; naming a team outside it isn't.
+      const listed = String(value).split(",");
+      const named = Object.keys(ctx.input.nicknames).filter((team) =>
+        namesTeam(ctx, team as TeamId, t),
+      );
+      return named.length > 0 && named.every((team) => listed.includes(team));
+    }
+    case "playoffs": {
+      const want = playoffWant(t);
+      return (
+        want === value || (want === "clinched" && value === "clinched_bye")
+      );
+    }
     case "result": {
       const won = WIN_WORDS.test(t);
       const lost = LOSS_WORDS.test(t);

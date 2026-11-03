@@ -1,10 +1,16 @@
 import type { TeamId } from "./league.ts";
 import { agrees, resolve } from "./validator/evidence.ts";
-import { extract, type Found, units } from "./validator/extract.ts";
+import {
+  extract,
+  type Found,
+  playoffWant,
+  units,
+} from "./validator/extract.ts";
 import {
   type Hit,
   idFor,
   judge,
+  LOOSE_PLAYOFF_PHRASE,
   show,
   type Verdict,
 } from "./validator/judge.ts";
@@ -72,6 +78,9 @@ function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
   }
   if (claim.tag) {
     const id = claim.tag.value;
+    if (/(^|\/)playoffs$/.test(id) && playoffWant(claim.text) === null) {
+      return { status: "unchecked", reason: LOOSE_PLAYOFF_PHRASE, hits: [] };
+    }
     const r = resolve(ctx, id, section);
     if (!r) {
       return {

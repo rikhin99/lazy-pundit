@@ -1,5 +1,6 @@
-import { buildEvidencePack, injuredPlayers } from "./evidence-pack.ts";
+import { buildEvidencePack, injuredPlayers, list } from "./evidence-pack.ts";
 import type { League, TeamId } from "./league.ts";
+import type { PlayoffStatus } from "./playoff-status.ts";
 import type { EvidencePack, EvidenceValue } from "./validator/types.ts";
 
 /** What a draft carries for its ranking week, all from the model. */
@@ -45,10 +46,18 @@ export function draftData(league: League, week: number): DraftData {
   return { week, evidence, intro: leagueStatLine(evidence, names), teams };
 }
 
+/** A settled playoff status, as a stat line says it. */
+const PLAYOFF_WORDS: Record<PlayoffStatus, string> = {
+  clinched_bye: "Clinched a bye",
+  clinched: "Clinched a playoff spot",
+  eliminated: "Eliminated",
+};
+
 /**
- * A team's stat line: points rank, a streak of two or more, and its last
- * result, e.g. `[3rd]{ev=pf_rank} in points · [won 3 straight]{ev=streak} ·
- * [beat]{ev=w8.result} [Pirates]{ev=w8.opponent} by [5.5]{ev=w8.margin}`.
+ * A team's stat line: points rank, a streak of two or more, its last result
+ * and any settled playoff status, e.g. `[3rd]{ev=pf_rank} in points ·
+ * [won 3 straight]{ev=streak} · [beat]{ev=w8.result} [Pirates]{ev=w8.opponent}
+ * by [5.5]{ev=w8.margin} · [Clinched a bye]{ev=playoffs}`.
  * The record is left out: the published line already leads with it.
  */
 function statLine(
@@ -66,6 +75,10 @@ function statLine(
   }
   const last = lastMatchup(ev, names);
   if (last) parts.push(last);
+  if (ev.playoffs !== undefined) {
+    const status = PLAYOFF_WORDS[ev.playoffs as PlayoffStatus];
+    parts.push(`[${status}]{ev=playoffs}`);
+  }
   return parts.join(" · ");
 }
 
@@ -97,7 +110,7 @@ function lastMatchup(
   return `[${verb}]{ev=${w}.result} ${opp} by [${num(ev[`${w}.margin`])}]{ev=${w}.margin}`;
 }
 
-/** The league stat line: the week's high and low, biggest margin and closest matchup. */
+/** The league stat line: the week's high and low, biggest margin, closest matchup and who clinched. */
 function leagueStatLine(
   pack: EvidencePack,
   names: Map<TeamId, string>,
@@ -117,6 +130,12 @@ function leagueStatLine(
       `Biggest margin: ${team("wk.margin_max_team")} by [${num(lg["wk.margin_max"])}]{ev=wk.margin_max}`,
       `Closest matchup: ${team("wk.margin_min_team")} by [${num(lg["wk.margin_min"])}]{ev=wk.margin_min}`,
     );
+  }
+  const clinched = lg["wk.clinched"];
+  if (clinched !== undefined) {
+    const teams = String(clinched).split(",") as TeamId[];
+    const who = list(teams.map((t) => names.get(t) ?? t));
+    parts.push(`[Clinched this week: ${who}]{ev=wk.clinched}`);
   }
   return parts.join(" · ");
 }

@@ -96,6 +96,7 @@ export type Kind =
   | "streak"
   | "result"
   | "team"
+  | "teams"
   | "ordinal"
   | "luck"
   | "move"

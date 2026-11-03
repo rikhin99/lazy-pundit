@@ -102,7 +102,7 @@ A top seed's place in the second round of the winners bracket, skipping the firs
 The playoff bracket for teams that missed the playoffs. On Sleeper the team with the lower score advances and is given the win, so a losers-bracket result says nothing about who outscored whom. Streaks, luck and close matchups leave it out, and score-based items read the scores.
 
 **Playoff status**:
-Whether a team has clinched a playoff bye, clinched a playoff spot or been eliminated. It is stated only when it holds whatever happens in the remaining matchups and however ties are broken. Otherwise the team has none, and nothing is said.
+Whether a team has clinched a playoff bye, clinched a playoff spot or been eliminated. It is stated only when it holds whatever happens in the remaining matchups and however ties are broken. Otherwise the team has none, and nothing is said. Once the regular season is over points for is known, so it decides a level finish. A league with divisions or median scoring gives no status.
 _Avoid_: Playoff odds, magic number, in the hunt
 
 **Snapshot**:

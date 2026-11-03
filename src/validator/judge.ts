@@ -33,9 +33,17 @@ export function teamName(ctx: Ctx, team: TeamId): string {
 export function show(ctx: Ctx, r: Resolved): string {
   const who = r.team && r.team !== ctx.input.team ? `${r.team}/` : "";
   const value =
-    r.kind === "team" ? teamName(ctx, String(r.value) as TeamId) : r.value;
+    r.kind === "team" || r.kind === "teams"
+      ? String(r.value)
+          .split(",")
+          .map((t) => teamName(ctx, t as TeamId))
+          .join(", ")
+      : r.value;
   return `${who}${r.stat} is ${value}`;
 }
+
+export const LOOSE_PLAYOFF_PHRASE =
+  "a loose playoff phrase; only clinched, a bye or eliminated is checked";
 
 export function judge(
   ctx: Ctx,
@@ -142,10 +150,7 @@ export function judge(
 
   if (shape.type === "playoffs") {
     if (shape.want === null) {
-      return none(
-        "unchecked",
-        "a loose playoff phrase; only clinched, a bye or eliminated is checked",
-      );
+      return none("unchecked", LOOSE_PLAYOFF_PHRASE);
     }
     for (const t of teams) {
       const r = resolve(ctx, "playoffs", t);

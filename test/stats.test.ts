@@ -54,7 +54,7 @@ describe("stat lines checked against the evidence pack", () => {
     );
   });
 
-  test.each([1, 8, 15])(
+  test.each([1, 8, 10, 14, 15])(
     "week %i: every team has a stat line and every claim in it, and in the intro, is tagged and verified",
     async (week) => {
       const league = await committed(week);

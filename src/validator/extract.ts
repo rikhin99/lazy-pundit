@@ -185,6 +185,33 @@ export const MOVE_VERBS =
   "climbs?|climbed|climbing|rises|rose|rising|jumps?|jumped|jumping|moves? up|moved up|falls?|fell|falling|drops?|dropped|dropping|slides?|slid|sliding|slips?|slipped|tumbles?|tumbled";
 export const MOVE_DOWN = /^(fall|fell|drop|slid|slip|tumbl|down)/;
 
+type PlayoffWant = Extract<Shape, { type: "playoffs" }>["want"];
+
+/** Playoff phrases and the status each one states; null is a loose phrase. */
+const PLAYOFFS: [RegExp, PlayoffWant][] = [
+  [
+    /\b(?:clinch(?:ed|es|ing)?|locked up|locks up|secured|secures) (?:a |the )?(?:first[- ]round |round[- ]one |playoff )?bye\b/gi,
+    "clinched_bye",
+  ],
+  [
+    /\bclinch(?:ed|es|ing)?\b(?: (?:a|their|his|her) (?:playoff )?(?:spot|berth|place))?/gi,
+    "clinched",
+  ],
+  [
+    /\b(?:eliminated|mathematically out|out of (?:the )?playoff (?:race|hunt|picture))\b/gi,
+    "eliminated",
+  ],
+  [
+    /\bplayoff (?:lock|bound|hopes?)\b|\bin the (?:playoff )?hunt\b|\bon the bubble\b|\bpunch(?:ed|es)? (?:their|a) (?:playoff )?ticket\b/gi,
+    null,
+  ],
+];
+
+/** What these words state about playoff status: undefined when they're no playoff phrase. */
+export function playoffWant(words: string): PlayoffWant | undefined {
+  return PLAYOFFS.find(([re]) => words.search(re) >= 0)?.[1];
+}
+
 export function extract(ctx: Ctx, s: string): Found[] {
   const week = ctx.evidence.week;
   const out: Found[] = [];
@@ -307,24 +334,6 @@ export function extract(ctx: Ctx, s: string): Found[] {
   }
 
   // playoff words
-  const PLAYOFFS: [RegExp, Extract<Shape, { type: "playoffs" }>["want"]][] = [
-    [
-      /\b(?:clinch(?:ed|es|ing)?|locked up|locks up|secured|secures) (?:a |the )?(?:first-round |round-one |playoff )?bye\b/gi,
-      "clinched_bye",
-    ],
-    [
-      /\bclinch(?:ed|es|ing)?\b(?: (?:a|their|his|her) (?:playoff )?(?:spot|berth|place))?/gi,
-      "clinched",
-    ],
-    [
-      /\b(?:eliminated|mathematically out|out of (?:the )?playoff (?:race|hunt|picture))\b/gi,
-      "eliminated",
-    ],
-    [
-      /\bplayoff (?:lock|bound|hopes?)\b|\bin the (?:playoff )?hunt\b|\bon the bubble\b|\bpunch(?:ed|es)? (?:their|a) (?:playoff )?ticket\b/gi,
-      null,
-    ],
-  ];
   for (const [re, want] of PLAYOFFS) {
     for (const m of s.matchAll(re)) {
       add(m.index, m.index + m[0].length, { type: "playoffs", want });
