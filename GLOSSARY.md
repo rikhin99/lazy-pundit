@@ -325,7 +325,7 @@ A claim that was true when written and is no longer true after a refresh or afte
 An untagged claim whose words match a stat, but not clearly enough to say which one.
 
 **Unchecked claim**:
-A claim with no evidence to check it against, such as movement before there is a previous published ranking.
+A claim with no evidence to check it against, such as a tier claim in a ranking with no groups.
 
 ## Problems
 
