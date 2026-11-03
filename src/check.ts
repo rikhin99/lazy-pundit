@@ -6,6 +6,12 @@ import { WorkspaceFileError } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
 import type { FailedSection, SectionKey } from "./llm-gate.ts";
 import {
+  type Lore,
+  loadLore,
+  type ValidatorNames,
+  validatorNames,
+} from "./lore.ts";
+import {
   type MovementBaseline,
   movementBaseline,
   moveOf,
@@ -94,6 +100,9 @@ export interface CheckedDraft extends CheckResult {
   text: string;
   ranking: RankingFile;
   league: League;
+  /** The workspace's lore and handles, to name teams in a later league. */
+  lore: Lore;
+  handles: Workspace["handles"];
   /** Each team's order evidence in the checked order. */
   order: Record<TeamId, OrderEvidence>;
   /** What movement was measured against, or none before the first publish. */
@@ -132,12 +141,14 @@ export async function checkDraft(
       { place: i + 1, move: moveOf(baseline, team as TeamId, i + 1) },
     ]),
   ) as Record<TeamId, OrderEvidence>;
+  const lore = await loadLore(ws);
   const { problems, autoTags } = reviewProse({
     text: written,
     ranking,
     league,
     evidence,
     order,
+    validatorNames: validatorNames(lore, league, ws.handles),
     before: {
       order: startingOrder,
       evidence: await earlierEvidence(ws, ranking),
@@ -164,6 +175,8 @@ export async function checkDraft(
     text,
     ranking: tagging ? parseRanking(name, text) : ranking,
     league,
+    lore,
+    handles: ws.handles,
     order,
     ...(baseline ? { baseline } : {}),
   };
@@ -185,6 +198,7 @@ export function claimsGoingStale(
     league: to,
     evidence: draftData(to, week).evidence,
     order: checked.order,
+    validatorNames: validatorNames(checked.lore, to, checked.handles),
     before: { evidence: [draftData(from, week).evidence] },
   });
   return problems.filter((p) => p.kind === "stale" && p.cause === "refresh");
@@ -223,18 +237,13 @@ function reviewProse(input: {
   league: League;
   evidence: EvidencePack;
   order: Record<TeamId, OrderEvidence>;
+  validatorNames: ValidatorNames;
   before: NonNullable<ValidatorInput["before"]>;
 }): {
   problems: Problem[];
   autoTags: { start: number; end: number; id: string }[];
 } {
   const { text: written, ranking, league, evidence, order, before } = input;
-  const nicknames = Object.fromEntries(
-    league.teams.map((t) => [
-      t.id,
-      [t.name, ...t.managers.map((m) => m.displayName)],
-    ]),
-  ) as Record<TeamId, string[]>;
   const names = teamNames(league);
 
   const sections: { team: TeamId | null; text: string; start: number }[] = [];
@@ -265,8 +274,7 @@ function reviewProse(input: {
       team: s.team,
       evidence,
       order,
-      nicknames,
-      sections: { lore: [], stakes: [], log: [] },
+      ...input.validatorNames,
       // The persona the draft was written in, not today's persona.md.
       swearing: ranking.meta.persona.swearing,
       before,

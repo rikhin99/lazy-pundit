@@ -42,6 +42,15 @@ What the pundits have written down about a league and its people that the platfo
 **Lore entry**:
 One fact or note in a league's lore, filed under a league, manager, team or other section. A blurb that uses a lore entry cites the section it came from. The validator checks that the section exists, never whether the entry is true.
 
+**Lore section**:
+One headed part of a league's lore: the league, a manager, a team, relationships, running jokes or anything the pundit makes up. A sentence that uses a lore entry cites the section's name.
+
+**League type**:
+What kind of group a league is: work, family, friends or other. It is written in the lore, and setup reads it to preselect the persona and the family-league setting.
+
+**Reserved tag**:
+A braced marker that means something to the tool in a file the pundit writes, such as `{manager=bo}` or `{local}`. Any other braced text in lore is an error, so a marker meant to keep something private never silently does nothing.
+
 **Nickname**:
 Another name for a manager or a team, such as "Karna" or "Rad Team". The validator uses nicknames to work out which team a sentence is about. A team's current name and its manager's display name always count as nicknames.
 _Avoid_: Alias

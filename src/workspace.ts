@@ -21,6 +21,17 @@ export const workspaceSchema = z.object({
       }),
     )
     .refine((s) => Object.keys(s).length > 0, "name at least one season"),
+  /** Each manager handle's linked platform accounts (`sleeper:<user_id>`). */
+  handles: z
+    .record(
+      z.string(),
+      z.array(
+        z
+          .string()
+          .regex(/^[a-z]+:.+$/, "an account is <platform>:<account id>"),
+      ),
+    )
+    .optional(),
 });
 
 export interface Workspace {
@@ -28,6 +39,8 @@ export interface Workspace {
   pundit: string;
   /** The latest season the workspace names. */
   season: { year: string; platform: "sleeper"; leagueId: string };
+  /** Each manager handle's linked platform accounts. */
+  handles: Record<string, string[]>;
 }
 
 /** Reads `workspace.md`. */
@@ -56,6 +69,7 @@ export async function readWorkspace(dir: string): Promise<Workspace> {
     dir,
     pundit: parsed.data.pundit,
     season: { year, platform: season.platform, leagueId: season.league_id },
+    handles: parsed.data.handles ?? {},
   };
 }
 

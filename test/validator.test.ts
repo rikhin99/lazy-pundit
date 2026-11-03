@@ -617,6 +617,37 @@ describe("playoff words", () => {
       expect(r.claims.map((c) => c.status)).toEqual([status]);
     });
 
+    test.each([
+      ["[Clinched this week: Bench Mob]{ev=wk.clinched}", "verified"],
+      ["[Clinched this week: Gus Bus]{ev=wk.clinched}", "wrong"],
+      // Only the stat line's own label is dropped, not whatever is before a colon.
+      ["[Gus Bus clinched: Bench Mob too]{ev=wk.clinched}", "wrong"],
+    ])(
+      "with a nickname that's a word in the label, %s is %s",
+      (text, status) => {
+        const nicknames = {
+          ...blurb(null, "").nicknames,
+          "sleeper:9": ["Hail Mary Hustle", "Week"],
+        };
+        const r = validate(blurb(null, text, { ...clinched(), nicknames }));
+        expect(r.claims.map((c) => c.status)).toEqual([status]);
+      },
+    );
+
+    test("a team name holding a colon is still read whole", () => {
+      const nicknames = {
+        ...blurb(null, "").nicknames,
+        "sleeper:3": ["Mob: Reloaded"],
+      };
+      const r = validate(
+        blurb(null, "[Clinched this week: Mob: Reloaded]{ev=wk.clinched}", {
+          ...clinched(),
+          nicknames,
+        }),
+      );
+      expect(r.claims.map((c) => c.status)).toEqual(["verified"]);
+    });
+
     test("a wrong claim's reason names the teams", () => {
       const r = validate(blurb(null, "[Gus Bus]{ev=wk.clinched}", clinched()));
       expect(r.claims[0]?.reason).toBe("wk.clinched is Bench Mob, Bye Bye Bea");

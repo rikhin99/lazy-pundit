@@ -19,6 +19,12 @@ import { type DraftData, draftData } from "./draft-data.ts";
 import type { League } from "./league.ts";
 import { type CallSetup, LlmStopped, llmAsk } from "./llm-call.ts";
 import { type FailedSection, type GatedProse, gatedProse } from "./llm-gate.ts";
+import {
+  loadLore,
+  refuseLocal,
+  type ValidatorNames,
+  validatorNames,
+} from "./lore.ts";
 import { loadPersona, type Persona, personaRecord } from "./persona.ts";
 import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
 import { dataChangedWarning, fetchFresh } from "./refresh.ts";
@@ -62,7 +68,10 @@ export async function draft(
   deps: Deps,
 ): Promise<DraftResult> {
   const ws = await readWorkspace(workspaceDir);
+  const lore = await loadLore(ws);
+  refuseLocal(lore);
   const fetched = await fetchFresh(ws, deps);
+  const names = validatorNames(lore, fetched.league, ws.handles);
   const week = fetched.league.lastScoredWeek;
   const dir = rankingsDir(ws);
   const path = join(dir, `${weekStem(week)}.md`);
@@ -89,6 +98,7 @@ export async function draft(
   const { prose, failed, fallback } = anthropicApiKey
     ? await llmProse(
         draftContext(league, data, persona, await lastBlurbs(dir, week)),
+        names,
         data,
         {
           deps,
@@ -195,6 +205,7 @@ interface ProseOutcome {
  */
 async function llmProse(
   ctx: DraftContext,
+  names: ValidatorNames,
   data: DraftData,
   setup: Omit<CallSetup, "config">,
 ): Promise<ProseOutcome> {
@@ -204,7 +215,7 @@ async function llmProse(
   const lines = statLines(data, ctx.persona);
   let gated: GatedProse;
   try {
-    gated = await gatedProse(ctx, llmAsk({ ...setup, config }));
+    gated = await gatedProse(ctx, names, llmAsk({ ...setup, config }));
   } catch (err) {
     if (!(err instanceof LlmStopped)) throw err;
     return {

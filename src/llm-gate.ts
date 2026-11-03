@@ -1,6 +1,7 @@
 import type { DraftContext } from "./draft-context.ts";
 import type { TeamId } from "./league.ts";
 import { LlmStopped } from "./llm-call.ts";
+import type { ValidatorNames } from "./lore.ts";
 import {
   FIRST_DRAFT_SYSTEM,
   firstDraftPrompt,
@@ -47,13 +48,15 @@ export interface GatedProse {
 /**
  * The LLM's prose for a draft, through the LLM gate: the first draft writes
  * every section, and each retry asks only for the sections still failing,
- * with the validator's complaints. A section that never passes keeps its
+ * with the validator's complaints. `names` holds lore's nicknames and section
+ * names for the validator only; none of it is sent to the LLM. A section that never passes keeps its
  * best attempt. `ask` sends one prompt and returns the reply's text. When
  * `ask` throws `LlmStopped` on a retry, the gate stops there and keeps what
  * it has; on the first draft, it throws.
  */
 export async function gatedProse(
   ctx: DraftContext,
+  names: ValidatorNames,
   ask: (system: string, prompt: string) => Promise<string>,
 ): Promise<GatedProse> {
   const first = readReply(
@@ -67,7 +70,7 @@ export async function gatedProse(
     { latest: FailedSection; best: FailedSection }
   >();
   for (const [key, text] of sectionsOf(first)) {
-    const failed = gate(ctx, key, text);
+    const failed = gate(ctx, names, key, text);
     if (failed) failing.set(key, { latest: failed, best: failed });
   }
 
@@ -86,7 +89,7 @@ export async function gatedProse(
     for (const [key, text] of sectionsOf(reply)) {
       const was = failing.get(key);
       if (!was) continue;
-      const failed = gate(ctx, key, text);
+      const failed = gate(ctx, names, key, text);
       if (!failed) {
         failing.delete(key);
         setSection(written, key, text);
@@ -105,6 +108,7 @@ export async function gatedProse(
 /** A section's faults, or undefined when it passes the gate. */
 function gate(
   ctx: DraftContext,
+  names: ValidatorNames,
   key: SectionKey,
   text: string,
 ): FailedSection | undefined {
@@ -115,10 +119,7 @@ function gate(
       evidence: ctx.evidence,
       // A first draft has no order to cite.
       order: {},
-      nicknames: Object.fromEntries(
-        ctx.teams.map((t) => [t.id, [t.name, ...t.managers]]),
-      ),
-      sections: { lore: [], stakes: [], log: [] },
+      ...names,
       swearing: ctx.persona.swearing,
     }),
   );

@@ -21,6 +21,9 @@ const TEAM_STATS =
 /** League items whose value is a comma-separated list of team IDs. */
 const TEAM_LIST_STATS = /^wk\.(clinched|eliminated)$/;
 
+/** What the league stat line's `wk.clinched` tag says before the teams. */
+export const CLINCHED_LABEL = "Clinched this week:";
+
 export function kindOf(id: string, value: EvidenceValue): Kind {
   const stat = statOf(id);
   if (TEAM_LIST_STATS.test(stat)) return "teams";
@@ -93,9 +96,11 @@ export function agrees(ctx: Ctx, r: Resolved, words: string): boolean {
       return namesTeam(ctx, String(value) as TeamId, t);
     case "teams": {
       // Naming some of the list is true; naming a team outside it isn't.
+      // The league stat line's own label names no team.
       const listed = String(value).split(",");
+      const names = t.replace(CLINCHED_LABEL.toLowerCase(), "");
       const named = Object.keys(ctx.input.nicknames).filter((team) =>
-        namesTeam(ctx, team as TeamId, t),
+        namesTeam(ctx, team as TeamId, names),
       );
       return named.length > 0 && named.every((team) => listed.includes(team));
     }

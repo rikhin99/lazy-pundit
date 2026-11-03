@@ -35,6 +35,8 @@ import type {
  * and nothing here knows about the ranking file or the workspace.
  */
 
+export { CLINCHED_LABEL } from "./validator/evidence.ts";
+export { normalize, wholeWords } from "./validator/names.ts";
 export { applyAutoTags, stripTags } from "./validator/tags.ts";
 export type {
   AutoTag,

@@ -9,6 +9,7 @@ import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
 import { setFrontMatterValue } from "./front-matter.ts";
 import type { League } from "./league.ts";
+import { validatorNames } from "./lore.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
 import { startingOrder } from "./standings.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
@@ -65,6 +66,9 @@ export async function refresh(
     };
   }
 
+  // Before anything's written: a nickname that clashes with the fresh names
+  // would otherwise stop the check below, leaving the draft half refreshed.
+  validatorNames(checked.lore, fresh.league, checked.handles);
   const { id, manifest } = await fresh.write();
   let text = checked.text;
   text = set(text, "checked_at", now);

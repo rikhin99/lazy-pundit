@@ -8,6 +8,7 @@ import {
   spendSchema,
 } from "../src/config.ts";
 import { FORMAT } from "../src/front-matter.ts";
+import { loreSchema } from "../src/lore.ts";
 import { personaSchema } from "../src/persona.ts";
 import { metaSchema } from "../src/ranking-file.ts";
 import { manifestSchema, SNAPSHOT_FORMAT } from "../src/snapshot.ts";
@@ -25,7 +26,7 @@ import { workspaceSchema } from "../src/workspace.ts";
  */
 const RECORDED = {
   FORMAT: {
-    1: "f3ba0516bef0ac315a9efd87a3ba24e0fb7b45492f255bd95fe104c90502f7dc",
+    1: "c169b438731104acc653fffd791bb371f64e3149358cc980b9fabed2239d79f5",
   } as Record<number, string>,
   SNAPSHOT_FORMAT: {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",
@@ -41,7 +42,11 @@ function shapeHash(...schemas: ZodType[]): string {
 }
 
 test.each([
-  ["FORMAT", FORMAT, shapeHash(metaSchema, workspaceSchema, personaSchema)],
+  [
+    "FORMAT",
+    FORMAT,
+    shapeHash(metaSchema, workspaceSchema, personaSchema, loreSchema),
+  ],
   ["SNAPSHOT_FORMAT", SNAPSHOT_FORMAT, shapeHash(manifestSchema)],
   [
     "CONFIG_FORMAT",

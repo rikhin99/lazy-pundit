@@ -2,6 +2,7 @@ import { buildEvidencePack, injuredPlayers, list } from "./evidence-pack.ts";
 import type { League, TeamId } from "./league.ts";
 import type { PlayoffStatus } from "./playoff-status.ts";
 import type { EvidencePack, EvidenceValue } from "./validator/types.ts";
+import { CLINCHED_LABEL } from "./validator.ts";
 
 /** What a draft carries for its ranking week, all from the model. */
 export interface DraftData {
@@ -135,7 +136,7 @@ function leagueStatLine(
   if (clinched !== undefined) {
     const teams = String(clinched).split(",") as TeamId[];
     const who = list(teams.map((t) => names.get(t) ?? t));
-    parts.push(`[Clinched this week: ${who}]{ev=wk.clinched}`);
+    parts.push(`[${CLINCHED_LABEL} ${who}]{ev=wk.clinched}`);
   }
   return parts.join(" · ");
 }
