@@ -123,6 +123,20 @@ test("whether a lineup entry started is decided only by isStarter in src/league.
   expect(offences).toEqual([]);
 });
 
+test("tests get a league from a real payload, through committed or patched, never a hand-built model", async () => {
+  const root = join(import.meta.dirname, "..");
+  const offences: string[] = [];
+  for (const file of await sourceFiles(join(root, "test"))) {
+    const code = await codeOf(file);
+    if (/\b(as|satisfies)\s+(unknown\s+as\s+)?League\b/.test(code)) {
+      offences.push(`${relative(root, file)} builds a League by hand`);
+    } else if (/:\s*League\s*=\s*\{/.test(code)) {
+      offences.push(`${relative(root, file)} builds a League by hand`);
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
 test("the validator is pure: beyond its own modules it imports only types from the league model", async () => {
   const own = join(SRC, "validator");
   const files = [join(SRC, "validator.ts"), ...(await sourceFiles(own))];

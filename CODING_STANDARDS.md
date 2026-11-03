@@ -1,6 +1,6 @@
 # Coding standards
 
-Read during review. Each rule is a judgement call; the mechanical rules are tests in `test/injected-boundaries.test.ts` (outside world only through injected `Deps`; files written only through `src/workspace-files.ts`; the validator imports nothing beyond its own modules except league-model types; whether a lineup entry started is decided only by `isStarter`), `test/format-versions.test.ts` (a file shape change needs a version bump) and `test/glossary-terms.test.ts` (no unambiguous glossary _Avoid_ term in identifiers or comments), and Biome and `tsc` cover formatting and types. Where a rule has a source, the source wins.
+Read during review. Each rule is a judgement call; the mechanical rules are tests in `test/injected-boundaries.test.ts` (outside world only through injected `Deps`; files written only through `src/workspace-files.ts`; the validator imports nothing beyond its own modules except league-model types; whether a lineup entry started is decided only by `isStarter`; a test never hand-builds a `League`), `test/format-versions.test.ts` (a file shape change needs a version bump) and `test/glossary-terms.test.ts` (no unambiguous glossary _Avoid_ term in identifiers or comments), and Biome and `tsc` cover formatting and types. Where a rule has a source, the source wins.
 
 ## Shape
 
