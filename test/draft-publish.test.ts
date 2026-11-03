@@ -2,16 +2,13 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { parse as parseYaml } from "yaml";
-import { type Deps, draft, publish, RankingFileError } from "../src/index.ts";
-import { fearTheTurtle, rankingsDir } from "./support/workspace.ts";
-
-/** The YAML front matter of a Markdown file. */
-function frontMatter(text: string): Record<string, unknown> {
-  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
-  if (!match?.[1]) throw new Error("no front matter");
-  return parseYaml(match[1]);
-}
+import { draft, publish, RankingFileError } from "../src/index.ts";
+import {
+  fearTheTurtle,
+  frontMatter,
+  published,
+  rankingsDir,
+} from "./support/workspace.ts";
 
 describe("draft", () => {
   test("writes the ranking file for the last scored week, in standings order", async () => {
@@ -120,13 +117,6 @@ Week high: Gus Bus 133.22 · Week low: Hail Mary Hustle 70.32 · Biggest margin:
 
 Stats: Sleeper · made with Lazy Pundit
 `;
-
-/** Publishes and expects it to go through. */
-async function published(dir: string, deps: Deps) {
-  const result = await publish(dir, deps);
-  if (!result.published) throw new Error("held back to editing");
-  return result;
-}
 
 describe("publish", () => {
   test("freezes the draft and writes and copies the plain text", async () => {

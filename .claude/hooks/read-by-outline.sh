@@ -27,6 +27,11 @@ Read)
   ;;
 Bash)
   cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
+  # `head -N <file>` and `cat <file> | head -N` read N lines: count them as
+  # `sed -n 1,Np <file>`.
+  cmd=$(printf '%s' "$cmd" | sed -E \
+    -e 's/cat +([^ ;&|<>]+) *\| *head +(-n +)?-?([0-9]+)/sed -n 1,\3p \1/g' \
+    -e 's/head +(-n +)?-?([0-9]+) +([^ ;&|<>-][^ ;&|<>]*)/sed -n 1,\2p \3/g')
   total=0
   files=0
   # Each file argument of a `cat` that reads (not one writing with > or >>).

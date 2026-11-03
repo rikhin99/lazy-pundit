@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parse as parseYaml } from "yaml";
 import {
   type Clipboard,
   type Clock,
@@ -10,6 +11,7 @@ import {
   fileTransport,
   type League,
   normalizeSleeper,
+  publish,
   readSnapshot,
   type Transport,
 } from "../../src/index.ts";
@@ -168,4 +170,18 @@ export async function patched(
     leagueId: FEAR_THE_TURTLE_ID,
   });
   return normalizeSleeper(await readSnapshot(dir, id));
+}
+
+/** Publishes and expects it to go through. */
+export async function published(dir: string, deps: Deps) {
+  const result = await publish(dir, deps);
+  if (!result.published) throw new Error("held back to editing");
+  return result;
+}
+
+/** The YAML front matter of a Markdown file. */
+export function frontMatter(text: string): Record<string, unknown> {
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  if (!match?.[1]) throw new Error("no front matter");
+  return parseYaml(match[1]);
 }

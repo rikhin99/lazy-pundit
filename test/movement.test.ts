@@ -1,21 +1,17 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { parse } from "yaml";
-import { check, type Deps, draft, publish } from "../src/index.ts";
-import { atWeek, fearTheTurtle, rankingsDir } from "./support/workspace.ts";
-
-/** Publishes and expects it to go through. */
-async function published(dir: string, deps: Deps) {
-  const result = await publish(dir, deps);
-  if (!result.published) throw new Error("held back to editing");
-  return result;
-}
-
-/** The YAML front matter of a Markdown file. */
-function frontMatter(text: string): Record<string, unknown> {
-  return parse(text.split("---\n")[1] ?? "");
-}
+import { checkDraft } from "../src/check.ts";
+import { check, draft, publish, type TeamId } from "../src/index.ts";
+import { moveOf } from "../src/movement.ts";
+import { renderPlainText } from "../src/plain-text.ts";
+import {
+  atWeek,
+  fearTheTurtle,
+  frontMatter,
+  published,
+  rankingsDir,
+} from "./support/workspace.ts";
 
 /** Each team's line in the plain text: "N. Name · record (movement)". */
 function teamLines(text: string): string[] {
@@ -212,5 +208,43 @@ describe("movement", () => {
     // Hail Mary Hustle was 1st in week 8's second edition and starts 12th.
     expect(teamLines(text)[11]).toBe("12. Hail Mary Hustle · 1-8 (▼11)");
     expect(text).not.toContain("Movement since");
+  });
+
+  // No fixture has a preseason ranking, so these render week 8's checked
+  // draft against a made-up baseline.
+  test("a preseason baseline is named Preseason in the header", async () => {
+    const { dir } = await week8AfterWeek7();
+    const { ranking, league, order, baseline } = await checkDraft(dir);
+    if (!baseline) throw new Error("no baseline");
+
+    const text = renderPlainText(ranking, league, order, {
+      ...baseline,
+      week: 0,
+    });
+
+    expect(text).toContain("Movement since Preseason");
+    expect(teamLines(text)[0]).toBe("1. Bench Mob · 7-1 (—)");
+  });
+
+  test("a preseason ranking shows no movement", async () => {
+    const { dir } = await week8AfterWeek7();
+    const { ranking, league, order, baseline } = await checkDraft(dir);
+
+    const preseason = { ...ranking, meta: { ...ranking.meta, week: 0 } };
+    const text = renderPlainText(preseason, league, order, baseline);
+
+    expect(text).toContain("Preseason · by");
+    expect(text).not.toContain("Movement since");
+    expect(teamLines(text)[0]).toBe("1. Bench Mob · 7-1");
+  });
+
+  test("a team missing from the baseline is new", () => {
+    const baseline = {
+      week: 7,
+      places: new Map([["sleeper:1" as TeamId, 3]]),
+    };
+
+    expect(moveOf(baseline, "sleeper:1" as TeamId, 1)).toBe(2);
+    expect(moveOf(baseline, "sleeper:99" as TeamId, 1)).toBe("new");
   });
 });

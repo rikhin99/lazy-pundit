@@ -22,7 +22,7 @@ Hand the sweep to one subagent, so the main session doesn't spend tokens reading
 
 > Ticket #<n> was built in <sha>. Decisions the diff doesn't show: <list>.
 >
-> Read every open ticket in full (body and comments), not only keyword matches, plus the closed tickets and spec sections this one refines. Then:
+> Read every open ticket in full (body and comments), not only keyword matches, in one call: `gh issue list --state open --limit 200 --json number,title,body,comments`. Also read the closed tickets and spec sections this one refines. Then:
 > - Add an "Input from #<n> (<sha>)" section to each open ticket the build changes.
 > - Comment "Refined by #<n> (<sha>): …" on each closed ticket whose decision it refined.
 > - Comment on #<n> with what was built, then close it. For one part of a split ticket, keep it open and say what the next part still owes.
