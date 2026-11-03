@@ -18,7 +18,7 @@ Done when every noun on the list has a glossary entry. The code and tickets then
 
 Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing."
 
-Before committing, undo each review fix's source change and see its test go red. Tighten any test that stays green. Done when every fix has a test seen red. In #55 part (a), one of six fixes' tests stayed green: it missed the snapshot a late failure leaves behind.
+See each review fix's test go red, by writing it before the fix or by undoing the fix. Tighten any test that stays green. A review fix that adds behaviour gets its own scratch run through the ticket's commands before committing, since no review sees it. Done when every fix has a test seen red and each added behaviour has had its run. In #55 part (a), one of six fixes' tests stayed green: it missed the snapshot a late failure leaves behind. In #55 part (b), a warning added after review misfired on auto-tagged stats, and only the sweep's scratch script caught it.
 
 While building, run only the affected test files. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 
@@ -38,6 +38,7 @@ Hand the sweep to one subagent, so the main session doesn't spend tokens reading
 > - Add an "Input from #<n> (<sha>)" section to an open ticket only when the build changes what that ticket has to do. Keep it to about five lines.
 > - Comment "Refined by #<n> (<sha>): …" on each closed ticket listed above, with its decision.
 > - Comment on #<n> with what was built, then close it. For one part of a split ticket, keep it open and say what the next part still owes.
+> - For a line in #37 or #1 that the build contradicts, comment on that ticket quoting the line and the new behaviour, and leave its body as it is.
 >
 > Rules:
 > - Every identifier you cite (function, file, field, command) must exist in <sha>; check it with `git grep`. Describe anything not built yet in words ("a function that adds to the month's spend"), never as a made-up name.

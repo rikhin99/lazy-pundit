@@ -6,7 +6,7 @@
 # (docs, the scratchpad), runs.
 cmd=$(jq -r '.tool_input.command // ""')
 msg="Edit src/ and test/ files with the Edit tool: it fails loudly on a miss, unlike an in-place shell edit."
-if printf '%s' "$cmd" | grep -Eq '(sed|perl) +-[a-zA-Z]*i' &&
+if printf '%s' "$cmd" | grep -Eq '(sed|perl) +-[a-zA-Z0-9]*i' &&
   printf '%s' "$cmd" | grep -Eq '(^|[ "'"'"'/])(src|test)/'; then
   echo "$msg" >&2
   exit 2
