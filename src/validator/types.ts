@@ -18,8 +18,8 @@ export interface OrderEvidence {
   place: number;
   /**
    * Places climbed since the movement baseline (negative for a fall), or
-   * `new`. Absent until movement is measured (#45), so movement wording is
-   * unchecked rather than wrong.
+   * `new` for a team with no place in it or with no baseline at all. Absent
+   * (a first draft's LLM gate) leaves movement wording unchecked.
    */
   move?: number | "new";
   /** The text of the enclosing group heading, if any. */

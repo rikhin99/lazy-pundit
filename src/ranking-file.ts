@@ -57,6 +57,8 @@ export const metaSchema = z.object({
   /** The persona the draft was written in. */
   persona: personaRecordSchema,
   created_at: z.string(),
+  /** A frozen copy's edition: 1 on the first publish, one more on each republish. */
+  edition: z.number().int().positive().optional(),
 });
 
 export type RankingMeta = z.infer<typeof metaSchema>;
@@ -91,6 +93,20 @@ export async function lastPublished(
   if (!last) return undefined;
   const text = await readFile(join(dir, last.name), "utf8");
   return { week: last.week, ranking: parseRanking(last.name, text) };
+}
+
+/**
+ * A frozen copy of a checked draft's `text`: the same file with `edition` set
+ * in its front matter.
+ */
+export function frozenCopy(
+  file: string,
+  text: string,
+  edition: number,
+): string {
+  const { data, body } = readFrontMatter(file, text, "format");
+  const { format: _, ...meta } = data;
+  return `${writeFrontMatter({ ...meta, edition }, ["starting_order"])}${body}`;
 }
 
 /** What a new draft's sections hold: the week intro and each team's blurb. */

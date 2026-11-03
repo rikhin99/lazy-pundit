@@ -47,12 +47,15 @@ const ENFORCED = [
   "max points",
   "fact checker",
   "force publish",
+  "previous ranking",
+  "last week's ranking",
 ];
 
 /**
  * _Avoid_ terms that also carry a meaning we use, so the reviewer judges each
  * use: "player" (an NFL player), "ranking" (its own entry), "export" (the
- * keyword), a platform's "league id", the HTTP "header".
+ * keyword), a platform's "league id", the HTTP "header", "revision" (its own
+ * entry, avoided only for an edition) and a file's FORMAT "version".
  */
 const REVIEWED = [
   "league id",
@@ -97,6 +100,8 @@ const REVIEWED = [
   "usage stats",
   "post",
   "theme",
+  "revision",
+  "version",
 ];
 
 /**

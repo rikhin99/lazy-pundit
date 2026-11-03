@@ -105,6 +105,9 @@ describe("check", () => {
         id: "place",
         line: lineOf(await read(), "Sitting at"),
       }),
+      // The swap's two teams are each a moved team.
+      expect.objectContaining({ kind: "moved", team: "sleeper:4" }),
+      expect.objectContaining({ kind: "moved", team: "sleeper:8" }),
     ]);
   });
 });
@@ -161,7 +164,9 @@ describe("publish confirm", () => {
     expect(result.published).toBe(true);
     expect(
       await readFile(join(rankingsDir(dir), "week-08.txt"), "utf8"),
-    ).toContain("6. Gus Bus · 4-4\nThey won by 50 this week.\n6th in points");
+    ).toContain(
+      "6. Gus Bus · 4-4 (new)\nThey won by 50 this week.\n6th in points",
+    );
   });
 
   test("--yes publishes without asking", async () => {
@@ -190,8 +195,8 @@ describe("publish confirm", () => {
 
   test("soft problems are listed without asking", async () => {
     const { dir, deps, edit } = await drafted();
-    // Movement isn't measured yet, so movement wording can't be checked.
-    await edit((t) => t.replace(GUS, `${GUS}They climb 2 spots.\n`));
+    // The draft has no group headings, so a tier claim can't be checked.
+    await edit((t) => t.replace(GUS, `${GUS}They sit in the second tier.\n`));
     const { asked, confirm } = answering(false);
 
     const result = await publish(dir, deps, { confirm });
@@ -218,7 +223,7 @@ describe("publish confirm", () => {
 
     if (!result.published) throw new Error("not published");
     expect(result.text).toContain(
-      "6. Gus Bus · 4-4\nThey won by 55, a rivalry and a bet later.\n",
+      "6. Gus Bus · 4-4 (new)\nThey won by 55, a rivalry and a bet later.\n",
     );
     expect(result.text).not.toMatch(/[{}]|\]\{|ev=|team=/);
     // The frozen copy keeps the draft as checked, auto-tags included.

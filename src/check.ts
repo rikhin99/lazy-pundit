@@ -5,6 +5,12 @@ import { draftData } from "./draft-data.ts";
 import { WorkspaceFileError } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
 import type { FailedSection, SectionKey } from "./llm-gate.ts";
+import {
+  type MovementBaseline,
+  movementBaseline,
+  moveOf,
+  orderEvidence,
+} from "./movement.ts";
 import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
@@ -39,7 +45,8 @@ export interface Problem {
   line: number;
   /** The words at fault, as the league would read them. */
   text: string;
-  kind: Exclude<ClaimStatus, "verified"> | "swear" | "unreadable-tag";
+  /** `moved`: a moved team, away from its starting place. */
+  kind: Exclude<ClaimStatus, "verified"> | "swear" | "unreadable-tag" | "moved";
   /** Why, in words the pundit reads. */
   reason: string;
   /** For a stale claim: what changed since it held. */
@@ -84,6 +91,10 @@ export interface CheckedDraft extends CheckResult {
   text: string;
   ranking: RankingFile;
   league: League;
+  /** Each team's order evidence in the checked order. */
+  order: Record<TeamId, OrderEvidence>;
+  /** What movement was measured against, or none before the first publish. */
+  baseline?: MovementBaseline;
 }
 
 /** Reads, checks and auto-tags the latest draft in the workspace's season. */
@@ -103,9 +114,13 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
   checkOrder(name, ranking, league);
 
   const { evidence } = draftData(league, ranking.meta.week);
-  const order = orderEvidence(ranking);
+  const baseline = await movementBaseline(dir, week);
+  const order = orderEvidence(ranking, baseline);
   const startingOrder = Object.fromEntries(
-    ranking.meta.starting_order.map((team, i) => [team, { place: i + 1 }]),
+    ranking.meta.starting_order.map((team, i) => [
+      team,
+      { place: i + 1, move: moveOf(baseline, team as TeamId, i + 1) },
+    ]),
   ) as Record<TeamId, OrderEvidence>;
   const nicknames = Object.fromEntries(
     league.teams.map((t) => [
@@ -183,6 +198,7 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
       autoTags.push({ ...t, start: s.start + t.start, end: s.start + t.end });
     }
   }
+  problems.push(...movedTeams(ranking, order, startingOrder, names));
   problems.sort(byHardThenLine);
 
   let text = written;
@@ -200,6 +216,8 @@ export async function checkDraft(workspaceDir: string): Promise<CheckedDraft> {
     text,
     ranking: autoTags.length > 0 ? parseRanking(name, text) : ranking,
     league,
+    order,
+    ...(baseline ? { baseline } : {}),
   };
 }
 
@@ -239,20 +257,34 @@ export function withGateFailures(
   );
 }
 
-/** Each team's place and group, read from the draft's current order. */
-function orderEvidence(ranking: RankingFile): Record<TeamId, OrderEvidence> {
-  const order: Record<TeamId, OrderEvidence> = {};
-  let place = 0;
-  let group: string | undefined;
+/**
+ * A moved team item for each team the pundit placed away from its starting
+ * place, on its heading's line.
+ */
+function movedTeams(
+  ranking: RankingFile,
+  order: Record<TeamId, OrderEvidence>,
+  startingOrder: Record<TeamId, OrderEvidence>,
+  names: Map<string, string>,
+): Problem[] {
+  const moved: Problem[] = [];
   for (const e of ranking.entries) {
-    if (e.kind === "group") {
-      group = e.label;
-      continue;
-    }
-    place += 1;
-    order[e.team as TeamId] = { place, ...(group ? { group } : {}) };
+    if (e.kind !== "team") continue;
+    const team = e.team as TeamId;
+    const now = order[team]?.place;
+    const start = startingOrder[team]?.place;
+    if (now === undefined || start === undefined || now === start) continue;
+    moved.push({
+      severity: "soft",
+      team,
+      section: names.get(team) ?? team,
+      line: e.line,
+      text: e.label,
+      kind: "moved",
+      reason: `starting place ${start}, now ${now}`,
+    });
   }
-  return order;
+  return moved;
 }
 
 /**

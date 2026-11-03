@@ -51,6 +51,7 @@ const KINDS: Record<Problem["kind"], string> = {
   unchecked: "unchecked",
   swear: "word list",
   "unreadable-tag": "unreadable tag",
+  moved: "you moved this team",
 };
 
 /** The problems list as the library ordered it: one line per item. */

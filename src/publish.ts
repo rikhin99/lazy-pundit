@@ -1,10 +1,11 @@
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { checkDraft, type Problem } from "./check.ts";
 import type { Deps } from "./deps.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
-import { lastPublished } from "./ranking-file.ts";
+import { frozenCopy, lastPublished, parseRanking } from "./ranking-file.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -77,10 +78,21 @@ export async function publish(
     }
   }
 
-  const publishedPath = join(dir, `${stem}.published.md`);
-  await writeWorkspaceFile(publishedPath, checked.text);
-  // The frozen copy is the checked draft verbatim, so its parse renders it.
-  const text = renderPlainText(checked.ranking, checked.league);
+  const name = `${stem}.published.md`;
+  const publishedPath = join(dir, name);
+  const edition = (await editionOf(publishedPath, name)) + 1;
+  await writeWorkspaceFile(
+    publishedPath,
+    frozenCopy(name, checked.text, edition),
+  );
+  // The frozen copy is the checked draft with its edition, so the draft's
+  // parse and order evidence render it.
+  const text = renderPlainText(
+    checked.ranking,
+    checked.league,
+    checked.order,
+    checked.baseline,
+  );
   const textPath = join(dir, `${stem}.txt`);
   await writeOutput(textPath, text);
   const copied = await deps.clipboard.write(text);
@@ -94,4 +106,14 @@ export async function publish(
     copied,
     problems,
   };
+}
+
+/**
+ * The edition of the frozen copy at `path`: 0 before the week's first
+ * publish, and 1 for one written before frozen copies carried an edition.
+ */
+async function editionOf(path: string, name: string): Promise<number> {
+  const text = await readFile(path, "utf8").catch(() => undefined);
+  if (text === undefined) return 0;
+  return parseRanking(name, text).meta.edition ?? 1;
 }

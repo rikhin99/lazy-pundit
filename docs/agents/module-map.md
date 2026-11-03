@@ -6,7 +6,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 `draft`: fetch (`sleeper/fetcher.ts`) → snapshot on disk (`snapshot.ts`) → League model (`sleeper/normalizer.ts`) → stats and evidence (`draft-data.ts`) → the persona (`persona.ts`, capped by `league-file.ts`'s family league) → with an Anthropic key, the draft context (`draft-context.ts`, with last week's published blurbs read in `draft.ts`), the prompt (`prompt.ts`) and the LLM gate (`llm-gate.ts`: one call, then up to 2 retries for failing sections), each call through `llm-call.ts` (price and spend-cap check, LLM transcript, spend) → Markdown (`ranking-file.ts` `renderDraft`) → `checkDraft`.
 
-`check` and `publish` both start from `checkDraft` in `check.ts`: read the latest `week-NN.md`, parse it, rebuild the evidence from its snapshot, validate each blurb, return the problems list and write any auto-tags. `publish` then freezes the checked text and renders plain text.
+`check` and `publish` both start from `checkDraft` in `check.ts`: read the latest `week-NN.md`, parse it, rebuild the evidence from its snapshot, measure order evidence against the movement baseline (`movement.ts`), validate each blurb, list moved teams, return the problems list and write any auto-tags. `publish` then freezes the checked text with its edition and renders plain text with movement.
 
 ## Modules (`src/`)
 
@@ -40,10 +40,11 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `llm-call.ts` | One LLM call for a draft: no price or past the spend cap stops it unmade; after it, its LLM transcript and spend. Any stop is `LlmStopped`, which `draft.ts` turns into the fallback | `llmAsk`, `LlmStopped`, `MAX_TOKENS` |
 | `prices.ts` | The dated price table, `config.yaml`'s overrides, a call's cost and its ceiling before it's made | `PRICE_TABLE`, `PRICES_AS_OF`, `priceOf`, `costOf`, `ceilingCost` |
 | `transcripts.ts` | LLM transcripts: writing one per call, deleting the folder | `writeTranscript`, `deleteTranscripts` |
-| `ranking-file.ts` | The `week-NN.md` format: render, parse (with text offsets), order checks, the last published ranking | `renderDraft`, `parseRanking`, `checkOrder`, `lastPublished` |
+| `ranking-file.ts` | The `week-NN.md` format: render, parse (with text offsets), order checks, the last published ranking, a frozen copy with its edition | `renderDraft`, `parseRanking`, `checkOrder`, `lastPublished`, `frozenCopy` |
+| `movement.ts` | The movement baseline, each team's order evidence (place, move, group), and the mark after a record: (▲2), (▼1), (—), (new) | `movementBaseline`, `moveOf`, `orderEvidence`, `movementMark` |
 | `draft.ts` | The `draft` command and its fallback reason | `draft` |
 | `check.ts` | The problems list: validates a draft and writes auto-tags; marks a new draft's gate failures | `check`, `checkDraft`, `Problem`, `withGateFailures` |
-| `publish.ts` | Publish confirms (hard problems; a new or changed relaxed persona), frozen copy, plain text, clipboard | `publish` |
+| `publish.ts` | Publish confirms (hard problems; a new or changed relaxed persona), frozen copy and its edition, plain text, clipboard | `publish` |
 | `plain-text.ts` | The plain text the league reads | `renderPlainText` |
 | `validator.ts` | The validator's entry: claims, auto-tags, swears for one blurb | `validate`, `applyAutoTags`, `stripTags`, `isHard` |
 | `validator/types.ts` | Validator input/output and `EvidencePack`, `OrderEvidence` types | types |
@@ -56,7 +57,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 The seams, and the helpers each one uses:
 
-- **Library API against a temp workspace** (`draft-publish`, `llm-draft`, `llm-fallback`, `persona`, `check`, `config`, `doctor`), with `persona.md` at `pundits/rikhin/persona.md` and the family league in `seasons/2025/league.md` when a test writes them: `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request; a scripted answer can be text, a reply with token counts, or an `LlmError` to throw) and `deps.env.anthropicApiKey`.
+- **Library API against a temp workspace** (`draft-publish`, `movement`, `llm-draft`, `llm-fallback`, `persona`, `check`, `config`, `doctor`), with `persona.md` at `pundits/rikhin/persona.md` and the family league in `seasons/2025/league.md` when a test writes them: `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock; `rankingsDir(dir)` finds the files; `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace. `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM. For LLM drafts, set `deps.llm = scriptedLlm(...)` (`support/llm.ts`, which records each request; a scripted answer can be text, a reply with token counts, or an `LlmError` to throw) and `deps.env.anthropicApiKey`.
 - **LLM client** (`anthropic-llm`): `anthropicLlm` against a transport that records requests and answers with a canned Messages API body.
 - **Validator** (`validator`): `blurb()` and `week8Evidence()` in `support/week8-evidence.ts` hold literal week-8 evidence; `support/plain-prose.ts` lists sentences that must never come back hard.
 - **League model and stats** (`sleeper-normalizer`, `standings`, `stats`, `data-hash`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.

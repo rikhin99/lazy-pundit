@@ -82,40 +82,40 @@ after Week 8 · by rikhin
 
 Week high: Gus Bus 133.22 · Week low: Hail Mary Hustle 70.32 · Biggest margin: Gus Bus by 55 · Closest matchup: Bench Mob by 2.71
 
-1. Bench Mob · 7-1
+1. Bench Mob · 7-1 (new)
 1st in points · won 7 straight · beat Snap Judgement by 2.71
 
-2. Bye Bye Bea · 6-2
+2. Bye Bye Bea · 6-2 (new)
 2nd in points · won 6 straight · beat Baron Von Trade by 19.95
 
-3. Red Zone Rascals · 5-3
+3. Red Zone Rascals · 5-3 (new)
 7th in points · lost to Kim Possible Kicks by 6.18
 
-4. Frank's FAAB Fund · 5-3
+4. Frank's FAAB Fund · 5-3 (new)
 8th in points · beat Wendy's Wire by 9.27
 
-5. Snap Judgement · 4-4
+5. Snap Judgement · 4-4 (new)
 5th in points · lost 2 straight · lost to Bench Mob by 2.71
 
-6. Gus Bus · 4-4
+6. Gus Bus · 4-4 (new)
 6th in points · beat Pylon Patrol by 55
 
-7. Tank Brigade · 4-4
+7. Tank Brigade · 4-4 (new)
 12th in points · won 3 straight · beat Hail Mary Hustle by 31.3
 
-8. Wendy's Wire · 3-5
+8. Wendy's Wire · 3-5 (new)
 3rd in points · lost 2 straight · lost to Frank's FAAB Fund by 9.27
 
-9. Baron Von Trade · 3-5
+9. Baron Von Trade · 3-5 (new)
 4th in points · lost to Bye Bye Bea by 19.95
 
-10. Kim Possible Kicks · 3-5
+10. Kim Possible Kicks · 3-5 (new)
 9th in points · won 2 straight · beat Red Zone Rascals by 6.18
 
-11. Pylon Patrol · 3-5
+11. Pylon Patrol · 3-5 (new)
 11th in points · lost 3 straight · lost to Gus Bus by 55
 
-12. Hail Mary Hustle · 1-7
+12. Hail Mary Hustle · 1-7 (new)
 10th in points · lost 4 straight · lost to Tank Brigade by 31.3
 
 Stats: Sleeper · made with Lazy Pundit
@@ -150,8 +150,12 @@ describe("publish", () => {
       format: 1,
       week: 8,
       snapshot: drafted.snapshot,
+      edition: 1,
     });
-    expect(frozen).toBe(await readFile(drafted.path, "utf8"));
+    // The draft verbatim, plus its edition at the end of the front matter.
+    expect(frozen.replace("edition: 1\n---\n", "---\n")).toBe(
+      await readFile(drafted.path, "utf8"),
+    );
   });
 
   test("a moved section takes its new place; a renamed heading is still the same team", async () => {
@@ -172,10 +176,10 @@ describe("publish", () => {
     const { text: out } = await published(dir, deps);
 
     expect(out).toContain(
-      "by 2.71\n\n1. Hail Mary Hustle · 1-7\n10th in points · lost 4 straight · lost to Tank Brigade by 31.3\n\n2. Bench Mob · 7-1\n1st in points · won 7 straight · beat Snap Judgement by 2.71\n\n3. Bye Bye Bea · 6-2\n",
+      "by 2.71\n\n1. Hail Mary Hustle · 1-7 (new)\n10th in points · lost 4 straight · lost to Tank Brigade by 31.3\n\n2. Bench Mob · 7-1 (new)\n1st in points · won 7 straight · beat Snap Judgement by 2.71\n\n3. Bye Bye Bea · 6-2 (new)\n",
     );
     expect(out).toContain(
-      "12. Pylon Patrol · 3-5\n11th in points · lost 3 straight · lost to Gus Bus by 55\n\nStats: Sleeper",
+      "12. Pylon Patrol · 3-5 (new)\n11th in points · lost 3 straight · lost to Gus Bus by 55\n\nStats: Sleeper",
     );
   });
 
@@ -241,10 +245,10 @@ describe("publish: intro and groups", () => {
     const { text } = await published(dir, deps);
 
     expect(text).toContain(
-      "after Week 8 · by rikhin\n\nEight weeks in and Bench Mob are 7-1.\n\n— CONTENDERS —\n\n1. Bench Mob · 7-1\n",
+      "after Week 8 · by rikhin\n\nEight weeks in and Bench Mob are 7-1.\n\n— CONTENDERS —\n\n1. Bench Mob · 7-1 (new)\n",
     );
     expect(text).toContain(
-      "3. Red Zone Rascals · 5-3\n7th in points · lost to Kim Possible Kicks by 6.18\n\n— THE REST —\n\n4. Frank's FAAB Fund · 5-3\n",
+      "3. Red Zone Rascals · 5-3 (new)\n7th in points · lost to Kim Possible Kicks by 6.18\n\n— THE REST —\n\n4. Frank's FAAB Fund · 5-3 (new)\n",
     );
   });
 

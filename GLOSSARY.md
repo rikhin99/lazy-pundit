@@ -230,6 +230,9 @@ The pundit's choice of how the power score is computed, including its weights. I
 The order the tool proposes from the power score. The pundit edits it into the ranking. It is fixed when a draft begins and changes only when the pundit refreshes.
 _Avoid_: Suggested ranking, default ranking, recommendation, starting-order snapshot
 
+**Starting place**:
+A team's place in the starting order. The editing view shows it beside the team's place in the pundit's ranking.
+
 **Refresh**:
 The pundit's explicit act of recomputing a draft's starting order from newer data or a changed method. It never changes the pundit's order or blurbs.
 
@@ -243,8 +246,19 @@ A team's position in the playoff order: its position in the standings, if that i
 The pundit's explicit act of declaring a week's ranking final. Only a published ranking counts as the previous ranking for movement. Changes made to the draft afterwards reach the league only when the pundit publishes again.
 _Avoid_: Export, save
 
+**Frozen copy**:
+The ranking exactly as the pundit published it for a ranking week, kept beside the draft. Every published output renders from it, and movement reads it. Publishing that week again replaces it with a new edition.
+
+**Edition**:
+How many times a ranking week has been published: 1 on the first publish, one more on each republish.
+_Avoid_: Revision (that's an LLM rewrite of a blurb), version
+
 **Movement**:
-A team's change in place since the pundit's most recent published ranking from an earlier ranking week in the same season. Republishing a week never moves the baseline. A team with no earlier published place is new, never given an invented movement.
+A team's change in place since the movement baseline. A team with no place in the baseline, or a ranking with no baseline, is new, never given an invented movement.
+
+**Movement baseline**:
+The frozen copy movement is measured against: the pundit's most recent one from an earlier ranking week in the same season. Republishing a week never changes it, and when it isn't the previous week the published ranking says which week it is.
+_Avoid_: Previous ranking, last week's ranking
 
 **Small-sample flag**:
 A warning that the season is too young for the power score to mean much. It appears only in the editing view.
@@ -329,6 +343,9 @@ _Avoid_: Warning (for a soft problem alone)
 **Publish confirm**:
 The one question publishing asks when the draft has hard problems: Publish anyway or Back to editing, with Back to editing the answer whenever nobody says otherwise. A draft with no hard problems publishes without it. It never rejects a ranking outright.
 _Avoid_: Override, force publish
+
+**Moved team**:
+A team the pundit has placed somewhere other than its starting place. It's listed as a soft problem with both places, so the pundit sees their edits at a glance.
 
 **Eval harness**:
 The builder's own measure of LLM prose quality, run on prepared leagues rather than on any pundit's real weeks. It looks for what the validator can't see by design, such as untagged superlatives or invented facts, and decides which model is the default. Pundits never run it.
