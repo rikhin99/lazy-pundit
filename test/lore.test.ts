@@ -774,3 +774,13 @@ describe("what the LLM may cite and is told", () => {
     );
   });
 });
+
+test("an uncited stat that check auto-tags draws no warning about lore", async () => {
+  const { result, llm } = await draftedByLlm(
+    "## Running jokes\n- A joke.\n",
+    undefined,
+    "## {team=sleeper:1}\nThey are 4-4, which says a lot.",
+  );
+  expect(llm.requests.length).toBeGreaterThan(1);
+  expect(result.warnings.filter((w) => w.includes("cited lore"))).toEqual([]);
+});

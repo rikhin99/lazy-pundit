@@ -195,7 +195,11 @@ export async function draft(
   warn(
     failed
       .flatMap((f) => f.claims)
-      .filter((c) => !checked.problems.some((p) => p.text === c.text))
+      .filter(
+        (c) =>
+          c.status === "unknown-id" &&
+          !checked.problems.some((p) => p.text === c.text),
+      )
       .map(
         (c) =>
           `The LLM cited lore it wasn't sent, so it may have made this up: "${c.text}".`,
