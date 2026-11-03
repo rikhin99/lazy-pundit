@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
@@ -148,11 +148,12 @@ describe("a nickname that reads as two holders' is a load error", () => {
     expect(await claimProblems(dir)).toEqual([]);
   });
 
-  test("refresh stops on a clash with fresh names, leaving the draft alone", async () => {
+  test("refresh stops on a clash with fresh names, writing nothing", async () => {
     const ws = await fearTheTurtle(8);
     const { path } = await draft(ws.dir, ws.deps);
     await writeLore(ws.dir, "## {team=sleeper:1}\nnicknames: Karna\n");
     const before = await readFile(path, "utf8");
+    const snapshots = await readdir(join(ws.dir, ".snapshots"));
     const renamed = {
       ...ws.deps,
       transport: patchingTransport(ws.deps.transport, {
@@ -167,6 +168,7 @@ describe("a nickname that reads as two holders' is a load error", () => {
     };
     await expect(refresh(ws.dir, renamed)).rejects.toThrow(/"Karna"/);
     expect(await readFile(path, "utf8")).toBe(before);
+    expect(await readdir(join(ws.dir, ".snapshots"))).toEqual(snapshots);
   });
 
   const twoTeams =

@@ -30,7 +30,8 @@
     "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x",
     "fixture:show": "node scripts/show-fixture.ts",
     "fixture:workspace": "node scripts/fixture-workspace.ts",
-    "outline": "node scripts/outline.ts"
+    "outline": "node scripts/outline.ts",
+    "trace": "node scripts/trace-context.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

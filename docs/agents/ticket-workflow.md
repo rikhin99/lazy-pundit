@@ -16,6 +16,10 @@ Done when every noun on the list has a glossary entry. The code and tickets then
 
 `/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other.
 
+Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing."
+
+Before committing, undo each review fix's source change and see its test go red. Tighten any test that stays green. Done when every fix has a test seen red. In #55 part (a), one of six fixes' tests stayed green: it missed the snapshot a late failure leaves behind.
+
 While building, run only the affected test files. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 
 ## 3. Sweep the tickets in one subagent
@@ -47,4 +51,4 @@ Done when the subagent's report accounts for every open ticket.
 
 ## 4. Measure
 
-Run `/context` and compare it with the 150k smart zone, then run `/retro`. The user pushes `main` (`! git push origin main`); `git push` is blocked for agents.
+Run `/context` and compare it with the 150k smart zone, run `npm run trace` for where the context went, then run `/retro`. The user pushes `main` (`! git push origin main`); `git push` is blocked for agents.
