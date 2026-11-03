@@ -12,7 +12,7 @@ Done when every noun on the list has a glossary entry. The code and tickets then
 
 ## 2. Build and review
 
-`/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`.
+`/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other.
 
 While building, run only the affected test files. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 
@@ -20,7 +20,7 @@ While building, run only the affected test files. The commit's pre-commit hook r
 
 Hand the sweep to one subagent, so the main session doesn't spend tokens reading tickets. Give it this prompt, with the blanks filled:
 
-> Ticket #<n> was built in <sha>. Decisions the diff doesn't show: <list>. Closed tickets it refined, each with the decision: <list>.
+> Ticket #<n> was built in <sha>. Decisions the diff doesn't show, with any claim nobody ran marked "from reading the code": <list>. Closed tickets it refined, each with the decision: <list>.
 >
 > First pass: read every open ticket, not only keyword matches, in this one call. It leaves out the spec, the map and each ticket's earlier "Input from" sections:
 >
@@ -35,6 +35,7 @@ Hand the sweep to one subagent, so the main session doesn't spend tokens reading
 >
 > Rules:
 > - Every identifier you cite (function, file, field, command) must exist in <sha>; check it with `git grep`. Describe anything not built yet in words ("a function that adds to the month's spend"), never as a made-up name.
+> - Keep the "from reading the code" mark on any claim you repeat, and add it to your own findings that you didn't run.
 > - Use `GLOSSARY.md` terms, and avoid its _Avoid_ terms.
 > - Write each new section or comment with the Write tool to a file in the scratchpad folder, and write only the new text. Pass a comment with `--body-file`. Append a section with `{ gh issue view <t> --json body --jq .body; echo; cat <file>; } | gh issue edit <t> --body-file -`. No heredocs.
 >

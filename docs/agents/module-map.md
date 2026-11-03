@@ -12,7 +12,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 
 | File | Owns | Entry points |
 |---|---|---|
-| `index.ts` | The library's public API; the CLI and tests import only this | re-exports |
+| `index.ts` | The library's public API; the CLI imports only this, and tests start from it (see "Direct imports" under Tests) | re-exports |
 | `cli.ts` | Arg parsing, the publish prompt and printing the problems list; no logic | commander program |
 | `deps.ts` | Injected outside world: transport, LLM, clock, clipboard, cache, config and workspaces folders, environment overrides; the only reader of `process.env` | `Deps`, `Environment`, `systemDeps` |
 | `config.ts` | The operator's files: `config.yaml`, `credentials.yaml` (0600), `spend.yaml` and its reader and writer, with `CONFIG_FORMAT` | `readConfig`, `loadCredentials`, `saveCredentials`, `dropWorkspaces`, `spendMonth`, `monthSpend`, `addSpend` |
@@ -64,5 +64,6 @@ The seams, and the helpers each one uses:
 - **League model and stats** (`sleeper-normalizer`, `standings`, `playoff-status`, `stats`, `data-hash`): `committed(week)` and `patched(week, patches)` in `support/workspace.ts`.
 - **CLI** (`cli`): spawns `src/cli.ts` in a workspace with `LAZY_PUNDIT_CLIPBOARD=off` and HOME and the XDG folders in a temp home; `homeListing()` writes a `config.yaml` for `--league`.
 - **Repo rules** (`injected-boundaries`, `format-versions`, `glossary-terms`, `sleeper-fixtures`).
+- **Direct imports**: a test may import from a `src/` module what `index.ts` doesn't export, when the case can't be set up through the library API. `draft-publish` does this for `setFrontMatterKey`, on front matter that `publish` refuses first.
 
 Fixture values for hand-checked literals: `npm run fixture:show -- <week> --model`. A workspace with a draft for running the CLI by hand: `npm run fixture:workspace`.
