@@ -54,6 +54,11 @@ export const configSchema = z.object({
 
 export type Config = z.output<typeof configSchema>;
 
+/** The config with no `config.yaml`: every default. */
+export function defaultConfig(): Config {
+  return configSchema.parse({ format: CONFIG_FORMAT });
+}
+
 export const credentialsSchema = z.object({
   format: z.literal(CONFIG_FORMAT),
   anthropic_api_key: z.string().min(1).optional(),
@@ -138,11 +143,12 @@ export function envCredentials(env: Deps["env"]): Credentials {
 /**
  * Adds a workspace to `config.yaml`'s list. A new file gets the defaults written
  * out, so they can be seen and edited; an existing one keeps everything as
- * written, comments included, and gains `name` only if it has none.
+ * written, comments included, gains `name` only if it has none, and changes
+ * `spend_cap_usd` only when given one.
  */
 export async function listWorkspace(
   deps: Pick<Deps, "configDir">,
-  entry: { name: string; slug: string; dir: string },
+  entry: { name: string; slug: string; dir: string; spendCap?: number },
 ): Promise<void> {
   const path = configPath(deps);
   const config = await readConfig(deps);
@@ -156,7 +162,7 @@ export async function listWorkspace(
         format: CONFIG_FORMAT,
         name: entry.name,
         model,
-        spend_cap_usd,
+        spend_cap_usd: entry.spendCap ?? spend_cap_usd,
         workspaces: { [entry.slug]: entry.dir },
       }),
       0o600,
@@ -165,6 +171,7 @@ export async function listWorkspace(
   }
   const doc = parseDocument(await readFile(path, "utf8"));
   if (config.name === undefined) doc.set("name", entry.name);
+  if (entry.spendCap !== undefined) doc.set("spend_cap_usd", entry.spendCap);
   doc.setIn(["workspaces", entry.slug], entry.dir);
   const mode = (await stat(path)).mode & 0o777;
   await writeConfigFile(path, doc.toString(), mode);

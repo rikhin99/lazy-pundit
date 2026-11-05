@@ -2,12 +2,16 @@
 # Drives `lazy-pundit init` through a real terminal, in a new temp home, with
 # the fetch replayed offline. Run it with `npm run -s drive:wizard -- <scenario>`.
 #
-#   full            every answer, default folder
-#   folder <path>   every answer, with this workspace folder
+#   full            every default, the key skipped, no second league
+#   folder <path>   the same, with this workspace folder
 #   bad-id          an unknown league ID, re-asked, then Ctrl-C
 #   yahoo, espn     pick a platform that stops the wizard
 #   cancel          Ctrl-C at the first prompt
 #   cancel-folder   Ctrl-C at the folder prompt
+#   rename          rename the first handle to "gus", pick standings
+#   skip-rest       Skip the rest at the handles step
+#   key             enter a key (checked offline, so it can't be), cap 0.10
+#   another         every default, then a second league, cancelled at its name
 #
 # It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
 # with the wizard's code. Look in that home for what the wizard wrote. A new
@@ -15,8 +19,8 @@
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder"
+if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -90,4 +94,45 @@ send "900000000000000001\r"
 need "Workspace folder"
 if {$scenario eq "cancel-folder"} { send $CTRL_C; finish }
 if {$scenario eq "folder"} { send "$folder\r" } else { send "\r" }
+
+set UP "\033\[A"
+need "Manager handles"
+if {$scenario eq "skip-rest"} {
+  send $UP; after 200; send "\r"
+  need "Set up another"
+  send "\r"
+  finish
+}
+if {$scenario eq "rename"} {
+  send $DOWN; after 200; send "\r"
+  need "Handle for"
+  # Clear the proposed handle, then type the new one.
+  send [string repeat "\x7f" 20]; after 200; send "gus\r"
+  need "Manager handles"
+}
+send "\r"
+
+need "starting order"
+if {$scenario eq "rename"} { send $DOWN; after 200 }
+send "\r"
+
+need "Add an Anthropic key"
+if {$scenario eq "key"} {
+  send "\r"
+  need "Anthropic key"
+  send "sk-ant-test\r"
+  need "Spend cap"
+  send [string repeat "\x7f" 5]; after 200; send "0.10\r"
+} else {
+  send $DOWN; after 200; send "\r"
+}
+
+need "Set up another"
+if {$scenario eq "another"} {
+  send "y"; after 200; send "\r"
+  need "pundit name"
+  send $CTRL_C
+  finish
+}
+send "\r"
 finish

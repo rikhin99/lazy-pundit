@@ -48,13 +48,18 @@ export const DEFAULT_SETTINGS: PunditSettings = {
   },
 };
 
+/** Where the workspace's pundit keeps their settings. */
+export function punditSettingsPath(ws: Workspace): string {
+  return join(punditDir(ws), "settings.md");
+}
+
 /** Reads the pundit's `settings.md`. What it leaves out, or a missing file, is the default. */
 export async function loadPunditSettings(
   ws: Workspace,
 ): Promise<PunditSettings> {
   let text: string;
   try {
-    text = await readFile(join(punditDir(ws), "settings.md"), "utf8");
+    text = await readFile(punditSettingsPath(ws), "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     return DEFAULT_SETTINGS;

@@ -36,16 +36,33 @@ export { type DraftData, draftData, type StatSet } from "./draft-data.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 export {
+  type ChecklistItem,
+  checkKey,
   checkLeague,
+  checkWorkspace,
   defaultPunditName,
+  HANDLES_SKIPPED,
+  handleProblem,
+  KEY_EXPLANATION,
+  KEY_SKIPPED,
   type LeagueCheck,
   type LeagueChoice,
+  type LeagueManager,
+  type ManagerHandle,
+  METHOD_CHOICES,
+  type OperatorSteps,
+  operatorSteps,
   type PlatformChoice,
   platformStop,
+  proposedHandles,
   punditNameProblem,
+  rerunNotBuilt,
   SetupRefusal,
   setUpWorkspace,
+  setupChecklist,
   sleeperLeagues,
+  spendCapProblem,
+  spendCapWarning,
 } from "./init.ts";
 export type {
   Claim,

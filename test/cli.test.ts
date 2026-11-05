@@ -43,6 +43,16 @@ test("init with no terminal says so, fails and writes nothing", async () => {
   expect(await readdir(home)).toEqual([]);
 });
 
+test("setup with a step, as doctor's fixes name, says re-running one step comes later", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "lazy-pundit-cli-"));
+  const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
+
+  const { code, stderr } = await cli(cwd, ["setup", "key"], "", home);
+
+  expect(code).toBe(1);
+  expect(stderr).toMatch(/setup key.*later release.*ANTHROPIC_API_KEY/s);
+});
+
 test("outside a workspace, publish prints the library's message and fails", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "lazy-pundit-cli-"));
 

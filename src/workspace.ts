@@ -5,6 +5,8 @@ import { ConfigFileError, configPath, readConfig } from "./config.ts";
 import type { Deps } from "./deps.ts";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
 
+const setupStatus = z.enum(["done", "skipped", "default"]);
+
 /** `workspace.md`'s front matter. Its shape is versioned by `FORMAT`. */
 export const workspaceSchema = z.object({
   pundit: z
@@ -32,7 +34,24 @@ export const workspaceSchema = z.object({
       ),
     )
     .optional(),
+  /** How each league-level setup step went, for the setup checklist. */
+  setup: z
+    .object({
+      handles: setupStatus.optional(),
+      lore: setupStatus.optional(),
+      stakes: setupStatus.optional(),
+      method: setupStatus.optional(),
+      persona: setupStatus.optional(),
+    })
+    .optional(),
 });
+
+export type SetupStatus = z.infer<typeof setupStatus>;
+
+/** A setup step whose status `workspace.md` records, since it belongs to the league. */
+export type LeagueStep = keyof NonNullable<
+  z.output<typeof workspaceSchema>["setup"]
+>;
 
 export interface Workspace {
   dir: string;
@@ -41,6 +60,8 @@ export interface Workspace {
   season: { year: string; platform: "sleeper"; leagueId: string };
   /** Each manager handle's linked platform accounts. */
   handles: Record<string, string[]>;
+  /** How each league-level setup step went. A step it doesn't name wasn't recorded. */
+  setup: NonNullable<z.output<typeof workspaceSchema>["setup"]>;
 }
 
 /** Reads `workspace.md`. */
@@ -70,6 +91,7 @@ export async function readWorkspace(dir: string): Promise<Workspace> {
     pundit: parsed.data.pundit,
     season: { year, platform: season.platform, leagueId: season.league_id },
     handles: parsed.data.handles ?? {},
+    setup: parsed.data.setup ?? {},
   };
 }
 

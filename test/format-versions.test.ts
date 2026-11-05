@@ -27,7 +27,7 @@ import { workspaceSchema } from "../src/workspace.ts";
  */
 const RECORDED = {
   FORMAT: {
-    1: "3a85720232ac70d3b7d548351da457ec4d13fa61710d77a43eea19da0b843519",
+    1: "cf80025267288401dbb50297c7f8611748c8dfb200d5020981e4e8a5e28604ee",
   } as Record<number, string>,
   SNAPSHOT_FORMAT: {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",

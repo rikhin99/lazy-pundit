@@ -153,6 +153,9 @@ The platform's list of every NFL player, with positions, NFL team and injury sta
 **Setup step**:
 One part of setting up a league, such as the lore, the persona or the Anthropic key, that `init` walks through in order and `setup` can re-run on its own. Only the pundit name and league data steps can't be skipped.
 
+**Setup checklist**:
+What `setup` shows for a league: each setup step and whether it is done, skipped or at its default.
+
 **Wizard**:
 `init`'s prompts: they ask for each setup step's answers in order and hand them to the library. Only the CLI has one.
 

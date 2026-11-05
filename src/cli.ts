@@ -1,12 +1,24 @@
 #!/usr/bin/env node
 import { relative } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { intro, isCancel, log, outro, select, text } from "@clack/prompts";
+import {
+  confirm,
+  intro,
+  isCancel,
+  log,
+  outro,
+  password,
+  select,
+  text,
+} from "@clack/prompts";
 import { Command } from "@commander-js/extra-typings";
 import {
+  type ChecklistItem,
   ConfigFileError,
   check,
+  checkKey,
   checkLeague,
+  checkWorkspace,
   type Deps,
   type DoctorCheck,
   DraftExistsError,
@@ -16,17 +28,30 @@ import {
   draft,
   FetchError,
   findWorkspace,
+  HANDLES_SKIPPED,
+  handleProblem,
+  KEY_EXPLANATION,
+  KEY_SKIPPED,
   type LeagueCheck,
+  type ManagerHandle,
+  METHOD_CHOICES,
+  operatorSteps,
   type PersonaRecord,
   type PlatformChoice,
+  type PowerScoreMethod,
   type Problem,
   platformStop,
+  proposedHandles,
   publish,
   punditNameProblem,
   refresh,
+  rerunNotBuilt,
   SetupRefusal,
   setUpWorkspace,
+  setupChecklist,
   sleeperLeagues,
+  spendCapProblem,
+  spendCapWarning,
   systemDeps,
   WorkspaceFileError,
 } from "./index.ts";
@@ -252,10 +277,17 @@ program
 /** The pundit cancelled a prompt, which ends setup rather than asking again. */
 class SetupCancelled extends Error {}
 
-/** A prompt's answer, or stops setup with nothing written if the pundit cancels. */
+/** Leagues this run of `init` has written, so a cancel says what it left. */
+let leaguesReady = 0;
+
+/** A prompt's answer, or stops setup with nothing more written if the pundit cancels. */
 function answered<T>(answer: T): Exclude<T, symbol> {
   if (isCancel(answer)) {
-    throw new SetupCancelled("Setup cancelled. Nothing was written.");
+    throw new SetupCancelled(
+      leaguesReady === 0
+        ? "Setup cancelled. Nothing was written."
+        : "Setup cancelled. Nothing was written for this league.",
+    );
   }
   return answer as Exclude<T, symbol>;
 }
@@ -309,6 +341,174 @@ async function askLeague(deps: Deps): Promise<LeagueCheck> {
   }
 }
 
+const SKIP = "skip";
+const SKIP_REST = "skip-rest";
+const SKIPS = [
+  { value: SKIP, label: "Skip" },
+  { value: SKIP_REST, label: "Skip the rest" },
+];
+
+/** Step 3: the proposed handles, accepted as a list or renamed one at a time. */
+async function askHandles(
+  league: LeagueCheck,
+): Promise<{ handles?: ManagerHandle[]; skipRest: boolean }> {
+  let handles = proposedHandles(league);
+  if (handles.length === 0) return { skipRest: false };
+  for (;;) {
+    const picked = answered(
+      await select({
+        message:
+          "Manager handles: lore's names for managers, each linked to their account. Pick one to rename it.",
+        options: [
+          { value: "accept", label: "Accept these handles" },
+          ...handles.map((h) => ({
+            value: h.account,
+            label: `${h.handle} (${h.displayName})`,
+          })),
+          ...SKIPS,
+        ],
+      }),
+    );
+    if (picked === "accept") return { handles, skipRest: false };
+    if (picked === SKIP || picked === SKIP_REST) {
+      log.warn(HANDLES_SKIPPED);
+      return { skipRest: picked === SKIP_REST };
+    }
+    const i = handles.findIndex((h) => h.account === picked);
+    const others = handles.filter((_, j) => j !== i).map((h) => h.handle);
+    const renamed = answered(
+      await text({
+        message: `Handle for ${handles[i]?.displayName}`,
+        initialValue: handles[i]?.handle ?? "",
+        validate: (v) => handleProblem((v ?? "").trim(), others),
+      }),
+    ).trim();
+    handles = handles.map((h, j) => (j === i ? { ...h, handle: renamed } : h));
+  }
+}
+
+/** Step 6: the power-score method, the default on the first key. */
+async function askMethod(): Promise<{
+  method?: PowerScoreMethod;
+  skipRest: boolean;
+}> {
+  const picked = answered(
+    await select<string>({
+      message: "How should the starting order be worked out?",
+      options: [...METHOD_CHOICES, ...SKIPS],
+    }),
+  );
+  if (picked === SKIP || picked === SKIP_REST) {
+    return { skipRest: picked === SKIP_REST };
+  }
+  return { method: picked as PowerScoreMethod, skipRest: false };
+}
+
+/** Step 7: the Anthropic key and spend cap, each asked only when missing. */
+async function askKeyAndCap(
+  deps: Deps,
+  skipRest: boolean,
+): Promise<{ key?: string; spendCap?: number }> {
+  const steps = await operatorSteps(deps);
+  if (skipRest) {
+    if (steps.askKey) log.warn(KEY_SKIPPED);
+    return {};
+  }
+  let key: string | undefined;
+  if (steps.askKey) {
+    log.info(KEY_EXPLANATION);
+    while (key === undefined) {
+      const picked = answered(
+        await select({
+          message: "Add an Anthropic key?",
+          options: [{ value: "key", label: "Enter a key" }, ...SKIPS],
+        }),
+      );
+      if (picked !== "key") {
+        log.warn(KEY_SKIPPED);
+        return {};
+      }
+      const typed = answered(
+        await password({
+          message: "Anthropic key",
+          validate: (v) => (v?.trim() ? undefined : "Enter the key, or Esc."),
+        }),
+      ).trim();
+      log.info("Checking the key with Anthropic…");
+      const { problem, warning } = await checkKey(deps, typed);
+      if (problem) log.error(problem);
+      else {
+        if (warning) log.warn(warning);
+        key = typed;
+      }
+    }
+  }
+  if (!steps.askCap) return key === undefined ? {} : { key };
+  const spendCap = Number(
+    answered(
+      await text({
+        message:
+          "Spend cap: the most LLM calls may spend in a calendar month, in US dollars",
+        initialValue: String(steps.spendCap),
+        validate: (v) => spendCapProblem(v ?? ""),
+      }),
+    ).trim(),
+  );
+  const tooSmall = await spendCapWarning(deps, spendCap);
+  if (tooSmall) log.warn(tooSmall);
+  return { ...(key === undefined ? {} : { key }), spendCap };
+}
+
+/** One league through every step, or false if the platform stops setup. */
+async function setUpLeague(deps: Deps): Promise<boolean> {
+  const punditName = answered(
+    await text({
+      message: "Your pundit name",
+      initialValue: (await defaultPunditName(deps)) ?? "",
+      validate: (v) => punditNameProblem(v ?? ""),
+    }),
+  );
+  const platform = answered(
+    await select<PlatformChoice>({
+      message: "Which platform is the league on?",
+      options: [
+        { value: "sleeper", label: "Sleeper" },
+        { value: "espn", label: "ESPN" },
+        { value: "yahoo", label: "Yahoo" },
+      ],
+    }),
+  );
+  const stop = platformStop(platform);
+  if (stop) {
+    log.warn(stop);
+    return false;
+  }
+  const league = await askLeague(deps);
+  log.success(`${league.name}, ${league.season}: ${league.teams} teams.`);
+  for (const warning of league.warnings) log.warn(warning);
+  const dir = answered(
+    await text({
+      message: `Workspace folder (leave empty for a new one in ${deps.workspacesDir})`,
+    }),
+  )?.trim();
+  const where = { punditName, league, ...(dir ? { dir } : {}) };
+  await checkWorkspace(deps, where);
+  const handles = await askHandles(league);
+  const method = handles.skipRest ? { skipRest: true } : await askMethod();
+  const person = await askKeyAndCap(deps, method.skipRest);
+  const workspace = await setUpWorkspace(deps, {
+    ...where,
+    ...(handles.handles ? { handles: handles.handles } : {}),
+    ...("method" in method && method.method ? { method: method.method } : {}),
+    ...person,
+  });
+  leaguesReady++;
+  log.success(
+    `Workspace ready in ${workspace.dir}. Next: lazy-pundit --league ${workspace.slug} draft`,
+  );
+  return true;
+}
+
 program
   .command("init")
   .description("Set up a league, step by step.")
@@ -318,44 +518,38 @@ program
     }
     const deps = systemDeps();
     intro("Lazy Pundit setup");
-    const punditName = answered(
-      await text({
-        message: "Your pundit name",
-        initialValue: (await defaultPunditName(deps)) ?? "",
-        validate: (v) => punditNameProblem(v ?? ""),
-      }),
-    );
-    const platform = answered(
-      await select<PlatformChoice>({
-        message: "Which platform is the league on?",
-        options: [
-          { value: "sleeper", label: "Sleeper" },
-          { value: "espn", label: "ESPN" },
-          { value: "yahoo", label: "Yahoo" },
-        ],
-      }),
-    );
-    const stop = platformStop(platform);
-    if (stop) {
-      outro(stop);
-      return;
+    while (await setUpLeague(deps)) {
+      const another = answered(
+        await confirm({
+          message: "Set up another league?",
+          initialValue: false,
+        }),
+      );
+      if (!another) break;
     }
-    const league = await askLeague(deps);
-    log.success(`${league.name}, ${league.season}: ${league.teams} teams.`);
-    for (const warning of league.warnings) log.warn(warning);
-    const dir = answered(
-      await text({
-        message: `Workspace folder (leave empty for a new one in ${deps.workspacesDir})`,
-      }),
-    )?.trim();
-    const workspace = await setUpWorkspace(deps, {
-      punditName,
-      league,
-      ...(dir ? { dir } : {}),
-    });
     outro(
-      `Workspace ready in ${workspace.dir}. Next: lazy-pundit --league ${workspace.slug} draft`,
+      leaguesReady > 0
+        ? "Run lazy-pundit setup in a workspace to see its setup checklist."
+        : "Nothing was written.",
     );
+  });
+
+const STATUS_MARKS: Record<ChecklistItem["status"], string> = {
+  done: "✓",
+  default: "·",
+  skipped: "-",
+};
+
+program
+  .command("setup")
+  .description("Show the setup checklist: each step, done, skipped or default.")
+  .argument("[step]", "a step to re-run (in a later release)")
+  .action(async (step) => {
+    if (step !== undefined) throw new SetupRefusal(rerunNotBuilt(step));
+    const deps = systemDeps();
+    for (const item of await setupChecklist(deps, await workspace(deps))) {
+      console.log(`${STATUS_MARKS[item.status]} ${item.step}: ${item.status}`);
+    }
   });
 
 program
