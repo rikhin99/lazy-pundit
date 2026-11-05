@@ -19,7 +19,7 @@ Read)
   case $path in
   "$CLAUDE_PROJECT_DIR"/src/* | "$CLAUDE_PROJECT_DIR"/test/*)
     if [ -z "$limit" ] && [ "$(lines "$path")" -gt 150 ]; then
-      echo "$msg" >&2
+      echo "This file has $(lines "$path") lines; the limit is 150. $msg" >&2
       exit 2
     fi
     ;;
@@ -56,7 +56,7 @@ Bash)
   done
   # One file read whole on its own is the rewrite escape hatch.
   if [ "$total" -gt 150 ] && ! { [ "$files" -eq 1 ] && printf '%s' "$cmd" | grep -Eq "sed -n '?1,999p"; }; then
-    echo "$msg" >&2
+    echo "This command reads $total lines of src/ and test/; the limit is 150. $msg" >&2
     exit 2
   fi
   ;;

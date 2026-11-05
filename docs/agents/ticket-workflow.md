@@ -16,7 +16,7 @@ Done when the list is in a message, each noun with its `GLOSSARY.md` line or a n
 
 `/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other. See each new test fail before writing the code that passes it. In #60 part (b), the checklist tests were written with their code and first seen red only by a mutation after the build.
 
-Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing. If the diff changes a file's shape, also run the commands on a file written by the previous commit. Write each run as a script file in the scratchpad that starts with `set -euo pipefail` and sets `HOME` and the working directory to a temp folder. Drive `init` with `npm run -s drive:wizard -- <scenario>`, adding a scenario if yours is missing."
+Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing. Write each run as a script file in the scratchpad that starts with `set -euo pipefail` and sets `HOME` and the working directory to a temp folder. Drive `init` with `npm run -s drive:wizard -- <scenario>`, adding a scenario if yours is missing."
 
 The same script rule holds for your own scratch runs. In #60 part (a), a one-liner's failed `cd` left its `mkdir` and `touch` running in the repo.
 
