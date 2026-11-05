@@ -75,4 +75,4 @@ The seams, and the helpers each one uses:
 - **Repo rules** (`injected-boundaries`, `format-versions`, `glossary-terms`, `sleeper-fixtures`).
 - **Direct imports**: a test may import from a `src/` module what `index.ts` doesn't export, when the case can't be set up through the library API. `draft-publish` does this for `setFrontMatterKey`, on front matter that `publish` refuses first.
 
-Fixture values for hand-checked literals: `npm run fixture:show -- <week> --model`. A workspace with a draft for running the CLI by hand: `npm run fixture:workspace`.
+Fixture values for hand-checked literals: `npm run fixture:show -- <week> --model`. A workspace with a draft for running the CLI by hand: `npm run fixture:workspace`. The `init` wizard through a real terminal, in a temp home and offline: `npm run -s drive:wizard -- <scenario>`, with the scenarios at the top of `scripts/drive-wizard.exp`; it needs `expect`, so it isn't in CI.

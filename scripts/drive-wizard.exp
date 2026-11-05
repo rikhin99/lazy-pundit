@@ -1,0 +1,93 @@
+#!/usr/bin/expect -f
+# Drives `lazy-pundit init` through a real terminal, in a new temp home, with
+# the fetch replayed offline. Run it with `npm run -s drive:wizard -- <scenario>`.
+#
+#   full            every answer, default folder
+#   folder <path>   every answer, with this workspace folder
+#   bad-id          an unknown league ID, re-asked, then Ctrl-C
+#   yahoo, espn     pick a platform that stops the wizard
+#   cancel          Ctrl-C at the first prompt
+#   cancel-folder   Ctrl-C at the folder prompt
+#
+# It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
+# with the wizard's code. Look in that home for what the wizard wrote. A new
+# wizard step needs its prompt and answer added at the bottom of this file.
+
+set scenario [lindex $argv 0]
+set folder [lindex $argv 1]
+if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder"
+  exit 2
+}
+if {$scenario eq "folder" && $folder eq ""} {
+  puts stderr "The folder scenario needs a path."
+  exit 2
+}
+
+set repo [file dirname [file dirname [file normalize [info script]]]]
+set home [file normalize [exec mktemp -d]]
+if {[string first "$repo/" "$home/"] == 0} {
+  puts stderr "Refusing to run: the temp home $home is inside the repo. Check TMPDIR."
+  exit 2
+}
+cd $home
+
+set env(HOME) $home
+set env(XDG_CONFIG_HOME) "$home/.config"
+set env(XDG_CACHE_HOME) "$home/.cache"
+set env(LAZY_PUNDIT_CLIPBOARD) off
+set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/sleeper/fear-the-turtle-2025/20251028T120000Z-c4a2c21d"
+catch {unset env(ANTHROPIC_API_KEY)}
+
+# A real width: a terminal of width 0 makes clack wrap one character per line.
+set stty_init "cols 120 rows 40"
+set timeout 15
+
+proc finish {} {
+  global home
+  expect {
+    eof {}
+    timeout { puts "\nHUNG"; exec kill -9 [exp_pid]; exit 9 }
+  }
+  lassign [wait] pid spawnid oserror code
+  puts "\nHOME $home\nEXIT $code"
+  exit $code
+}
+
+proc need {prompt} {
+  expect {
+    -ex $prompt { after 300 }
+    timeout { puts "\nTIMEOUT waiting for \"$prompt\""; exec kill -9 [exp_pid]; exit 9 }
+    eof { puts "\nEOF waiting for \"$prompt\""; exit 8 }
+  }
+}
+
+set DOWN "\033\[B"
+set CTRL_C "\x03"
+
+spawn node "$repo/src/cli.ts" init
+need "pundit name"
+if {$scenario eq "cancel"} { send $CTRL_C; finish }
+send "Rikhin\r"
+
+need "Which platform"
+if {$scenario eq "espn"} { send "$DOWN"; after 200; send "\r"; finish }
+if {$scenario eq "yahoo"} { send "$DOWN"; after 200; send "$DOWN"; after 200; send "\r"; finish }
+send "\r"
+
+need "username"
+send "\r"
+need "number in the"
+if {$scenario eq "bad-id"} {
+  send "123\r"
+  need "no league"
+  need "username"
+  send $CTRL_C
+  finish
+}
+send "900000000000000001\r"
+
+need "Workspace folder"
+if {$scenario eq "cancel-folder"} { send $CTRL_C; finish }
+if {$scenario eq "folder"} { send "$folder\r" } else { send "\r" }
+finish

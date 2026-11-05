@@ -30,6 +30,7 @@
     "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x",
     "fixture:show": "node scripts/show-fixture.ts",
     "fixture:workspace": "node scripts/fixture-workspace.ts",
+    "drive:wizard": "expect scripts/drive-wizard.exp",
     "outline": "node scripts/outline.ts",
     "trace": "node scripts/trace-context.ts"
   },

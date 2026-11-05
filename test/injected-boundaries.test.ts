@@ -160,3 +160,29 @@ test("the validator is pure: beyond its own modules it imports only types from t
   }
   expect(offences).toEqual([]);
 });
+
+test("only src/sleeper/ reads Sleeper's raw payload fields", async () => {
+  const sleeper = await sourceFiles(join(SRC, "sleeper"));
+  const fields = new Set<string>();
+  for (const file of sleeper) {
+    const code = await codeOf(file);
+    for (const m of code.matchAll(/^\s+([a-z]+(?:_[a-z0-9]+)+)\??:/gm)) {
+      fields.add(m[1] as string);
+    }
+  }
+  // Guards the pattern above: an empty set would pass everything below.
+  expect(fields).toContain("scoring_settings");
+  // Also a field of workspace.md's own, under the same name.
+  fields.delete("league_id");
+
+  const names = [...fields].join("|");
+  const read = new RegExp(`\\.(${names})\\b|\\["(${names})"\\]`, "g");
+  const offences: string[] = [];
+  for (const file of await sourceFiles(SRC)) {
+    if (sleeper.includes(file)) continue;
+    for (const m of (await codeOf(file)).matchAll(read)) {
+      offences.push(`${relative(SRC, file)} reads ${m[1] ?? m[2]}`);
+    }
+  }
+  expect(offences).toEqual([]);
+});
