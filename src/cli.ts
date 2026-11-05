@@ -1,22 +1,32 @@
 #!/usr/bin/env node
 import { relative } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { intro, isCancel, log, outro, select, text } from "@clack/prompts";
 import { Command } from "@commander-js/extra-typings";
 import {
   ConfigFileError,
   check,
+  checkLeague,
   type Deps,
   type DoctorCheck,
   DraftExistsError,
+  defaultPunditName,
   deleteTranscripts,
   doctor,
   draft,
   FetchError,
   findWorkspace,
+  type LeagueCheck,
   type PersonaRecord,
+  type PlatformChoice,
   type Problem,
+  platformStop,
   publish,
+  punditNameProblem,
   refresh,
+  SetupRefusal,
+  setUpWorkspace,
+  sleeperLeagues,
   systemDeps,
   WorkspaceFileError,
 } from "./index.ts";
@@ -239,6 +249,115 @@ program
     );
   });
 
+/** The pundit cancelled a prompt, which ends setup rather than asking again. */
+class SetupCancelled extends Error {}
+
+/** A prompt's answer, or stops setup with nothing written if the pundit cancels. */
+function answered<T>(answer: T): Exclude<T, symbol> {
+  if (isCancel(answer)) {
+    throw new SetupCancelled("Setup cancelled. Nothing was written.");
+  }
+  return answer as Exclude<T, symbol>;
+}
+
+/** The league ID the pundit picks from their Sleeper leagues, or types. */
+async function askLeagueId(deps: Deps): Promise<string> {
+  const accountName = answered(
+    await text({
+      message: "Your Sleeper username (leave empty to type a league ID)",
+    }),
+  )?.trim();
+  if (accountName) {
+    const leagues = await sleeperLeagues(deps, accountName);
+    if (leagues.length === 0)
+      log.warn(`${accountName} has no leagues this season.`);
+    else {
+      const picked = answered(
+        await select({
+          message: "Which league?",
+          options: [
+            ...leagues.map((l) => ({
+              value: l.leagueId,
+              label: `${l.name} (${l.season}, ${l.teams} teams)`,
+            })),
+            { value: "", label: "Type a league ID instead" },
+          ],
+        }),
+      );
+      if (picked) return picked;
+    }
+  }
+  return answered(
+    await text({
+      message: "Sleeper league ID (the number in the league's URL)",
+      validate: (v) => (v?.trim() ? undefined : "Enter the league ID."),
+    }),
+  ).trim();
+}
+
+/** Asks for a league until one passes the live fetch. */
+async function askLeague(deps: Deps): Promise<LeagueCheck> {
+  for (;;) {
+    try {
+      const leagueId = await askLeagueId(deps);
+      log.info("Fetching the league from Sleeper…");
+      return await checkLeague(deps, leagueId);
+    } catch (err) {
+      if (!(err instanceof SetupRefusal)) throw err;
+      log.error(err.message);
+    }
+  }
+}
+
+program
+  .command("init")
+  .description("Set up a league, step by step.")
+  .action(async () => {
+    if (!process.stdin.isTTY) {
+      throw new SetupRefusal("init asks questions, so run it in a terminal.");
+    }
+    const deps = systemDeps();
+    intro("Lazy Pundit setup");
+    const punditName = answered(
+      await text({
+        message: "Your pundit name",
+        initialValue: (await defaultPunditName(deps)) ?? "",
+        validate: (v) => punditNameProblem(v ?? ""),
+      }),
+    );
+    const platform = answered(
+      await select<PlatformChoice>({
+        message: "Which platform is the league on?",
+        options: [
+          { value: "sleeper", label: "Sleeper" },
+          { value: "espn", label: "ESPN" },
+          { value: "yahoo", label: "Yahoo" },
+        ],
+      }),
+    );
+    const stop = platformStop(platform);
+    if (stop) {
+      outro(stop);
+      return;
+    }
+    const league = await askLeague(deps);
+    log.success(`${league.name}, ${league.season}: ${league.teams} teams.`);
+    for (const warning of league.warnings) log.warn(warning);
+    const dir = answered(
+      await text({
+        message: `Workspace folder (leave empty for a new one in ${deps.workspacesDir})`,
+      }),
+    )?.trim();
+    const workspace = await setUpWorkspace(deps, {
+      punditName,
+      league,
+      ...(dir ? { dir } : {}),
+    });
+    outro(
+      `Workspace ready in ${workspace.dir}. Next: lazy-pundit --league ${workspace.slug} draft`,
+    );
+  });
+
 program
   .command("doctor")
   .description("Check Node, your config and credentials, and each workspace.")
@@ -258,7 +377,9 @@ try {
     err instanceof WorkspaceFileError ||
     err instanceof ConfigFileError ||
     err instanceof DraftExistsError ||
-    err instanceof FetchError
+    err instanceof FetchError ||
+    err instanceof SetupRefusal ||
+    err instanceof SetupCancelled
   ) {
     console.error(err.message);
     process.exitCode = 1;

@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { readFrontMatter, type VersionKey } from "./front-matter.ts";
 
 /**
@@ -15,6 +15,17 @@ export async function writeWorkspaceFile(
 ): Promise<void> {
   readFrontMatter(basename(path), text, opts.versionKey ?? "format");
   await writeFile(path, text, opts.exclusive ? { flag: "wx" } : {});
+}
+
+/**
+ * Writes a `.gitignore` in `dir`, which keeps local files out of a repository.
+ * Git reads it as it is, so it carries no format version.
+ */
+export async function writeGitignore(
+  dir: string,
+  ...patterns: string[]
+): Promise<void> {
+  await writeFile(join(dir, ".gitignore"), `${patterns.join("\n")}\n`);
 }
 
 /**

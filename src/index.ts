@@ -35,6 +35,18 @@ export {
 export { type DraftData, draftData, type StatSet } from "./draft-data.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
+export {
+  checkLeague,
+  defaultPunditName,
+  type LeagueCheck,
+  type LeagueChoice,
+  type PlatformChoice,
+  platformStop,
+  punditNameProblem,
+  SetupRefusal,
+  setUpWorkspace,
+  sleeperLeagues,
+} from "./init.ts";
 export type {
   Claim,
   League,

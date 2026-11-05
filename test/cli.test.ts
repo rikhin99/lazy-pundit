@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -25,10 +25,22 @@ test("the CLI imports only the library, the arg parser and the prompt", async ()
   const imports = [...text.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
   expect(imports.sort()).toEqual([
     "./index.ts",
+    "@clack/prompts",
     "@commander-js/extra-typings",
     "node:path",
     "node:readline/promises",
   ]);
+});
+
+test("init with no terminal says so, fails and writes nothing", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "lazy-pundit-cli-"));
+  const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
+
+  const { code, stderr } = await cli(cwd, ["init"], "", home);
+
+  expect(code).toBe(1);
+  expect(stderr).toMatch(/run it in a terminal/);
+  expect(await readdir(home)).toEqual([]);
 });
 
 test("outside a workspace, publish prints the library's message and fails", async () => {

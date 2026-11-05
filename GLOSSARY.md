@@ -153,6 +153,12 @@ The platform's list of every NFL player, with positions, NFL team and injury sta
 **Setup step**:
 One part of setting up a league, such as the lore, the persona or the Anthropic key, that `init` walks through in order and `setup` can re-run on its own. Only the pundit name and league data steps can't be skipped.
 
+**Wizard**:
+`init`'s prompts: they ask for each setup step's answers in order and hand them to the library. Only the CLI has one.
+
+**Pick list**:
+The league data step's list of a platform account's leagues this season, to choose from instead of typing a league ID.
+
 **Credentials**:
 The operator's secrets: the Anthropic key and the ESPN cookie. They belong to the operator, never to a league workspace, so a workspace can be shared or backed up without them.
 

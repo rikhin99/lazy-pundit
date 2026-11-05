@@ -136,6 +136,41 @@ export function envCredentials(env: Deps["env"]): Credentials {
 }
 
 /**
+ * Adds a workspace to `config.yaml`'s list. A new file gets the defaults written
+ * out, so they can be seen and edited; an existing one keeps everything as
+ * written, comments included, and gains `name` only if it has none.
+ */
+export async function listWorkspace(
+  deps: Pick<Deps, "configDir">,
+  entry: { name: string; slug: string; dir: string },
+): Promise<void> {
+  const path = configPath(deps);
+  const config = await readConfig(deps);
+  if (config === undefined) {
+    const { model, spend_cap_usd } = configSchema.parse({
+      format: CONFIG_FORMAT,
+    });
+    await writeConfigFile(
+      path,
+      stringify({
+        format: CONFIG_FORMAT,
+        name: entry.name,
+        model,
+        spend_cap_usd,
+        workspaces: { [entry.slug]: entry.dir },
+      }),
+      0o600,
+    );
+    return;
+  }
+  const doc = parseDocument(await readFile(path, "utf8"));
+  if (config.name === undefined) doc.set("name", entry.name);
+  doc.setIn(["workspaces", entry.slug], entry.dir);
+  const mode = (await stat(path)).mode & 0o777;
+  await writeConfigFile(path, doc.toString(), mode);
+}
+
+/**
  * Removes workspaces from `config.yaml`'s list, keeping the rest of the file
  * as written, comments included.
  */
