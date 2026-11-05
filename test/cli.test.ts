@@ -15,6 +15,7 @@ import {
   rankingsDir,
   statCorrection,
   WEEKS,
+  writeSettings,
 } from "./support/workspace.ts";
 
 const CLI = join(import.meta.dirname, "..", "src", "cli.ts");
@@ -190,6 +191,20 @@ test("refresh with no change says so, and updates checked_at", async () => {
   const now = frontMatter(await readFile(path, "utf8"));
   expect(now.checked_at).not.toBe(was.checked_at);
   expect({ ...now, checked_at: was.checked_at }).toEqual(was);
+});
+
+test("refresh after a settings change says the starting order follows them, not that nothing changed", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+  await writeSettings(dir, "method: ffmwr");
+
+  const { code, stdout } = await cli(dir, ["refresh"]);
+
+  expect(code).toBe(0);
+  expect(stdout).toContain(
+    "The draft recorded another power-score method or weights: its starting order now follows your settings.",
+  );
+  expect(stdout).not.toContain("No changes since");
 });
 
 test("refresh over changed data prints the newly stale claims and the problems list", async () => {
