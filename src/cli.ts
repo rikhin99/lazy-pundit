@@ -53,6 +53,7 @@ const KINDS: Record<Problem["kind"], string> = {
   swear: "word list",
   "unreadable-tag": "unreadable tag",
   moved: "you moved this team",
+  "small-sample": "small sample",
 };
 
 /** The problems list as the library ordered it: one line per item. */
@@ -61,6 +62,10 @@ function printProblems(problems: Problem[]): void {
     const mark = p.severity === "hard" ? "✗" : "·";
     const cause = p.cause ? `, after a ${p.cause}` : "";
     const gate = p.gate ? ", gate failure" : "";
+    if (p.line === null) {
+      console.log(`  ${mark} ${p.section}: ${KINDS[p.kind]}: ${p.reason}`);
+      continue;
+    }
     console.log(
       `  ${mark} line ${p.line} ${p.section}: "${p.text}" ${KINDS[p.kind]}${cause}${gate}: ${p.reason}`,
     );
@@ -154,8 +159,15 @@ program
     const deps = systemDeps();
     const result = await refresh(await workspace(deps), deps);
     printWarnings(result.warnings);
+    if (result.methodChanged) {
+      console.log(
+        "The draft recorded another power-score method or weights: its starting order now follows your settings.",
+      );
+    }
     if (result.changes.length === 0) {
-      console.log(`No changes since ${result.dataAsOf}.`);
+      if (!result.methodChanged) {
+        console.log(`No changes since ${result.dataAsOf}.`);
+      }
     } else {
       console.log(
         `Data changed since ${result.dataAsOf}: week ${result.week} now stands on snapshot ${result.snapshot}.`,

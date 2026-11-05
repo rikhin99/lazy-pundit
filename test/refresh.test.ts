@@ -17,10 +17,10 @@ import { scriptedLlm } from "./support/llm.ts";
 import {
   atWeek,
   FEAR_THE_TURTLE_ID,
-  fearTheTurtle,
   fixedClock,
   frontMatter,
   type Json,
+  onStandings,
   patchingTransport,
   published,
   statCorrection,
@@ -65,7 +65,7 @@ const STALE_CLAIMS = [
 const body = (text: string) => text.slice(text.indexOf("\n---\n"));
 
 async function drafted() {
-  const ws = await fearTheTurtle(8);
+  const ws = await onStandings(8);
   const { path } = await draft(ws.dir, ws.deps);
   const read = () => readFile(path, "utf8");
   const edit = async (change: (text: string) => string) =>

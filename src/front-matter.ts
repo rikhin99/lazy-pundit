@@ -1,9 +1,9 @@
 import {
   Document,
+  isCollection,
   isMap,
   isNode,
   isScalar,
-  isSeq,
   parse,
   parseDocument,
 } from "yaml";
@@ -53,17 +53,20 @@ function setKeyLine(
   return `${text.slice(0, end)}${eol}${line}${text.slice(end)}`;
 }
 
+/** A value `setFrontMatterValue` can write: text, a list of text, or a map of plain values. */
+export type FrontMatterValue = string | string[] | Record<string, unknown>;
+
 /**
  * Sets one top-level key's value in a file's front matter, leaving every other
  * byte of the text as it is, the old value's trailing comment included. A new
  * key becomes the last line of the front matter. A string that YAML would
- * misread is quoted, and a list is written on one line (`[a, b, c]`).
+ * misread is quoted, and a list or map is written on one line (`[a, b, c]`).
  */
 export function setFrontMatterValue(
   file: string,
   text: string,
   key: string,
-  value: string | string[],
+  value: FrontMatterValue,
 ): string {
   const rendered = renderValue(value);
   const span = valueSpan(frontMatterYaml(file, text), key);
@@ -89,9 +92,9 @@ function topLevelPair(yaml: string, key: string) {
   );
 }
 
-function renderValue(value: string | string[]): string {
+function renderValue(value: FrontMatterValue): string {
   const doc = new Document(value);
-  if (isSeq(doc.contents)) doc.contents.flow = true;
+  if (isCollection(doc.contents)) doc.contents.flow = true;
   return doc.toString({ lineWidth: 0, flowCollectionPadding: false }).trimEnd();
 }
 

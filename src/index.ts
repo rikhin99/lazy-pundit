@@ -69,7 +69,21 @@ export {
   playoffStatuses,
   settledThisWeek,
 } from "./playoff-status.ts";
+export {
+  type BlendWeights,
+  isSmallSample,
+  type PowerScoreMethod,
+  type PowerScoreRecord,
+  powerScores,
+  startingOrder,
+} from "./power-score.ts";
 export { type PublishOptions, type PublishResult, publish } from "./publish.ts";
+export {
+  DEFAULT_SETTINGS,
+  loadPunditSettings,
+  methodForWeek,
+  type PunditSettings,
+} from "./pundit-settings.ts";
 export { RankingFileError } from "./ranking-file.ts";
 export { type RefreshResult, refresh } from "./refresh.ts";
 export {

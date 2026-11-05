@@ -33,6 +33,7 @@ import {
   validatorNames,
 } from "./lore.ts";
 import { loadPersona, type Persona, personaRecord } from "./persona.ts";
+import { startingOrder } from "./power-score.ts";
 import {
   ceilingCost,
   costOf,
@@ -41,11 +42,11 @@ import {
   usd,
 } from "./prices.ts";
 import { FIRST_DRAFT_SYSTEM, firstDraftPrompt, loreBlock } from "./prompt.ts";
+import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
 import { dataChangedWarning, fetchFresh } from "./refresh.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
-import { startingOrder } from "./standings.ts";
 import { stripTags } from "./validator.ts";
 import {
   rankingsDir,
@@ -84,7 +85,7 @@ export class DraftExistsError extends Error {
 
 /**
  * Fetches the workspace's latest season and writes a new draft for its
- * ranking week, starting in standings order, and checks it.
+ * ranking week, starting in the order the pundit's settings give, and checks it.
  */
 export async function draft(
   workspaceDir: string,
@@ -100,6 +101,7 @@ export async function draft(
   const lore = await loadLore(ws);
   refuseLocal(lore);
   warn(lore.warnings);
+  const settings = await loadPunditSettings(ws);
   const fetched = await fetchFresh(ws, deps);
   const names = validatorNames(lore, fetched.league, ws.handles);
   const week = fetched.league.lastScoredWeek;
@@ -118,7 +120,8 @@ export async function draft(
   const { id } = await fetched.write();
   const snapshot = await readSnapshot(snapshotsDir(ws), id);
   const league = normalizeSleeper(snapshot);
-  const order = startingOrder(league, week);
+  const method = methodForWeek(settings, league, week);
+  const order = startingOrder(league, week, method);
   const data = draftData(league, week);
   const { anthropicApiKey, warnings: credentialWarnings } =
     await loadCredentials(deps);
@@ -175,6 +178,7 @@ export async function draft(
       snapshot: id,
       data_hash: dataHash(league, week),
       starting_order: order,
+      power_score: method,
       persona: personaRecord(persona),
       created_at: now,
     },

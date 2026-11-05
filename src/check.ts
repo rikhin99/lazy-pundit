@@ -17,6 +17,7 @@ import {
   moveOf,
   orderEvidence,
 } from "./movement.ts";
+import { isSmallSample } from "./power-score.ts";
 import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
@@ -46,16 +47,24 @@ import { writeWorkspaceFile } from "./workspace-files.ts";
  */
 export interface Problem {
   severity: "hard" | "soft";
-  /** The section's team, or null for the intro. */
+  /** The section's team, or null for the intro or a league item. */
   team: TeamId | null;
-  /** The team's name in the league, or "Intro". */
+  /** The team's name in the league, "Intro", or "League" for a league item. */
   section: string;
-  /** The file line the words are on. */
-  line: number;
-  /** The words at fault, as the league would read them. */
+  /** The file line the words are on, or null for a league item, which has none. */
+  line: number | null;
+  /** The words at fault, as the league would read them. Empty for a league item. */
   text: string;
-  /** `moved`: a moved team, away from its starting place. */
-  kind: Exclude<ClaimStatus, "verified"> | "swear" | "unreadable-tag" | "moved";
+  /**
+   * `moved`: a moved team, away from its starting place. `small-sample`: the
+   * small-sample flag, a league item.
+   */
+  kind:
+    | Exclude<ClaimStatus, "verified">
+    | "swear"
+    | "unreadable-tag"
+    | "moved"
+    | "small-sample";
   /** Why, in words the pundit reads. */
   reason: string;
   /** For a stale claim: what changed since it held. */
@@ -159,6 +168,7 @@ export async function checkDraft(
   });
   problems.push(
     ...movedTeams(ranking, order, startingOrder, teamNames(league)),
+    ...(isSmallSample(week) ? [smallSampleFlag(week)] : []),
   );
   problems.sort(byHardThenLine);
 
@@ -321,11 +331,24 @@ function reviewProse(input: {
 /** Why a word-list hit is a problem. */
 export const SWEAR_REASON = "on the word list, and swearing is off";
 
-/** The problems list's order: hard first, then by line. */
+/** The small-sample flag. Worked out here, never written to the file, so nothing published can carry it. */
+function smallSampleFlag(week: number): Problem {
+  return {
+    severity: "soft",
+    team: null,
+    section: "League",
+    line: null,
+    text: "",
+    kind: "small-sample",
+    reason: `week ${week} is early in the season, so the starting order means little yet`,
+  };
+}
+
+/** The problems list's order: hard first, then by line, with league items ahead of any line. */
 function byHardThenLine(a: Problem, b: Problem): number {
   return (
     Number(b.severity === "hard") - Number(a.severity === "hard") ||
-    a.line - b.line
+    (a.line ?? 0) - (b.line ?? 0)
   );
 }
 

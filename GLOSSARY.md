@@ -260,7 +260,13 @@ The tool's per-team number for a week, used only to produce the starting order.
 _Avoid_: Rating, ranking
 
 **Power-score method**:
-The pundit's choice of how the power score is computed, including its weights. It is a per-pundit setting, and each starting order records the method that produced it.
+The pundit's choice of how the power score is computed, including its weights: standings, points per game, all-play, form, the ffwrapped formula, the FFMWR rank average or the ramped blend. It is a per-pundit setting, and each starting order records the method that produced it.
+
+**Ramped blend**:
+The default power-score method: a weighted mix of a team's league percentiles of all-play record, form and record. Its weights move in a straight line from the first regular-season week to the last, so record counts for more as the playoffs approach.
+
+**Pundit settings**:
+One pundit's choices for one league that aren't part of the persona: the power-score method and its weights. A pundit can change them at any time. A draft copies what it used, so changing them later never rewrites the past, and an existing draft picks up the change only when the pundit refreshes.
 
 **Starting order**:
 The order the tool proposes from the power score. The pundit edits it into the ranking. It is fixed when a draft begins and changes only when the pundit refreshes.
@@ -366,8 +372,11 @@ A claim with no evidence to check it against, such as a tier claim in a ranking 
 ## Problems
 
 **Problems list**:
-Everything in a draft the pundit should see before publishing: each claim that isn't verified, each word-list hit and each flag, placed at its team and line. Every surface shows the same list, hard problems first.
+Everything in a draft the pundit should see before publishing: each claim that isn't verified, each word-list hit and each flag, placed at its team and line unless it's a league item. Every surface shows the same list, hard problems first.
 _Avoid_: Errors, issues, warnings (for the whole list)
+
+**League item**:
+A problems-list item about the whole league rather than a team or a line of the draft, such as the small-sample flag.
 
 **Hard problem**:
 A problem that would put something false or garbled in front of the league: a wrong or stale claim, a cited evidence ID that doesn't exist, or a tag the tool can't read. Publishing with one asks the pundit first.

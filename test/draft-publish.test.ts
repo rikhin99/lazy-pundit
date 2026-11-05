@@ -8,13 +8,14 @@ import {
   atWeek,
   fearTheTurtle,
   frontMatter,
+  onStandings,
   published,
   rankingsDir,
 } from "./support/workspace.ts";
 
 describe("draft", () => {
   test("writes the ranking file for the last scored week, in standings order", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
 
     const result = await draft(dir, deps);
 
@@ -55,7 +56,7 @@ describe("draft", () => {
     [1, "week-01.md"],
     [15, "week-15.md"],
   ])("a week-%i snapshot gives a ranking week of %i", async (week, file) => {
-    const { dir, deps } = await fearTheTurtle(week);
+    const { dir, deps } = await onStandings(week);
 
     const result = await draft(dir, deps);
 
@@ -65,7 +66,7 @@ describe("draft", () => {
   });
 
   test("never overwrites an existing draft for the same week", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const { path } = await draft(dir, deps);
     await writeFile(path, "my edits");
 
@@ -122,7 +123,7 @@ Stats: Sleeper · made with Lazy Pundit
 
 describe("publish", () => {
   test("freezes the draft and writes and copies the plain text", async () => {
-    const { dir, deps, clipboard } = await fearTheTurtle(8);
+    const { dir, deps, clipboard } = await onStandings(8);
     const drafted = await draft(dir, deps);
 
     const result = await published(dir, deps);
@@ -151,7 +152,7 @@ describe("publish", () => {
   });
 
   test("a moved section takes its new place; a renamed heading is still the same team", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const { path } = await draft(dir, deps);
     const text = await readFile(path, "utf8");
     const last = text.slice(text.indexOf("## Hail Mary Hustle"));
@@ -196,7 +197,7 @@ describe("publish", () => {
   ])(
     "a %s team is rejected by name and nothing is published",
     async (_, edit, message) => {
-      const { dir, deps, clipboard } = await fearTheTurtle(8);
+      const { dir, deps, clipboard } = await onStandings(8);
       const { path } = await draft(dir, deps);
       await writeFile(path, edit(await readFile(path, "utf8")));
 
@@ -216,7 +217,7 @@ describe("publish", () => {
 describe("publish: the frozen copy keeps the draft's text", () => {
   /** Drafts week 8, edits the draft's text and returns it, with the frozen copy's path. */
   async function editedDraft(edit: (text: string) => string) {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const { path } = await draft(dir, deps);
     const text = edit(await readFile(path, "utf8"));
     await writeFile(path, text);
@@ -348,7 +349,7 @@ describe("publish: the frozen copy keeps the draft's text", () => {
 
 describe("publish: intro and groups", () => {
   test("the intro follows the header and groups divide the places, which run straight through", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const { path } = await draft(dir, deps);
     await writeFile(
       path,
@@ -378,7 +379,7 @@ describe("publish: intro and groups", () => {
   });
 
   test("a section with neither a team tag nor {intro} is rejected", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const { path } = await draft(dir, deps);
     await writeFile(
       path,
@@ -414,7 +415,7 @@ describe("format versions", () => {
   });
 
   test("a draft with an unknown format version is refused", async () => {
-    const { dir, deps, clipboard } = await fearTheTurtle(8);
+    const { dir, deps, clipboard } = await onStandings(8);
     const { path } = await draft(dir, deps);
     await writeFile(
       path,
@@ -428,7 +429,7 @@ describe("format versions", () => {
   });
 
   test("a workspace.md with an unknown format version is refused", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const file = join(dir, "workspace.md");
     await writeFile(
       file,

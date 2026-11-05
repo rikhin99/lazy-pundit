@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import {
   type CheckedDraft,
   checkDraft,
@@ -7,11 +8,12 @@ import {
 import { type DataChange, diff } from "./data-diff.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
-import { setFrontMatterValue } from "./front-matter.ts";
+import { type FrontMatterValue, setFrontMatterValue } from "./front-matter.ts";
 import type { League } from "./league.ts";
 import { validatorNames } from "./lore.ts";
+import { startingOrder } from "./power-score.ts";
+import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
-import { startingOrder } from "./standings.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
 
@@ -19,8 +21,10 @@ export interface RefreshResult {
   week: number;
   /** The draft refreshed. */
   path: string;
-  /** The data changes found; none means only `checked_at` moved. */
+  /** The data changes found. */
   changes: DataChange[];
+  /** Whether the pundit settings asked for another method or weights than the draft recorded. */
+  methodChanged: boolean;
   /** The draft's data as of before this refresh. */
   dataAsOf: string;
   /** The snapshot the draft stands on now. */
@@ -35,9 +39,11 @@ export interface RefreshResult {
 
 /**
  * Refetches and, if the data changed, moves the latest draft onto a new
- * snapshot with a recomputed starting order. It never touches the pundit's
- * order, blurbs, week or persona, and doesn't auto-tag. With no data change
- * it only updates `checked_at`. A failed fetch throws and changes nothing.
+ * snapshot with a recomputed starting order. A changed method in the pundit
+ * settings recomputes the order too, with no new snapshot if the data stands.
+ * It never touches the pundit's order, blurbs, week or persona, and doesn't
+ * auto-tag. With neither change it only updates `checked_at`. A failed fetch
+ * or a bad settings file throws and changes nothing.
  */
 export async function refresh(
   workspaceDir: string,
@@ -45,27 +51,44 @@ export async function refresh(
 ): Promise<RefreshResult> {
   const checked = await checkDraft(workspaceDir, { autoTag: false });
   const { meta } = checked.ranking;
-  const fresh = await fetchFresh(await readWorkspace(workspaceDir), deps);
+  const ws = await readWorkspace(workspaceDir);
+  const settings = await loadPunditSettings(ws);
+  const fresh = await fetchFresh(ws, deps);
   const changes = diff(checked.league, fresh.league, meta.week);
+  const method = methodForWeek(settings, fresh.league, meta.week);
+  const methodChanged = !isDeepStrictEqual(meta.power_score, method);
   const now = deps.clock.now().toISOString();
   const name = `${checked.stem}.md`;
-  const set = (text: string, key: string, value: string | string[]) =>
+  const set = (text: string, key: string, value: FrontMatterValue) =>
     setFrontMatterValue(name, text, key, value);
+  const setOrder = (text: string, league: League) =>
+    set(
+      set(text, "starting_order", startingOrder(league, meta.week, method)),
+      "power_score",
+      method,
+    );
 
   if (changes.length === 0) {
-    await writeWorkspaceFile(
-      checked.path,
-      set(checked.text, "checked_at", now),
-    );
+    let text = set(checked.text, "checked_at", now);
+    if (methodChanged) {
+      // On the draft's own league: fresh names or positions aren't a data
+      // change, but a lineup's best points read them.
+      text = setOrder(text, checked.league);
+    }
+    await writeWorkspaceFile(checked.path, text);
+    const { problems, warnings } = methodChanged
+      ? await checkDraft(workspaceDir, { autoTag: false })
+      : checked;
     return {
       week: checked.week,
       path: checked.path,
       changes,
+      methodChanged,
       dataAsOf: meta.data_as_of,
       snapshot: meta.snapshot,
       newlyStale: [],
-      problems: checked.problems,
-      warnings: checked.warnings,
+      problems,
+      warnings,
     };
   }
 
@@ -78,7 +101,7 @@ export async function refresh(
   text = set(text, "data_as_of", manifest.fetched_at);
   text = set(text, "snapshot", id);
   text = set(text, "data_hash", dataHash(fresh.league, meta.week));
-  text = set(text, "starting_order", startingOrder(fresh.league, meta.week));
+  text = setOrder(text, fresh.league);
   text = set(text, "earlier_snapshots", [
     ...(meta.earlier_snapshots ?? []),
     meta.snapshot,
@@ -90,6 +113,7 @@ export async function refresh(
     week: checked.week,
     path: checked.path,
     changes,
+    methodChanged,
     dataAsOf: meta.data_as_of,
     snapshot: id,
     // Measured on the new text, so its lines match the problems list.

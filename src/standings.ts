@@ -85,15 +85,7 @@ export function standingsAsReported(league: League): boolean {
   return league.settings.median || league.settings.divisions > 0;
 }
 
-/**
- * The tool's proposed order: the standings through the ranking week. The
- * power-score methods replace this later.
- */
-export function startingOrder(league: League, week: number): TeamId[] {
-  return standingsThrough(league, week).map((s) => s.team);
-}
-
-function winPercentage(s: Standing): number {
+export function winPercentage(s: Standing): number {
   const matchups = s.wins + s.losses + s.ties;
   return matchups === 0 ? 0 : (s.wins + s.ties / 2) / matchups;
 }

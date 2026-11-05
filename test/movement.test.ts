@@ -7,8 +7,8 @@ import { moveOf } from "../src/movement.ts";
 import { renderPlainText } from "../src/plain-text.ts";
 import {
   atWeek,
-  fearTheTurtle,
   frontMatter,
+  onStandings,
   published,
   rankingsDir,
 } from "./support/workspace.ts";
@@ -30,7 +30,7 @@ function moveSection(text: string, heading: string, before: string): string {
 
 /** A workspace with week 7 published as drafted, then week 8 drafted. */
 async function week8AfterWeek7() {
-  const ws = await fearTheTurtle(7);
+  const ws = await onStandings(7);
   await draft(ws.dir, ws.deps);
   await published(ws.dir, ws.deps);
   const deps = atWeek(ws.deps, 8);
@@ -69,7 +69,7 @@ describe("movement", () => {
   });
 
   test("publishing week 9 with week 8 skipped shows movement since week 7", async () => {
-    const ws = await fearTheTurtle(7);
+    const ws = await onStandings(7);
     await draft(ws.dir, ws.deps);
     await published(ws.dir, ws.deps);
     const deps = atWeek(ws.deps, 9);
@@ -90,7 +90,7 @@ describe("movement", () => {
   });
 
   test("with no earlier published ranking every team is new, and a numeric movement claim is wrong", async () => {
-    const { dir, deps } = await fearTheTurtle(8);
+    const { dir, deps } = await onStandings(8);
     const { path } = await draft(dir, deps);
     const GUS = "## Gus Bus {team=sleeper:1}\n";
     const text = await readFile(path, "utf8");

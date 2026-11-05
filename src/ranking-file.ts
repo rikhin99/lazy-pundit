@@ -9,6 +9,7 @@ import {
 } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
 import { personaRecordSchema } from "./persona.ts";
+import { powerScoreRecordSchema } from "./power-score.ts";
 
 /**
  * A ranking file: a draft (`week-NN.md`) or its frozen copy
@@ -57,6 +58,8 @@ export const metaSchema = z.object({
   /** The data hash of the snapshot through the ranking week (`dataHash`). */
   data_hash: z.string().regex(/^[0-9a-f]{64}$/),
   starting_order: z.array(z.string()),
+  /** The power-score method the starting order came from, with its weights for the week. */
+  power_score: powerScoreRecordSchema,
   /** The persona the draft was written in. */
   persona: personaRecordSchema,
   created_at: z.string(),
@@ -133,7 +136,7 @@ export function renderDraft(
     return `## ${team.name} {team=${id}}\n${blurb ? `${blurb}\n` : ""}`;
   });
   if (prose.intro) sections.unshift(`## Intro {intro}\n${prose.intro}\n`);
-  return `${writeFrontMatter({ ...meta }, ["starting_order"])}\n${sections.join("\n")}`;
+  return `${writeFrontMatter({ ...meta }, ["starting_order", "power_score"])}\n${sections.join("\n")}`;
 }
 
 const HEADING = /^(#{1,2})\s+(.*?)\s*$/;

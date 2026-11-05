@@ -10,6 +10,7 @@ import {
 import { FORMAT } from "../src/front-matter.ts";
 import { loreSchema } from "../src/lore.ts";
 import { personaSchema } from "../src/persona.ts";
+import { punditSettingsSchema } from "../src/pundit-settings.ts";
 import { metaSchema } from "../src/ranking-file.ts";
 import { manifestSchema, SNAPSHOT_FORMAT } from "../src/snapshot.ts";
 import { workspaceSchema } from "../src/workspace.ts";
@@ -26,7 +27,7 @@ import { workspaceSchema } from "../src/workspace.ts";
  */
 const RECORDED = {
   FORMAT: {
-    1: "c169b438731104acc653fffd791bb371f64e3149358cc980b9fabed2239d79f5",
+    1: "3a85720232ac70d3b7d548351da457ec4d13fa61710d77a43eea19da0b843519",
   } as Record<number, string>,
   SNAPSHOT_FORMAT: {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",
@@ -45,7 +46,13 @@ test.each([
   [
     "FORMAT",
     FORMAT,
-    shapeHash(metaSchema, workspaceSchema, personaSchema, loreSchema),
+    shapeHash(
+      metaSchema,
+      workspaceSchema,
+      personaSchema,
+      loreSchema,
+      punditSettingsSchema,
+    ),
   ],
   ["SNAPSHOT_FORMAT", SNAPSHOT_FORMAT, shapeHash(manifestSchema)],
   [

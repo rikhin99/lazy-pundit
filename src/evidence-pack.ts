@@ -468,7 +468,7 @@ function recordOf(r: WLT): string {
 }
 
 /** Competition ranks, highest value first: tied teams share the better rank. */
-function ranks(values: [TeamId, number][]): Map<TeamId, number> {
+export function ranks(values: [TeamId, number][]): Map<TeamId, number> {
   return new Map(
     values.map(([t, v]) => [t, 1 + values.filter(([, o]) => o > v).length]),
   );

@@ -3,13 +3,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { check, draft, type Problem, publish } from "../src/index.ts";
-import { fearTheTurtle, rankingsDir } from "./support/workspace.ts";
+import { onStandings, rankingsDir } from "./support/workspace.ts";
 
 const GUS = "## Gus Bus {team=sleeper:1}\n";
 
 /** Drafts week 8, then lets the test edit the draft as the pundit would. */
 async function drafted() {
-  const ws = await fearTheTurtle(8);
+  const ws = await onStandings(8);
   const { path } = await draft(ws.dir, ws.deps);
   const edit = async (change: (text: string) => string) =>
     writeFile(path, change(await readFile(path, "utf8")));

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -74,6 +74,25 @@ seasons:
   const clipboard = recordingClipboard();
   const deps: Deps = { ...(await operator()), clipboard };
   return { dir, deps: atWeek(deps, week), clipboard };
+}
+
+/** Writes the Fear The Turtle pundit's settings file with `lines` of front matter. */
+export async function writeSettings(dir: string, lines: string) {
+  await mkdir(join(dir, "pundits/rikhin"), { recursive: true });
+  await writeFile(
+    join(dir, "pundits/rikhin/settings.md"),
+    `---\nformat: 1\n${lines}\n---\n`,
+  );
+}
+
+/**
+ * `fearTheTurtle` whose pundit settings ask for the standings method, for tests
+ * whose literals follow a team's place rather than the power score behind it.
+ */
+export async function onStandings(week: number) {
+  const ws = await fearTheTurtle(week);
+  await writeSettings(ws.dir, "method: standings");
+  return ws;
 }
 
 /**
