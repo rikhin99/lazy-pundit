@@ -12,6 +12,8 @@
 #   skip-rest       Skip the rest at the handles step
 #   key             enter a key (checked offline, so it can't be), cap 0.10
 #   another         every default, then a second league, cancelled at its name
+#   stakes          money at stake: buy-in 50, the default payouts, a $10 weekly high score
+#   family          a family league type, so the family league and Family persona are preselected
 #
 # It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
 # with the wizard's code. Look in that home for what the wizard wrote. A new
@@ -19,8 +21,8 @@
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another"
+if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another stakes family}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|stakes|family"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -112,6 +114,29 @@ if {$scenario eq "rename"} {
 }
 send "\r"
 
+need "What kind of league"
+if {$scenario eq "family"} { send $DOWN; after 200 }
+send "\r"
+need "nicknames each team"
+send "\r"
+
+need "bragging rights"
+if {$scenario eq "stakes"} {
+  send $DOWN; after 200; send "\r"
+  need "Buy-in"
+  send "50\r"
+  need "Payouts by place"
+  send "\r"
+  need "house rules"
+  send " "; after 200; send "\r"
+  need "its outcome"
+  send "\$10\r"
+} else {
+  send "\r"
+}
+need "family league"
+send "\r"
+
 need "starting order"
 if {$scenario eq "rename"} { send $DOWN; after 200 }
 send "\r"
@@ -126,6 +151,9 @@ if {$scenario eq "key"} {
 } else {
   send $DOWN; after 200; send "\r"
 }
+
+need "Which persona"
+send "\r"
 
 need "Set up another"
 if {$scenario eq "another"} {

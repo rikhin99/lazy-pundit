@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
-import type { League, TeamId } from "./league.ts";
+import type { League, Team, TeamId } from "./league.ts";
 import { normalize, type ValidatorInput, wholeWords } from "./validator.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -32,6 +32,14 @@ export interface Lore {
   /** Personal data it seems to hold, and text no section holds. */
   warnings: string[];
 }
+
+/**
+ * What naming a league's teams needs of it: its platform and each team's name
+ * and managers, which setup has before any snapshot is written.
+ */
+export type LeagueNames = Pick<League, "platform"> & {
+  teams: Pick<Team, "id" | "name" | "managers">[];
+};
 
 /** The names `validate` takes: what a team goes by, and what may be cited. */
 export type ValidatorNames = Pick<ValidatorInput, "nicknames" | "sections">;
@@ -325,7 +333,7 @@ export function refuseLocal(lore: Lore): void {
  */
 function teamsOf(
   s: LoreSection,
-  league: League,
+  league: LeagueNames,
   handles: Workspace["handles"],
 ): TeamId[] {
   const manager = handleOf(s);
@@ -351,7 +359,7 @@ function teamsOf(
  */
 export function validatorNames(
   lore: Lore,
-  league: League,
+  league: LeagueNames,
   handles: Workspace["handles"],
 ): ValidatorNames {
   const nicknames = Object.fromEntries(

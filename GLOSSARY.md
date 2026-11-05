@@ -156,6 +156,13 @@ One part of setting up a league, such as the lore, the persona or the Anthropic 
 **Setup checklist**:
 What `setup` shows for a league: each setup step and whether it is done, skipped or at its default.
 
+**Placeholder**:
+The file a skipped setup step still writes: comments saying how to fill it in, and nothing that loads as written. Skipped lore has no sections, skipped stakes are unrecorded, and a skipped persona is Broadcast.
+_Avoid_: Template
+
+**Hand edit**:
+A change the pundit made by hand to a file a setup step wrote. Re-running the step shows the diff against it and overwrites only on confirm.
+
 **Wizard**:
 `init`'s prompts: they ask for each setup step's answers in order and hand them to the library. Only the CLI has one.
 

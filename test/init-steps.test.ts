@@ -10,23 +10,33 @@ import { dirname, join } from "node:path";
 import { expect, test } from "vitest";
 import { loadCredentials } from "../src/config.ts";
 import {
+  buyInProblem,
+  COMMON_HOUSE_RULES,
   checkKey,
   checkLeague,
   type Deps,
   draft,
+  familyLeagueDefault,
+  familyLeagueLowers,
   handleProblem,
   METHOD_CHOICES,
+  nicknamesOf,
+  nicknamesProblem,
   operatorSteps,
+  outcomeProblem,
+  payoutsProblem,
+  personaDefault,
   proposedHandles,
+  proposedNicknames,
   SetupRefusal,
   setUpWorkspace,
   setupChecklist,
   spendCapProblem,
   spendCapWarning,
 } from "../src/index.ts";
-import { familyLeague } from "../src/league-file.ts";
+import { familyLeague, leagueFilePath } from "../src/league-file.ts";
 import { loadLore, refuseLocal } from "../src/lore.ts";
-import { personaPath } from "../src/persona.ts";
+import { loadPersona, personaPath } from "../src/persona.ts";
 import { powerScoreMethodSchema } from "../src/power-score.ts";
 import {
   DEFAULT_SETTINGS,
@@ -35,7 +45,13 @@ import {
 } from "../src/pundit-settings.ts";
 import { readWorkspace } from "../src/workspace.ts";
 import { scriptedLlm } from "./support/llm.ts";
-import { atWeek, FEAR_THE_TURTLE_ID, operator } from "./support/workspace.ts";
+import {
+  atWeek,
+  committed,
+  FEAR_THE_TURTLE_ID,
+  frontMatter,
+  operator,
+} from "./support/workspace.ts";
 
 async function setUp(
   extra: Partial<Parameters<typeof setUpWorkspace>[1]> = {},
@@ -122,18 +138,296 @@ test("managers sharing a slug get their own handles, a co-manager of two teams g
     { account: "sleeper:3", displayName: "拳王" },
   ];
   const handles = proposedHandles({
+    platform: "sleeper",
     leagueId: "1",
     name: "L",
     season: "2025",
     teams: 3,
     warnings: [],
     managers,
+    teamList: [],
   });
   expect(handles.map((h) => [h.handle, h.account])).toEqual([
     ["big-bo", "sleeper:1"],
     ["big-bo-2", "sleeper:2"],
     ["manager", "sleeper:3"],
   ]);
+});
+
+test("the lore step prefills each team's nicknames from its name and manager, under the manager's handle once the handles step linked one", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+
+  const unlinked = proposedNicknames(league);
+  expect(unlinked).toHaveLength(12);
+  expect(unlinked[2]).toEqual({
+    team: "sleeper:3",
+    teamName: "Bench Mob",
+    section: "{team=sleeper:3}",
+    nicknames: ["Bench Mob", "benchwarmer_bo"],
+  });
+
+  const linked = proposedNicknames(league, proposedHandles(league));
+  expect(linked[2]?.section).toBe("{manager=benchwarmer-bo}");
+});
+
+test("a prefilled nickname that would read as another team's is left out", () => {
+  const league = {
+    platform: "sleeper" as const,
+    leagueId: "1",
+    name: "L",
+    season: "2025",
+    teams: 2,
+    warnings: [],
+    managers: [
+      { account: "sleeper:1", displayName: "bo" },
+      { account: "sleeper:2", displayName: "Mob" },
+    ],
+    teamList: [
+      {
+        id: "sleeper:1" as const,
+        name: "Bench Mob",
+        managers: [{ account: "sleeper:1", displayName: "bo" }],
+      },
+      {
+        id: "sleeper:2" as const,
+        name: "Mob Squad",
+        managers: [{ account: "sleeper:2", displayName: "Mob" }],
+      },
+    ],
+  };
+  expect(proposedNicknames(league).map((t) => t.nicknames)).toEqual([
+    ["bo"],
+    ["Mob Squad"],
+  ]);
+});
+
+test("answered lore is written with its type and nicknames, loads with no warnings and reaches a draft", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const handles = proposedHandles(league);
+  const nicknames = proposedNicknames(league, handles).map((t) =>
+    t.team === "sleeper:3"
+      ? { ...t, nicknames: [...t.nicknames, "Mobsters"] }
+      : t,
+  );
+  const llm = scriptedLlm("not a usable reply");
+
+  const { ws, dir } = await setUp(
+    { handles, lore: { type: "family", nicknames }, key: "k" },
+    { ...deps, llm },
+  );
+
+  const lore = await loadLore(ws);
+  expect(lore.type).toBe("family");
+  expect(lore.warnings).toEqual([]);
+  expect(() => refuseLocal(lore)).not.toThrow();
+  expect(
+    lore.sections.find((s) => s.name === "manager:benchwarmer-bo"),
+  ).toMatchObject({
+    nicknames: ["Bench Mob", "benchwarmer_bo", "Mobsters"],
+  });
+  expect(await readFile(join(dir, "lore.md"), "utf8")).toMatch(
+    /sent to the LLM provider[\s\S]*transcripts delete/,
+  );
+  expect((await readWorkspace(dir)).setup.lore).toBe("done");
+
+  const result = await draft(dir, { ...deps, llm });
+  expect(llm.requests[0]?.prompt).toContain("Mobsters");
+  expect(result.warnings).toEqual([]);
+});
+
+test("a team left with no nicknames keeps its section, with a comment saying whose it is", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const nicknames = proposedNicknames(league).map((t) =>
+    t.team === "sleeper:1" ? { ...t, nicknames: [] } : t,
+  );
+  const { ws, dir } = await setUp({ lore: { type: "work", nicknames } }, deps);
+  const text = await readFile(join(dir, "lore.md"), "utf8");
+  expect(text).toContain(
+    "## {team=sleeper:1}\n<!-- Gus Bus, gridiron_gus -->\n",
+  );
+  expect(text).toContain(
+    "## {team=sleeper:2}\nnicknames: Wendy's Wire, waiver_wendy\n",
+  );
+  const lore = await loadLore(ws);
+  expect(lore.warnings).toEqual([]);
+  expect(
+    lore.sections.find((s) => s.name === "team:sleeper:1")?.nicknames,
+  ).toEqual([]);
+});
+
+test("typed nicknames are split on commas, trimmed, with blanks dropped", () => {
+  expect(nicknamesOf(" Mob, Bo ,, The Boss ")).toEqual([
+    "Mob",
+    "Bo",
+    "The Boss",
+  ]);
+  expect(nicknamesOf("  ")).toEqual([]);
+});
+
+test("a typed nickname that clashes with another team's is a problem, and setUpWorkspace refuses it before writing", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const nicknames = proposedNicknames(league).map((t) =>
+    t.team === "sleeper:1" ? { ...t, nicknames: ["Bench Mob"] } : t,
+  );
+  expect(nicknamesProblem(league, [], nicknames)).toMatch(/Bench Mob/);
+  expect(
+    nicknamesProblem(league, [], proposedNicknames(league)),
+  ).toBeUndefined();
+  await expect(
+    setUpWorkspace(deps, {
+      punditName: "Rikhin",
+      league,
+      lore: { type: "friends", nicknames },
+    }),
+  ).rejects.toThrow(SetupRefusal);
+  expect(await readdir(deps.workspacesDir).catch(() => [])).toEqual([]);
+});
+
+test("a No at the stakes question writes stakes: none, and a skipped stakes step writes no stakes record", async () => {
+  const { ws } = await setUp({
+    stakes: { stakes: "none", familyLeague: false },
+  });
+  const answered = frontMatter(await readFile(leagueFilePath(ws), "utf8"));
+  expect(answered).toMatchObject({ league: 1, season: "2025", stakes: "none" });
+  expect((await readWorkspace(ws.dir)).setup.stakes).toBe("done");
+
+  const skipped = await setUp();
+  const unrecorded = frontMatter(
+    await readFile(leagueFilePath(skipped.ws), "utf8"),
+  );
+  expect(Object.keys(unrecorded).sort()).toEqual([
+    "family-league",
+    "league",
+    "season",
+  ]);
+  expect(skipped.ws.setup.stakes).toBe("skipped");
+});
+
+test("money at stake writes the buy-in, payouts by place and each picked house rule with its outcome", async () => {
+  const [high, , , last] = COMMON_HOUSE_RULES;
+  if (!high || !last) throw new Error("four common house rules");
+  const { ws } = await setUp({
+    stakes: {
+      familyLeague: false,
+      stakes: {
+        buyIn: 50,
+        payouts: ["70%", "$100"],
+        houseRules: [
+          { rule: high, outcome: "$10" },
+          { rule: last, outcome: "Wears the jersey" },
+        ],
+      },
+    },
+  });
+  const data = frontMatter(await readFile(leagueFilePath(ws), "utf8"));
+  expect(data).toMatchObject({
+    "buy-in": "$50",
+    payouts: ["70%", "$100"],
+    "house-rules": [
+      {
+        id: "high-score",
+        name: "Weekly high score",
+        trigger: "high-score",
+        per: "week",
+        outcome: "$10",
+      },
+      {
+        id: "last-place",
+        name: "Last place",
+        trigger: "last-place",
+        per: "season",
+        outcome: "Wears the jersey",
+      },
+    ],
+  });
+  expect(data.stakes).toBeUndefined();
+  expect(await familyLeague(ws)).toBe(false);
+});
+
+test("the family league is preselected on for a family league type, and an answer of on is written", async () => {
+  expect(familyLeagueDefault("family")).toBe(true);
+  for (const type of ["friends", "work", "other", undefined] as const) {
+    expect(familyLeagueDefault(type)).toBe(false);
+  }
+  const { ws } = await setUp({
+    stakes: { stakes: "none", familyLeague: true },
+  });
+  expect(await familyLeague(ws)).toBe(true);
+});
+
+test("a buy-in is dollars, a payout is dollars or a share of the pot, and an outcome is written down", () => {
+  expect(buyInProblem("50")).toBeUndefined();
+  for (const bad of ["", "-5", "$50", "fifty"]) {
+    expect(buyInProblem(bad)).toMatch(/dollars/);
+  }
+  expect(payoutsProblem("100%")).toBeUndefined();
+  expect(payoutsProblem("60%, $100, 20%")).toBeUndefined();
+  expect(payoutsProblem("60%, abc")).toMatch(/abc/);
+  expect(payoutsProblem("80%, 30%")).toMatch(/100%/);
+  expect(payoutsProblem("")).toMatch(/place/);
+  expect(outcomeProblem("$10")).toBeUndefined();
+  expect(outcomeProblem("5 FAAB")).toBeUndefined();
+  expect(outcomeProblem("Buys the beer")).toBeUndefined();
+  expect(outcomeProblem(" ")).toMatch(/outcome/);
+  expect(outcomeProblem("a {local} fine")).toMatch(/brace/);
+});
+
+test("the persona step preselects Family for a family league, Banter for friends and Broadcast otherwise", () => {
+  expect(personaDefault("family")).toBe("family");
+  expect(personaDefault("friends")).toBe("banter");
+  for (const type of ["work", "other", undefined] as const) {
+    expect(personaDefault(type)).toBe("broadcast");
+  }
+});
+
+test("the persona step says what a family league lowers in a preset, and nothing for one it leaves be", () => {
+  expect(familyLeagueLowers("roast", true)).toMatch(/Roast.*swearing.*teasing/);
+  expect(familyLeagueLowers("banter", true)).toMatch(/Banter.*swearing/);
+  expect(familyLeagueLowers("banter", true)).not.toMatch(/teasing/);
+  expect(familyLeagueLowers("family", true)).toBeUndefined();
+  expect(familyLeagueLowers("broadcast", true)).toBeUndefined();
+  expect(familyLeagueLowers("roast", false)).toBeUndefined();
+});
+
+test("a family league type, then accepting the preselections, gives a family league with the Family persona", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const type = "family";
+  const { ws } = await setUp(
+    {
+      lore: { type, nicknames: proposedNicknames(league) },
+      stakes: { stakes: "none", familyLeague: familyLeagueDefault(type) },
+      persona: personaDefault(type),
+    },
+    deps,
+  );
+  const lore = await loadLore(ws);
+  const loaded = await loadPersona(ws, await committed(8), lore);
+  expect(await familyLeague(ws)).toBe(true);
+  expect(loaded.persona.preset).toBe("family");
+  expect(loaded.warnings).toEqual([]);
+  expect(ws.setup.persona).toBe("done");
+});
+
+test("a picked persona loads with its preset and no style note, and its file explains the overrides in comments", async () => {
+  const { ws } = await setUp({ persona: "roast" });
+  const text = await readFile(personaPath(ws), "utf8");
+  expect(text).toMatch(/^# .*swearing/m);
+  const loaded = await loadPersona(ws, await committed(8), await loadLore(ws));
+  expect(loaded.persona).toMatchObject({ preset: "roast", styleNote: "" });
+  expect(loaded.warnings).toEqual([]);
+});
+
+test("a skipped persona step writes a placeholder that loads as Broadcast with no warnings", async () => {
+  const { ws } = await setUp();
+  const loaded = await loadPersona(ws, await committed(8), await loadLore(ws));
+  expect(loaded.persona).toMatchObject({ preset: "broadcast", styleNote: "" });
+  expect(loaded.warnings).toEqual([]);
+  expect(ws.setup.persona).toBe("skipped");
 });
 
 test("a renamed handle has to fit a lore heading and be free", () => {
@@ -312,12 +606,16 @@ test("the setup checklist matches what was done and skipped", async () => {
 
 test("a checklist tells the accepted default method from a skipped one, and skipped steps from done", async () => {
   const deps = atWeek(await operator(), 8);
-  const { dir } = await setUp({ method: "ramped-blend" }, deps);
+  const { dir } = await setUp(
+    { method: "ramped-blend", persona: "broadcast" },
+    deps,
+  );
   expect(statuses(await setupChecklist(deps, dir))).toMatchObject({
     handles: "skipped",
     method: "default",
     key: "skipped",
     cap: "default",
+    persona: "default",
   });
 
   const other = atWeek(await operator(), 8);

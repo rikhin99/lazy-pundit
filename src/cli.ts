@@ -6,6 +6,7 @@ import {
   intro,
   isCancel,
   log,
+  multiselect,
   outro,
   password,
   select,
@@ -13,7 +14,9 @@ import {
 } from "@clack/prompts";
 import { Command } from "@commander-js/extra-typings";
 import {
+  buyInProblem,
   type ChecklistItem,
+  COMMON_HOUSE_RULES,
   ConfigFileError,
   check,
   checkKey,
@@ -27,32 +30,52 @@ import {
   doctor,
   draft,
   FetchError,
+  familyLeagueDefault,
+  familyLeagueLowers,
   findWorkspace,
   HANDLES_SKIPPED,
   handleProblem,
   KEY_EXPLANATION,
   KEY_SKIPPED,
+  LEAGUE_TYPE_CHOICES,
   type LeagueCheck,
+  type LeagueType,
+  LORE_NOTICE,
+  type LoreAnswers,
   type ManagerHandle,
   METHOD_CHOICES,
+  nicknamesOf,
+  nicknamesProblem,
   operatorSteps,
+  outcomeProblem,
   type PersonaRecord,
   type PlatformChoice,
   type PowerScoreMethod,
+  PRESETS,
+  type PresetName,
   type Problem,
+  payoutsOf,
+  payoutsProblem,
+  personaDefault,
   platformStop,
   proposedHandles,
+  proposedNicknames,
   publish,
   punditNameProblem,
   refresh,
   rerunNotBuilt,
   SetupRefusal,
+  STAKES_QUESTION,
+  type StakesAnswers,
+  type StakesFields,
   setUpWorkspace,
   setupChecklist,
   sleeperLeagues,
   spendCapProblem,
   spendCapWarning,
   systemDeps,
+  type TeamNicknames,
+  WINNER_TAKES_ALL,
   WorkspaceFileError,
 } from "./index.ts";
 
@@ -408,11 +431,11 @@ async function askMethod(): Promise<{
 async function askKeyAndCap(
   deps: Deps,
   skipRest: boolean,
-): Promise<{ key?: string; spendCap?: number }> {
+): Promise<{ key?: string; spendCap?: number; skipRest: boolean }> {
   const steps = await operatorSteps(deps);
   if (skipRest) {
     if (steps.askKey) log.warn(KEY_SKIPPED);
-    return {};
+    return { skipRest };
   }
   let key: string | undefined;
   if (steps.askKey) {
@@ -426,7 +449,7 @@ async function askKeyAndCap(
       );
       if (picked !== "key") {
         log.warn(KEY_SKIPPED);
-        return {};
+        return { skipRest: picked === SKIP_REST };
       }
       const typed = answered(
         await password({
@@ -443,7 +466,9 @@ async function askKeyAndCap(
       }
     }
   }
-  if (!steps.askCap) return key === undefined ? {} : { key };
+  if (!steps.askCap) {
+    return key === undefined ? { skipRest: false } : { key, skipRest: false };
+  }
   const spendCap = Number(
     answered(
       await text({
@@ -456,7 +481,158 @@ async function askKeyAndCap(
   );
   const tooSmall = await spendCapWarning(deps, spendCap);
   if (tooSmall) log.warn(tooSmall);
-  return { ...(key === undefined ? {} : { key }), spendCap };
+  return { ...(key === undefined ? {} : { key }), spendCap, skipRest: false };
+}
+
+/** Step 4: the league type, then each team's nicknames, accepted as a list or changed a team at a time. */
+async function askLore(
+  league: LeagueCheck,
+  handles: ManagerHandle[],
+): Promise<{ lore?: LoreAnswers; skipRest: boolean }> {
+  log.info(LORE_NOTICE);
+  const type = answered(
+    await select<string>({
+      message: "What kind of league is this?",
+      options: [...LEAGUE_TYPE_CHOICES, ...SKIPS],
+    }),
+  );
+  if (type === SKIP || type === SKIP_REST) {
+    return { skipRest: type === SKIP_REST };
+  }
+  const withNicknames = (all: TeamNicknames[], i: number, typed: string) =>
+    all.map((t, j) => (j === i ? { ...t, nicknames: nicknamesOf(typed) } : t));
+  let nicknames = proposedNicknames(league, handles);
+  for (;;) {
+    const picked = answered(
+      await select({
+        message:
+          "The nicknames each team goes by. Pick a team to change its nicknames.",
+        options: [
+          { value: "accept", label: "Accept these nicknames" },
+          ...nicknames.map((t) => ({
+            value: t.team,
+            label: `${t.teamName}: ${t.nicknames.join(", ") || "none"}`,
+          })),
+        ],
+      }),
+    );
+    if (picked === "accept") {
+      return { lore: { type: type as LeagueType, nicknames }, skipRest: false };
+    }
+    const i = nicknames.findIndex((t) => t.team === picked);
+    const typed = answered(
+      await text({
+        message: `Nicknames for ${nicknames[i]?.teamName}, separated by commas`,
+        initialValue: nicknames[i]?.nicknames.join(", ") ?? "",
+        validate: (v) =>
+          nicknamesProblem(
+            league,
+            handles,
+            withNicknames(nicknames, i, v ?? ""),
+          ),
+      }),
+    );
+    nicknames = withNicknames(nicknames, i, typed);
+  }
+}
+
+/** Step 5: the stakes, No on the first key, then the family league. */
+async function askStakes(
+  type: LeagueType | undefined,
+): Promise<{ stakes?: StakesAnswers; skipRest: boolean }> {
+  const atStake = answered(
+    await select<string>({
+      message: STAKES_QUESTION,
+      options: [
+        { value: "no", label: "No, bragging rights only" },
+        { value: "yes", label: "Yes" },
+        ...SKIPS,
+      ],
+    }),
+  );
+  if (atStake === SKIP || atStake === SKIP_REST) {
+    return { skipRest: atStake === SKIP_REST };
+  }
+  let stakes: StakesAnswers["stakes"] = "none";
+  if (atStake === "yes") {
+    const buyIn = Number(
+      answered(
+        await text({
+          message: "Buy-in per team, in US dollars",
+          validate: (v) => buyInProblem(v ?? ""),
+        }),
+      ).trim(),
+    );
+    const payouts = payoutsOf(
+      answered(
+        await text({
+          message:
+            "Payouts by place, first place first: dollars such as $100, or shares of the pot such as 70%",
+          initialValue: WINNER_TAKES_ALL.join(", "),
+          validate: (v) => payoutsProblem(v ?? ""),
+        }),
+      ),
+    );
+    const picked = answered(
+      await multiselect<string>({
+        message:
+          "Which of these house rules does the league play? (space picks)",
+        options: COMMON_HOUSE_RULES.map((r) => ({
+          value: r.id,
+          label: r.name,
+        })),
+        required: false,
+      }),
+    );
+    const houseRules: StakesFields["houseRules"] = [];
+    for (const rule of COMMON_HOUSE_RULES.filter((r) =>
+      picked.includes(r.id),
+    )) {
+      const outcome = answered(
+        await text({
+          message: `${rule.name}: its outcome, in dollars such as $10, FAAB such as 5 FAAB, or words`,
+          validate: (v) => outcomeProblem(v ?? ""),
+        }),
+      ).trim();
+      houseRules.push({ rule, outcome });
+    }
+    stakes = { buyIn, payouts, houseRules };
+  }
+  const familyLeague = answered(
+    await confirm({
+      message:
+        "Is this a family league, read by people of any age? Every persona then stays clean.",
+      initialValue: familyLeagueDefault(type),
+    }),
+  );
+  return { stakes: { stakes, familyLeague }, skipRest: false };
+}
+
+/** Step 8: the persona, preselected from the league type, with each preset sample. */
+async function askPersona(
+  type: LeagueType | undefined,
+  familyLeague: boolean,
+): Promise<PresetName | undefined> {
+  const picked = answered(
+    await select<string>({
+      message: "Which persona should the prose be written in?",
+      initialValue: personaDefault(type),
+      options: [
+        ...Object.entries(PRESETS).map(([value, p]) => ({
+          value,
+          label: p.name,
+          hint: [
+            familyLeagueLowers(value as PresetName, familyLeague),
+            p.sample,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        })),
+        { value: SKIP, label: "Skip" },
+      ],
+    }),
+  );
+  return picked === SKIP ? undefined : (picked as PresetName);
 }
 
 /** One league through every step, or false if the platform stops setup. */
@@ -494,13 +670,25 @@ async function setUpLeague(deps: Deps): Promise<boolean> {
   const where = { punditName, league, ...(dir ? { dir } : {}) };
   await checkWorkspace(deps, where);
   const handles = await askHandles(league);
-  const method = handles.skipRest ? { skipRest: true } : await askMethod();
-  const person = await askKeyAndCap(deps, method.skipRest);
+  const lore = handles.skipRest
+    ? { skipRest: true }
+    : await askLore(league, handles.handles ?? []);
+  const type = "lore" in lore ? lore.lore?.type : undefined;
+  const stakes = lore.skipRest ? { skipRest: true } : await askStakes(type);
+  const staked = "stakes" in stakes ? stakes.stakes : undefined;
+  const method = stakes.skipRest ? { skipRest: true } : await askMethod();
+  const { skipRest, ...person } = await askKeyAndCap(deps, method.skipRest);
+  const persona = skipRest
+    ? undefined
+    : await askPersona(type, staked?.familyLeague ?? false);
   const workspace = await setUpWorkspace(deps, {
     ...where,
     ...(handles.handles ? { handles: handles.handles } : {}),
+    ...("lore" in lore && lore.lore ? { lore: lore.lore } : {}),
+    ...(staked ? { stakes: staked } : {}),
     ...("method" in method && method.method ? { method: method.method } : {}),
     ...person,
+    ...(persona ? { persona } : {}),
   });
   leaguesReady++;
   log.success(

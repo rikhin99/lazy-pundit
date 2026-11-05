@@ -36,33 +36,54 @@ export { type DraftData, draftData, type StatSet } from "./draft-data.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 export {
+  buyInProblem,
   type ChecklistItem,
+  COMMON_HOUSE_RULES,
+  type CommonHouseRule,
   checkKey,
   checkLeague,
   checkWorkspace,
   defaultPunditName,
+  familyLeagueDefault,
+  familyLeagueLowers,
   HANDLES_SKIPPED,
   handleProblem,
   KEY_EXPLANATION,
   KEY_SKIPPED,
+  LEAGUE_TYPE_CHOICES,
   type LeagueCheck,
   type LeagueChoice,
   type LeagueManager,
+  type LeagueTeam,
+  LORE_NOTICE,
+  type LoreAnswers,
   type ManagerHandle,
   METHOD_CHOICES,
+  nicknamesOf,
+  nicknamesProblem,
   type OperatorSteps,
   operatorSteps,
+  outcomeProblem,
   type PlatformChoice,
+  payoutsOf,
+  payoutsProblem,
+  personaDefault,
   platformStop,
   proposedHandles,
+  proposedNicknames,
   punditNameProblem,
   rerunNotBuilt,
   SetupRefusal,
+  STAKES_QUESTION,
+  type StakesAnswers,
+  type StakesFields,
   setUpWorkspace,
   setupChecklist,
   sleeperLeagues,
   spendCapProblem,
   spendCapWarning,
+  type TeamNicknames,
+  WINNER_TAKES_ALL,
 } from "./init.ts";
 export type {
   Claim,
@@ -86,6 +107,7 @@ export type {
 } from "./league.ts";
 export { BENCH, isStarter } from "./league.ts";
 export { bestLineupPoints } from "./lineup.ts";
+export type { LeagueType } from "./lore.ts";
 export {
   type Persona,
   type PersonaRecord,

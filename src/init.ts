@@ -11,10 +11,16 @@ import {
 } from "./config.ts";
 import type { Deps } from "./deps.ts";
 import { FORMAT, WorkspaceFileError } from "./front-matter.ts";
-import type { LeagueSettings } from "./league.ts";
+import type { LeagueSettings, TeamId } from "./league.ts";
 import { leagueFilePath } from "./league-file.ts";
 import { MAX_TOKENS } from "./llm-call.ts";
-import { personaPath } from "./persona.ts";
+import {
+  type LeagueNames,
+  type LeagueType,
+  type Lore,
+  validatorNames,
+} from "./lore.ts";
+import { PRESETS, type PresetName, personaPath } from "./persona.ts";
 import type { PowerScoreMethod } from "./power-score.ts";
 import { ceilingCost, priceOf, usd } from "./prices.ts";
 import { DEFAULT_SETTINGS, punditSettingsPath } from "./pundit-settings.ts";
@@ -24,7 +30,7 @@ import {
   sleeperLeagueKind,
   sleeperUserLeagues,
 } from "./sleeper/setup.ts";
-import { FetchError } from "./snapshot.ts";
+import { FetchError, type Platform } from "./snapshot.ts";
 import {
   type LeagueStep,
   punditDir,
@@ -39,9 +45,19 @@ export type { LeagueChoice };
 
 /** A league the league data step has fetched live and accepted. */
 export interface LeagueCheck extends LeagueChoice {
+  platform: Platform;
   /** What this version doesn't model about the league, which is still accepted. */
   warnings: string[];
   /** Each team's managers, team by team: one managing two teams is listed twice. */
+  managers: LeagueManager[];
+  /** Each team with its name and managers, which the lore step's prefill reads. */
+  teamList: LeagueTeam[];
+}
+
+/** A team as a league's data names it. */
+export interface LeagueTeam {
+  id: TeamId;
+  name: string;
   managers: LeagueManager[];
 }
 
@@ -124,18 +140,23 @@ export async function checkLeague(
       { cause: err },
     );
   });
+  const teamList = league.teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    managers: t.managers.map((m) => ({
+      account: `${league.platform}:${m.accountId}`,
+      displayName: m.displayName,
+    })),
+  }));
   return {
+    platform: league.platform,
     leagueId: league.leagueId,
     name: league.name,
     season: league.season,
     teams: league.teams.length,
     warnings: leagueWarnings(league.settings),
-    managers: league.teams
-      .flatMap((t) => t.managers)
-      .map((m) => ({
-        account: `${league.platform}:${m.accountId}`,
-        displayName: m.displayName,
-      })),
+    managers: teamList.flatMap((t) => t.managers),
+    teamList,
   };
 }
 
@@ -174,6 +195,359 @@ export function handleProblem(
     return `Another manager already has the handle ${handle}.`;
   }
   return undefined;
+}
+
+/** The lore step's league types, the first preselected. */
+export const LEAGUE_TYPE_CHOICES: { value: LeagueType; label: string }[] = [
+  { value: "friends", label: "Friends" },
+  { value: "family", label: "Family" },
+  { value: "work", label: "Work" },
+  { value: "other", label: "Other" },
+];
+
+/** Said at the lore step, before anything is asked, and kept atop `lore.md`. */
+export const LORE_NOTICE =
+  "Lore is sent to the LLM provider with each draft, and kept in this workspace's LLM transcripts until you run lazy-pundit transcripts delete. Don't write anything personal: no addresses, phone numbers, emails, birthdays or health.";
+
+/** One team's nicknames at the lore step, and the lore section they go under. */
+export interface TeamNicknames {
+  team: TeamId;
+  teamName: string;
+  /**
+   * The section's heading: `{manager=<handle>}` when the handles step linked
+   * the team's one manager and they run no other team, else `{team=<id>}`.
+   */
+  section: string;
+  nicknames: string[];
+}
+
+/** The lore step's answers. */
+export interface LoreAnswers {
+  type: LeagueType;
+  nicknames: TeamNicknames[];
+}
+
+/**
+ * The lore step's prefill: each team's name and its managers' display names,
+ * leaving out any that would read as another team's, so accepting it never
+ * makes a nickname clash.
+ */
+export function proposedNicknames(
+  league: LeagueCheck,
+  handles: ManagerHandle[] = [],
+): TeamNicknames[] {
+  const proposed: TeamNicknames[] = league.teamList.map((t) => ({
+    team: t.id,
+    teamName: t.name,
+    section: sectionFor(t, league, handles),
+    nicknames: [],
+  }));
+  for (const [i, t] of league.teamList.entries()) {
+    const entry = proposed[i];
+    if (!entry) continue;
+    const names = [t.name, ...t.managers.map((m) => m.displayName)];
+    for (const name of new Set(names)) {
+      if (nicknameShapeProblem(name)) continue;
+      entry.nicknames.push(name);
+      if (nicknamesProblem(league, handles, proposed)) entry.nicknames.pop();
+    }
+  }
+  return proposed;
+}
+
+function sectionFor(
+  team: LeagueTeam,
+  league: LeagueCheck,
+  handles: ManagerHandle[],
+): string {
+  const [only, ...more] = team.managers;
+  const handle = handles.find((h) => h.account === only?.account);
+  const teamsRun = league.teamList.filter((t) =>
+    t.managers.some((m) => m.account === handle?.account),
+  );
+  return handle && more.length === 0 && teamsRun.length === 1
+    ? `{manager=${handle.handle}}`
+    : `{team=${team.id}}`;
+}
+
+/** A team's typed nicknames, separated by commas. */
+export function nicknamesOf(typed: string): string[] {
+  return typed
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
+
+function nicknameShapeProblem(name: string): string | undefined {
+  if (/[{},]/.test(name)) {
+    return `"${name}" can't be a nickname: it holds a brace or a comma`;
+  }
+  return undefined;
+}
+
+/**
+ * What's wrong with the lore step's nicknames, or undefined: one that holds a
+ * brace or comma, or one that reads as two teams' names, as `lore.md` would
+ * refuse to load.
+ */
+export function nicknamesProblem(
+  league: LeagueCheck,
+  handles: ManagerHandle[],
+  nicknames: TeamNicknames[],
+): string | undefined {
+  for (const t of nicknames) {
+    for (const n of t.nicknames) {
+      const problem = nicknameShapeProblem(n);
+      if (problem) return problem;
+    }
+  }
+  const lore: Lore = {
+    sections: nicknames.map((t) => ({
+      name: t.section.replace(/^\{(manager|team)=(.*)\}$/, "$1:$2"),
+      line: 0,
+      nicknames: t.nicknames,
+      entries: [],
+    })),
+    localLines: [],
+    warnings: [],
+  };
+  try {
+    validatorNames(lore, leagueNames(league), linksOf(handles));
+  } catch (err) {
+    if (!(err instanceof WorkspaceFileError)) throw err;
+    return err.message.replace(/^lore\.md: /, "");
+  }
+  return undefined;
+}
+
+/** A checked league as lore's names read it. */
+function leagueNames(league: LeagueCheck): LeagueNames {
+  const accountId = (account: string) =>
+    account.slice(`${league.platform}:`.length);
+  return {
+    platform: league.platform,
+    teams: league.teamList.map((t) => ({
+      id: t.id,
+      name: t.name,
+      managers: t.managers.map((m) => ({
+        accountId: accountId(m.account),
+        displayName: m.displayName,
+      })),
+    })),
+  };
+}
+
+/** The handles as `workspace.md`'s `handles:` links them. */
+function linksOf(handles: ManagerHandle[]): Workspace["handles"] {
+  return Object.fromEntries(handles.map((h) => [h.handle, [h.account]]));
+}
+
+/** A name kept safe inside a Markdown comment: no tag and no comment end. */
+function commentSafe(name: string): string {
+  return name.replace(/[{}]/g, "").replace(/--+/g, "-");
+}
+
+const LORE_COMMENT = `<!--
+${LORE_NOTICE}
+Lore is context for the prose, and the data still comes from the league.
+
+Sections look like this:
+
+## League
+type: friends
+
+## {manager=their-handle}
+nicknames: Bo, The Boss
+- Hasn't won a title since 2019.
+-->`;
+
+/** The answered lore step's \`lore.md\`. */
+function loreText(answers: LoreAnswers, league: LeagueCheck): string {
+  const sections = answers.nicknames.map((t) => {
+    const team = league.teamList.find((x) => x.id === t.team);
+    const who = [
+      t.teamName,
+      ...(team?.managers.map((m) => m.displayName) ?? []),
+    ].map(commentSafe);
+    // With no nicknames, only a comment says whose section it is.
+    return [
+      `## ${t.section}`,
+      t.nicknames.length > 0
+        ? `nicknames: ${t.nicknames.join(", ")}`
+        : `<!-- ${who.join(", ")} -->`,
+    ].join("\n");
+  });
+  return `---
+lore: 1
+---
+
+# Lore
+
+${LORE_COMMENT}
+
+## League
+type: ${answers.type}
+
+${sections.join("\n\n")}
+`;
+}
+
+/** A house rule the stakes step offers, with the trigger the tool can work out. */
+export interface CommonHouseRule {
+  id: string;
+  name: string;
+  trigger: string;
+  per: "week" | "season";
+}
+
+/** The stakes step's checklist of common house rules, each asked for its outcome. */
+export const COMMON_HOUSE_RULES: CommonHouseRule[] = [
+  {
+    id: "high-score",
+    name: "Weekly high score",
+    trigger: "high-score",
+    per: "week",
+  },
+  {
+    id: "low-score",
+    name: "Weekly low score",
+    trigger: "low-score",
+    per: "week",
+  },
+  {
+    id: "most-bench-points",
+    name: "Most points left on the bench in a week",
+    trigger: "most-bench-points",
+    per: "week",
+  },
+  {
+    id: "last-place",
+    name: "Last place",
+    trigger: "last-place",
+    per: "season",
+  },
+];
+
+/** The stakes step's structured fields, when something besides bragging rights is at stake. */
+export interface StakesFields {
+  /** Dollars per team. */
+  buyIn: number;
+  /** By place, first place first: `$N` or `N%` of the pot. */
+  payouts: string[];
+  houseRules: { rule: CommonHouseRule; outcome: string }[];
+}
+
+/** The stakes and family league step's answers. */
+export interface StakesAnswers {
+  /** `none` only on an explicit No at "Is anything at stake besides bragging rights?". */
+  stakes: "none" | StakesFields;
+  familyLeague: boolean;
+}
+
+/** The asking text of the stakes step's first question, default No. */
+export const STAKES_QUESTION = "Is anything at stake besides bragging rights?";
+
+/** The payouts when the pundit takes the default: winner takes all. */
+export const WINNER_TAKES_ALL = ["100%"];
+
+/** Whether the family league starts on: only for a family league type. */
+export function familyLeagueDefault(type: LeagueType | undefined): boolean {
+  return type === "family";
+}
+
+const DOLLARS = /^\d+(?:\.\d{1,2})?$/;
+
+/** What's wrong with a typed buy-in, or undefined. */
+export function buyInProblem(typed: string): string | undefined {
+  return DOLLARS.test(typed.trim())
+    ? undefined
+    : "The buy-in is a number of dollars per team, such as 50.";
+}
+
+/** The typed payouts, one per place, first place first. */
+export function payoutsOf(typed: string): string[] {
+  return typed
+    .split(",")
+    .map((p) => p.trim().replace(/\s+/g, ""))
+    .filter(Boolean);
+}
+
+/**
+ * What's wrong with typed payouts, or undefined: each place's payout is `$N`
+ * or `N%` of the pot, and the shares come to 100% at most.
+ */
+export function payoutsProblem(typed: string): string | undefined {
+  const payouts = payoutsOf(typed);
+  if (payouts.length === 0) {
+    return "Give each place's payout, first place first, such as 70%, 30%.";
+  }
+  let shares = 0;
+  for (const p of payouts) {
+    const share = /^(\d+(?:\.\d+)?)%$/.exec(p)?.[1];
+    if (share !== undefined) shares += Number(share);
+    else if (!/^\$\d+(?:\.\d{1,2})?$/.test(p)) {
+      return `"${p}" isn't a payout: give dollars, such as $100, or a share of the pot, such as 70%.`;
+    }
+  }
+  return shares > 100
+    ? `The shares come to ${shares}%, more than the whole pot (100%).`
+    : undefined;
+}
+
+/** What's wrong with a typed house rule outcome, or undefined. */
+export function outcomeProblem(typed: string): string | undefined {
+  if (!typed.trim()) {
+    return "Write the outcome: dollars such as $10, FAAB such as 5 FAAB, or anything in words.";
+  }
+  if (/[{}]/.test(typed)) return "An outcome can't hold a brace.";
+  return undefined;
+}
+
+/** The answered stakes step's `league.md`, or its placeholder when skipped. */
+function leagueText(
+  season: string,
+  answers: StakesAnswers | undefined,
+): string {
+  const stakes = answers?.stakes;
+  const fields =
+    stakes === undefined
+      ? `# Stakes aren't recorded. Write stakes: none for bragging rights only, or
+# buy-in: $50, payouts: ["70%", "30%"] and house-rules for what's played for.
+`
+      : stringify(
+          stakes === "none"
+            ? { stakes: "none" }
+            : {
+                "buy-in": `$${stakes.buyIn}`,
+                payouts: stakes.payouts,
+                ...(stakes.houseRules.length === 0
+                  ? {}
+                  : {
+                      "house-rules": stakes.houseRules.map(
+                        ({ rule, outcome }) => ({
+                          id: rule.id,
+                          name: rule.name,
+                          trigger: rule.trigger,
+                          per: rule.per,
+                          outcome: outcome.trim(),
+                        }),
+                      ),
+                    }),
+              },
+        );
+  return `---
+league: 1
+season: "${season}"
+# On keeps every persona clean, whatever it asks for.
+family-league: ${answers?.familyLeague ? "on" : "off"}
+${fields}---
+
+<!--
+This season's stakes belong here, not in lore. Like lore, what's written here is
+sent to the LLM provider, so don't write anything personal, and nothing here
+records who has paid.
+-->
+`;
 }
 
 /** Lowercase letters, digits and dashes, from any name. */
@@ -286,35 +660,51 @@ lore: 1
 
 # Lore
 
-<!--
-Everything outside a comment like this one is sent to the LLM provider with each
-draft, so don't write anything personal: no addresses, phone numbers, birthdays
-or health. Lore is context for the prose, and the data still comes from the league.
-
-Sections look like this:
-
-## League
-type: friends
-
-## {manager=their-handle}
-nicknames: Bo, The Boss
-- Hasn't won a title since 2019.
--->
+${LORE_COMMENT}
 `;
 
-const LEAGUE_PLACEHOLDER = `---
-league: 1
-# Set this to on to keep every persona clean, whatever it asks for.
-family-league: off
----
-`;
-
-const PERSONA_PLACEHOLDER = `---
+/**
+ * `persona.md` with this preset. Its explanation goes in YAML comments, since
+ * all of the body is the style note, sent with every draft.
+ */
+function personaText(preset: PresetName): string {
+  return `---
 format: ${FORMAT}
-# broadcast, family, banter or roast. Anything below the front matter is your style note.
-preset: broadcast
+# The preset: broadcast, family, banter or roast. Any of its controls can be
+# overridden here: swearing (off, mild, on), teasing (none, light, roast),
+# formality (formal, casual, unhinged), shape (prose, bullets), length (2-3,
+# or one number of sentences) and intro (on, off).
+# Anything written below the front matter is your style note, sent with every draft.
+preset: ${preset}
 ---
 `;
+}
+
+/** The persona step's preselection, from the lore's league type. */
+export function personaDefault(type: LeagueType | undefined): PresetName {
+  if (type === "family") return "family";
+  if (type === "friends") return "banter";
+  return "broadcast";
+}
+
+/**
+ * What the family league lowers in a preset, said at the persona step, or
+ * undefined when it lowers nothing: swearing to off, teasing to light.
+ */
+export function familyLeagueLowers(
+  preset: PresetName,
+  familyLeague: boolean,
+): string | undefined {
+  if (!familyLeague) return undefined;
+  const { name, swearing, teasing } = PRESETS[preset];
+  const lowered = [
+    ...(swearing === "off" ? [] : ["swearing to off"]),
+    ...(teasing === "roast" ? ["teasing to light"] : []),
+  ];
+  return lowered.length === 0
+    ? undefined
+    : `The family league lowers ${name}'s ${lowered.join(" and ")}.`;
+}
 
 /**
  * The files the steps after the league data leave: the pundit settings, and the
@@ -323,8 +713,15 @@ preset: broadcast
  */
 async function writeStepFiles(
   ws: Workspace,
-  method: PowerScoreMethod | undefined,
+  league: LeagueCheck,
+  answers: {
+    method?: PowerScoreMethod;
+    lore?: LoreAnswers;
+    stakes?: StakesAnswers;
+    persona?: PresetName;
+  },
 ): Promise<void> {
+  const { method } = answers;
   await mkdir(punditDir(ws), { recursive: true });
   await mkdir(seasonDir(ws), { recursive: true });
   const chosen =
@@ -339,13 +736,26 @@ format: ${FORMAT}
 ${chosen}---
 `,
   );
-  await writeWorkspaceFile(join(ws.dir, "lore.md"), LORE_PLACEHOLDER, {
-    versionKey: "lore",
-  });
-  await writeWorkspaceFile(leagueFilePath(ws), LEAGUE_PLACEHOLDER, {
-    versionKey: "league",
-  });
-  await writeWorkspaceFile(personaPath(ws), PERSONA_PLACEHOLDER);
+  await writeWorkspaceFile(
+    join(ws.dir, "lore.md"),
+    answers.lore ? loreText(answers.lore, league) : LORE_PLACEHOLDER,
+    { versionKey: "lore" },
+  );
+  await writeWorkspaceFile(
+    leagueFilePath(ws),
+    leagueText(league.season, answers.stakes),
+    { versionKey: "league" },
+  );
+  await writeWorkspaceFile(
+    personaPath(ws),
+    personaText(answers.persona ?? "broadcast"),
+  );
+}
+
+/** Broadcast, the persona with no `persona.md`, is the default. */
+function personaStatus(preset: PresetName | undefined): SetupStatus {
+  if (preset === undefined) return "skipped";
+  return preset === "broadcast" ? "default" : "done";
 }
 
 function methodStatus(method: PowerScoreMethod | undefined): SetupStatus {
@@ -529,8 +939,14 @@ export async function setUpWorkspace(
     dir?: string;
     /** The handles step's list; left out when the step is skipped. */
     handles?: ManagerHandle[];
+    /** The lore step's answers; left out when the step is skipped. */
+    lore?: LoreAnswers;
+    /** The stakes and family league step's answers; left out when it's skipped. */
+    stakes?: StakesAnswers;
     /** The method step's choice; left out when the step is skipped. */
     method?: PowerScoreMethod;
+    /** The persona step's preset; left out when the step is skipped. */
+    persona?: PresetName;
     /** A key that has passed `checkKey`; left out when it's skipped or already held. */
     key?: string;
     /** The spend cap; left out when it's skipped or already held. */
@@ -542,6 +958,18 @@ export async function setUpWorkspace(
   for (const [i, { handle }] of handles.entries()) {
     const others = handles.slice(0, i).map((h) => h.handle);
     const problem = handleProblem(handle, others);
+    if (problem !== undefined) throw new SetupRefusal(problem);
+  }
+  if (answers.lore) {
+    const problem = nicknamesProblem(league, handles, answers.lore.nicknames);
+    if (problem !== undefined) throw new SetupRefusal(problem);
+  }
+  const fields = answers.stakes?.stakes;
+  if (fields !== undefined && fields !== "none") {
+    const problem =
+      buyInProblem(String(fields.buyIn)) ??
+      payoutsProblem(fields.payouts.join(",")) ??
+      fields.houseRules.map((r) => outcomeProblem(r.outcome)).find(Boolean);
     if (problem !== undefined) throw new SetupRefusal(problem);
   }
   if (
@@ -560,11 +988,10 @@ export async function setUpWorkspace(
   const pundit = slugOf(name);
   const setup: Required<Workspace["setup"]> = {
     handles: handles.length === 0 ? "skipped" : "done",
-    // The placeholders: #61 asks these.
-    lore: "skipped",
-    stakes: "skipped",
+    lore: answers.lore ? "done" : "skipped",
+    stakes: answers.stakes ? "done" : "skipped",
     method: methodStatus(answers.method),
-    persona: "skipped",
+    persona: personaStatus(answers.persona),
   };
 
   const firstMade = await mkdir(dir, { recursive: true }).catch(
@@ -597,7 +1024,7 @@ ${
 `,
       { exclusive: true },
     );
-    await writeStepFiles(await readWorkspace(dir), answers.method);
+    await writeStepFiles(await readWorkspace(dir), league, answers);
     await writeGitignore(join(dir, ".snapshots"), "*");
     // The snapshot folder's own `*` ignores itself, so a clone wouldn't have it;
     // and `transcripts delete` removes its folder. The root's lines outlive both.
