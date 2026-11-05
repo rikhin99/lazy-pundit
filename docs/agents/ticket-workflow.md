@@ -4,23 +4,23 @@ The steps around `/implement <ticket>`, in order. Each ends on the condition tha
 
 ## 1. Glossary first, before the first test
 
-Before reading code, list what the ticket adds. If it adds two or more commands or behaviours with their own seams, propose a split once, naming the line to cut on.
+Before reading code, list what the ticket adds. If it adds two or more commands or behaviours with their own seams, propose a split once, naming the line to cut on. Size alone is no reason, and a ticket's "Size watch" section is no reason either: #55 and #60 were split, and each part still ended well over the 150k zone while paying for its own review and sweep.
 
 List every domain noun the ticket brings or renames: a file, a setting, a role, a command, a state. Run `/domain-modeling` for each one that `GLOSSARY.md` doesn't define, at the same time as agreeing the test seams. Then name files, fields and functions after the glossary terms.
 
-Read the ticket and the spec sections it cites. To find where a neighbouring ticket's scope begins, ask an Explore subagent for a short brief rather than reading the ticket. To find code, start from the module map's exports column and read only the functions you need, not whole files.
+Read the ticket and the spec sections it cites. When the user names a comment, such as the latest, read that comment (`gh issue view <n> --json comments --jq '.comments[-1].body'`), not the whole thread. To find where a neighbouring ticket's scope begins, ask an Explore subagent for a short brief rather than reading the ticket. To find code, start from the module map's exports column and read only the functions you need, not whole files.
 
 Done when the list is in a message, each noun with its `GLOSSARY.md` line or a new entry. The code and tickets then use those names from the start. In #51 the glossary came last, which forced a code rename (`usage.yaml` → `spend.yaml`) and a second pass over 10 tickets and comments.
 
 ## 2. Build and review
 
-`/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other.
+`/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other. See each new test fail before writing the code that passes it. In #60 part (b), the checklist tests were written with their code and first seen red only by a mutation after the build.
 
 Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing. If the diff changes a file's shape, also run the commands on a file written by the previous commit. Write each run as a script file in the scratchpad that starts with `set -euo pipefail` and sets `HOME` and the working directory to a temp folder. Drive `init` with `npm run -s drive:wizard -- <scenario>`, adding a scenario if yours is missing."
 
 The same script rule holds for your own scratch runs. In #60 part (a), a one-liner's failed `cd` left its `mkdir` and `touch` running in the repo.
 
-See each review fix's test go red, by writing it before the fix or by undoing the fix. Tighten any test that stays green. A review fix that adds behaviour gets its own scratch run through the ticket's commands before committing, since no review sees it. Done when every fix has a test seen red and each added behaviour has had its run. In #55 part (a), one of six fixes' tests stayed green: it missed the snapshot a late failure leaves behind. In #55 part (b), a warning added after review misfired on auto-tagged stats, and only the sweep's scratch script caught it.
+See each review fix's test go red, by writing it before the fix or by undoing the fix. Tighten any test that stays green. A review fix that adds behaviour gets its own scratch run through the ticket's commands before committing, since no review sees it. A fix that no portable test can show failing, such as one that needs a write to fail, gets a scratch run that shows it instead, named in the commit message. Done when every fix has a test seen red, or that scratch run, and each added behaviour has had its run. In #55 part (a), one of six fixes' tests stayed green: it missed the snapshot a late failure leaves behind. In #55 part (b), a warning added after review misfired on auto-tagged stats, and only the sweep's scratch script caught it.
 
 While building, run only the affected test files. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 

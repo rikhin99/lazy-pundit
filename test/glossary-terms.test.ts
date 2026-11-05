@@ -49,6 +49,7 @@ const ENFORCED = [
   "force publish",
   "previous ranking",
   "last week's ranking",
+  "template",
 ];
 
 /**
@@ -64,7 +65,6 @@ const REVIEWED = [
   "account",
   "player",
   "user id",
-  "template",
   "roster",
   "cache",
   "fixture",

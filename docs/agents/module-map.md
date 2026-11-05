@@ -1,6 +1,6 @@
 # Module map
 
-Read this before opening source files. It says which file owns what. Within a file, `npm run outline -- <file>…` lists each declaration's line range and doc line: read the ranges you need with `sed -n`, and open a whole file only when you'll rewrite most of it. Line counts are rough sizes.
+Read this before opening source files. It says which file owns what. Within a file, `npm run outline -- <file>…` lists each exported declaration's line range and doc line (`--all` adds the internal ones; a test file lists everything): read the ranges you need with `sed -n`, and open a whole file only when you'll rewrite most of it. Line counts are rough sizes.
 
 ## The pipeline
 

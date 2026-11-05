@@ -1,9 +1,11 @@
 /**
  * Prints each top-level declaration in a source file with its line range
  * (doc comment included) and the doc comment's first line, so you can read
- * only the ranges you need with `sed -n`.
+ * only the ranges you need with `sed -n`. A file with exports lists only its
+ * exported declarations unless `--all` is passed; a file with none, such as a
+ * test file, lists every declaration.
  *
- *   npm run outline -- src/check.ts [more files…]
+ *   npm run outline -- [--all] src/check.ts [more files…]
  */
 import { readFile } from "node:fs/promises";
 
@@ -17,7 +19,7 @@ interface Entry {
   doc: string;
 }
 
-function outline(text: string): string[] {
+function outline(text: string, all: boolean): string[] {
   const lines = text.split("\n");
   const entries: Entry[] = [];
   lines.forEach((l, i) => {
@@ -44,21 +46,35 @@ function outline(text: string): string[] {
       .replace(/\s*(\{|=)\s*$/, "");
     entries.push({ start, line: i, head: head.slice(0, 110), doc });
   });
-  return entries.map((e, k) => {
+  const rows = entries.map((e, k) => {
     let end = (entries[k + 1]?.start ?? lines.length) - 1;
     while (end > e.line && !lines[end]?.trim()) end--;
     const doc = e.doc ? `  // ${e.doc.slice(0, 90)}` : "";
-    return `${e.start + 1}-${end + 1}\t${e.head}${doc}`;
+    return {
+      exported: e.head.startsWith("export"),
+      row: `${e.start + 1}-${end + 1}\t${e.head}${doc}`,
+    };
   });
+  const shown =
+    all || !rows.some((r) => r.exported)
+      ? rows
+      : rows.filter((r) => r.exported);
+  const hidden = rows.length - shown.length;
+  return [
+    ...shown.map((r) => r.row),
+    ...(hidden > 0 ? [`(${hidden} internal declarations: pass --all)`] : []),
+  ];
 }
 
-const files = process.argv.slice(2);
+const args = process.argv.slice(2);
+const all = args.includes("--all");
+const files = args.filter((a) => a !== "--all");
 if (files.length === 0) {
-  console.error("usage: npm run outline -- <file> [more files…]");
+  console.error("usage: npm run outline -- [--all] <file> [more files…]");
   process.exit(1);
 }
 for (const file of files) {
   const text = await readFile(file, "utf8");
   console.log(`${file} (${text.split("\n").length} lines)`);
-  for (const row of outline(text)) console.log(`  ${row}`);
+  for (const row of outline(text, all)) console.log(`  ${row}`);
 }
