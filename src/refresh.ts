@@ -14,6 +14,7 @@ import type { League, TeamId } from "./league.ts";
 import { validatorNames } from "./lore.ts";
 import { startingOrder } from "./power-score.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
+import { applyRetention } from "./retention.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
 import { triggerWinnerChanges } from "./stakes.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
@@ -50,12 +51,13 @@ export interface RefreshResult {
 export async function refresh(
   workspaceDir: string,
   deps: Deps,
+  opts: { full?: boolean } = {},
 ): Promise<RefreshResult> {
   const checked = await checkDraft(workspaceDir, { autoTag: false });
   const { meta } = checked.ranking;
   const ws = await readWorkspace(workspaceDir);
   const settings = await loadPunditSettings(ws);
-  const fresh = await fetchFresh(ws, deps);
+  const fresh = await fetchFresh(ws, deps, opts);
   const changes = diff(checked.league, fresh.league, meta.week);
   const method = methodForWeek(settings, fresh.league, meta.week);
   const methodChanged = !isDeepStrictEqual(meta.power_score, method);
@@ -182,13 +184,31 @@ export async function freshDataWarnings(
   }
 }
 
-/** The workspace's latest season, fetched into memory: no snapshot yet. */
-export function fetchFresh(ws: Workspace, deps: Deps): Promise<FetchedSleeper> {
-  return fetchSleeper({
+/**
+ * The workspace's latest season, fetched into memory: no snapshot yet. A
+ * routine fetch unless `full`. Writing the snapshot applies retention.
+ */
+export async function fetchFresh(
+  ws: Workspace,
+  deps: Deps,
+  opts: { full?: boolean } = {},
+): Promise<FetchedSleeper> {
+  const fetched = await fetchSleeper({
     transport: deps.transport,
     clock: deps.clock,
     snapshotsDir: snapshotsDir(ws),
     cacheDir: deps.cacheDir,
     leagueId: ws.season.leagueId,
+    full: opts.full ?? false,
   });
+  return {
+    league: fetched.league,
+    async write() {
+      const written = await fetched.write();
+      // Pruning is housekeeping: one that fails deletes less, never fails the
+      // command whose snapshot is already written, and runs again next write.
+      await applyRetention(ws, deps.clock.now()).catch(() => undefined);
+      return written;
+    },
+  };
 }

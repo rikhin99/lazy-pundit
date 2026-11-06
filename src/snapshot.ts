@@ -1,5 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
@@ -9,6 +16,7 @@ import {
   type Transport,
   type TransportRequest,
 } from "./transport.ts";
+import { writeGitignore } from "./workspace-files.ts";
 
 /**
  * A snapshot folder holds content-addressed blobs shared by every snapshot in
@@ -170,6 +178,10 @@ export class SnapshotRecorder {
     };
     const id = snapshotId(manifest, opts.idHash);
 
+    // The raw payloads name every manager's account: keep them out of git.
+    if ((await mkdir(opts.snapshotsDir, { recursive: true })) !== undefined) {
+      await writeGitignore(opts.snapshotsDir, "*");
+    }
     const blobsDir = join(opts.snapshotsDir, "blobs");
     await mkdir(blobsDir, { recursive: true });
     for (const f of this.#fetched) {
@@ -203,6 +215,75 @@ export async function readManifest(
 ): Promise<Manifest> {
   const text = await readFile(join(snapshotsDir, id, "manifest.json"), "utf8");
   return manifestSchema.parse(JSON.parse(text));
+}
+
+/**
+ * Every snapshot in the folder whose manifest this build reads, oldest first
+ * (IDs start with their fetch time). A missing folder has none.
+ */
+export async function listSnapshots(
+  snapshotsDir: string,
+): Promise<{ id: string; manifest: Manifest }[]> {
+  const listed: { id: string; manifest: Manifest }[] = [];
+  for (const id of (await snapshotFolders(snapshotsDir)).sort(compareKeys)) {
+    try {
+      listed.push({ id, manifest: await readManifest(snapshotsDir, id) });
+    } catch {
+      // Another build's format, or not a snapshot: not this build's to read.
+    }
+  }
+  return listed;
+}
+
+/**
+ * Deletes these snapshots, then every blob no remaining snapshot lists. If a
+ * remaining folder's manifest can't be read, its blobs are unknown, so no
+ * blob is deleted.
+ */
+export async function deleteSnapshots(
+  snapshotsDir: string,
+  ids: string[],
+): Promise<void> {
+  for (const id of ids) {
+    await rm(join(snapshotsDir, id), { recursive: true, force: true });
+  }
+  const listed = new Set<string>();
+  for (const id of await snapshotFolders(snapshotsDir)) {
+    let shas: string[];
+    try {
+      const raw = JSON.parse(
+        await readFile(join(snapshotsDir, id, "manifest.json"), "utf8"),
+      );
+      shas = z
+        .object({ requests: z.array(z.object({ sha256: z.string() })) })
+        .parse(raw)
+        .requests.map((r) => r.sha256);
+    } catch {
+      return;
+    }
+    for (const sha of shas) listed.add(sha);
+  }
+  const blobsDir = join(snapshotsDir, "blobs");
+  for (const name of await readdir(blobsDir).catch(() => [])) {
+    const sha = name.match(/^([0-9a-f]{64})\.json\.gz$/)?.[1];
+    if (sha && !listed.has(sha))
+      await rm(join(blobsDir, name), { force: true });
+  }
+}
+
+/** The folder's snapshot folders: everything but blobs, temp and dot files. */
+async function snapshotFolders(snapshotsDir: string): Promise<string[]> {
+  const entries = await readdir(snapshotsDir, { withFileTypes: true }).catch(
+    (err: unknown) => {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw err;
+    },
+  );
+  return entries
+    .filter(
+      (e) => e.isDirectory() && e.name !== "blobs" && !e.name.startsWith("."),
+    )
+    .map((e) => e.name);
 }
 
 /** A snapshot read into memory: its manifest and every payload by URL. */
@@ -272,6 +353,9 @@ export function requestKey(
   );
   return JSON.stringify([req.url, params]);
 }
+
+/** What a snapshot ID looks like, for finding the IDs a file names. */
+export const SNAPSHOT_ID = /\b\d{8}T\d{6}Z-[0-9a-f]{8}\b/;
 
 /** `<fetched_at UTC>-<the data hash's first 8 hex digits>`. */
 function snapshotId(manifest: Manifest, hash: string): string {

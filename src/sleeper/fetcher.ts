@@ -3,7 +3,13 @@ import { readCacheEntry, writeCacheEntry } from "../cache.ts";
 import type { Clock } from "../clock.ts";
 import { dataHash } from "../data-hash.ts";
 import type { League } from "../league.ts";
-import { FetchError, type Manifest, SnapshotRecorder } from "../snapshot.ts";
+import {
+  FetchError,
+  listSnapshots,
+  type Manifest,
+  readBlob,
+  SnapshotRecorder,
+} from "../snapshot.ts";
 import type { Transport } from "../transport.ts";
 import { SLEEPER_API, SLEEPER_PLAYERS_URL } from "./api.ts";
 import { normalizeSleeper } from "./normalizer.ts";
@@ -13,6 +19,8 @@ const LAST_NFL_WEEK = 18;
 
 const PLAYERS_CACHE = "sleeper/players_nfl.json";
 const PLAYERS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/** A fetch this long after the season's last snapshot is a full fetch. */
+const FULL_FETCH_GAP_MS = 14 * 24 * 60 * 60 * 1000;
 
 /** Only the league fields the fetcher needs to decide what else to fetch. */
 const leagueSchema = z.object({
@@ -34,6 +42,8 @@ export interface FetchSleeperOptions {
   leagueId: string;
   /** Sent with every request and never recorded. */
   headers?: Record<string, string>;
+  /** A full fetch: every week, nothing kept from the last snapshot. */
+  full?: boolean;
 }
 
 /** A complete fetch held in memory: nothing is on disk until `write`. */
@@ -82,8 +92,17 @@ export async function fetchSleeper(
   for (let week = 1; week <= weeks; week++) {
     paths.push(`matchups/${week}`, `transactions/${week}`);
   }
+  const kept = opts.full
+    ? undefined
+    : await keptWeeks(opts, base, league, opts.clock.now());
   const bodies = await Promise.all(
-    paths.map((path) => recorder.get(`${base}/${path}`)),
+    paths.map(async (path) => {
+      const url = `${base}/${path}`;
+      const body = await kept?.(path);
+      if (!body) return recorder.get(url);
+      recorder.put(url, body);
+      return body;
+    }),
   );
 
   const payloads = bodies.map(parseJson);
@@ -92,14 +111,14 @@ export async function fetchSleeper(
     payloads.filter((_, i) => paths[i]?.startsWith("matchups/")),
   );
   const players = await playersFile(recorder, opts, inMatchups);
-  const kept = Object.fromEntries(
+  const trimmed = Object.fromEntries(
     [...named]
       .sort()
       .flatMap((id) => (id in players ? [[id, players[id]]] : [])),
   );
   recorder.put(
     SLEEPER_PLAYERS_URL,
-    new TextEncoder().encode(JSON.stringify(kept)),
+    new TextEncoder().encode(JSON.stringify(trimmed)),
   );
 
   // The snapshot ID's short hash follows the data, not the raw payloads.
@@ -121,6 +140,54 @@ export async function fetchSleeper(
         season: league.season,
         idHash: dataHash(normalized, normalized.lastScoredWeek),
       }),
+  };
+}
+
+/**
+ * A routine fetch's reuse: for a week's matchups or transactions path, the
+ * payload from the season's last snapshot, or nothing when the path must be
+ * fetched. Fetched are the last 2 scored weeks, every week after them, and any
+ * week the last snapshot didn't hold as scored. Nothing is reused (a full
+ * fetch) without a last snapshot of this league and season, or when it's more
+ * than 2 weeks old. A fetch that wrote no snapshot doesn't count as the last,
+ * which can only make a fetch full sooner.
+ */
+async function keptWeeks(
+  opts: FetchSleeperOptions,
+  base: string,
+  league: z.infer<typeof leagueSchema>,
+  now: Date,
+): Promise<((path: string) => Promise<Uint8Array | undefined>) | undefined> {
+  const last = (await listSnapshots(opts.snapshotsDir))
+    .filter(
+      ({ manifest: m }) =>
+        m.platform === "sleeper" &&
+        m.league_id === league.league_id &&
+        m.season === league.season,
+    )
+    .at(-1)?.manifest;
+  if (
+    !last ||
+    now.getTime() - new Date(last.fetched_at).getTime() > FULL_FETCH_GAP_MS
+  ) {
+    return undefined;
+  }
+  const shas = new Map(last.requests.map((r) => [r.url, r.sha256]));
+  const read = async (url: string) => {
+    const sha = shas.get(url);
+    return sha === undefined
+      ? undefined
+      : readBlob(opts.snapshotsDir, sha).catch(() => undefined);
+  };
+  const lastBase = await read(base);
+  const lastLeague = leagueSchema.safeParse(lastBase && parseJson(lastBase));
+  if (!lastLeague.success) return undefined;
+  const scored = league.settings.last_scored_leg ?? 0;
+  const lastScored = lastLeague.data.settings.last_scored_leg ?? 0;
+  const firstFetched = Math.min(scored - 1, lastScored + 1);
+  return async (path) => {
+    const week = Number(path.match(/^(?:matchups|transactions)\/(\d+)$/)?.[1]);
+    return week < firstFetched ? read(`${base}/${path}`) : undefined;
   };
 }
 

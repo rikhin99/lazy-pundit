@@ -151,6 +151,15 @@ What a fetching command says when fresh data has data changes against the draft'
 **Players file**:
 The platform's list of every NFL player, with positions, NFL team and injury status. It is fetched rarely and kept in the operator's cache, outside any workspace, and each snapshot keeps only the players its league names. "Cache" means only this person-level store, never a snapshot.
 
+**Routine fetch**:
+A fetch of the season's shared data plus the matchups of the last 2 scored weeks and the in-progress week. Every other week comes from the last snapshot.
+
+**Full fetch**:
+A fetch of every week: the first fetch, any fetch more than 2 weeks after the last one, or `refresh --full`.
+
+**Retention**:
+Which snapshots are kept: every snapshot a draft or frozen copy names, as its snapshot or one of its earlier snapshots, and the latest of each season. Others older than 14 days are deleted, along with stored payloads no kept snapshot uses.
+
 ## Setup and cost
 
 **Setup step**:
@@ -244,6 +253,9 @@ The week a ranking is labelled with: the most recent scored week in its data whe
 **Scored week**:
 A week the platform has finished scoring. Until then the week is in progress and its results aren't evidence. A scored week can still change through stat corrections, and nothing signals when they stop.
 _Avoid_: Final week
+
+**In-progress week**:
+The week the platform hasn't finished scoring yet. A routine fetch always asks for it, but its results aren't evidence.
 
 **Stat correction**:
 A change the platform makes to a week's scores after it has been scored.

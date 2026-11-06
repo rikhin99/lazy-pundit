@@ -222,9 +222,15 @@ program
   .description(
     "Refetch the league and move the latest draft onto any new data, leaving your order and words.",
   )
-  .action(async () => {
+  .option(
+    "--full",
+    "Fetch every week, not only the last 2 scored weeks and the one in progress.",
+  )
+  .action(async (opts: { full?: boolean }) => {
     const deps = systemDeps();
-    const result = await refresh(await workspace(deps), deps);
+    const result = await refresh(await workspace(deps), deps, {
+      full: opts.full === true,
+    });
     printWarnings(result.warnings);
     if (result.methodChanged) {
       console.log(

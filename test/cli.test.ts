@@ -219,6 +219,17 @@ test("refresh with no change says so, and updates checked_at", async () => {
   expect({ ...now, checked_at: was.checked_at }).toEqual(was);
 });
 
+test("refresh --full takes a full fetch, and with no change says so", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  const { path } = await draft(dir, deps);
+  const was = frontMatter(await readFile(path, "utf8"));
+
+  const { code, stdout } = await cli(dir, ["refresh", "--full"]);
+
+  expect(code).toBe(0);
+  expect(stdout).toBe(`No changes since ${was.data_as_of}.\nNo problems.\n`);
+});
+
 test("refresh after a settings change says the starting order follows them, not that nothing changed", async () => {
   const { dir, deps } = await fearTheTurtle(8);
   await draft(dir, deps);
