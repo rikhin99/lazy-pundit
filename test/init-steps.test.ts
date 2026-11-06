@@ -34,7 +34,11 @@ import {
   spendCapProblem,
   spendCapWarning,
 } from "../src/index.ts";
-import { familyLeague, leagueFilePath } from "../src/league-file.ts";
+import {
+  familyLeague,
+  leagueFilePath,
+  loadLeagueFile,
+} from "../src/league-file.ts";
 import { loadLore, refuseLocal } from "../src/lore.ts";
 import { loadPersona, personaPath } from "../src/persona.ts";
 import { powerScoreMethodSchema } from "../src/power-score.ts";
@@ -305,6 +309,9 @@ test("a No at the stakes question writes stakes: none, and a skipped stakes step
     "season",
   ]);
   expect(skipped.ws.setup.stakes).toBe("skipped");
+  expect((await loadLeagueFile(skipped.ws)).stakes).toEqual({
+    kind: "unrecorded",
+  });
 });
 
 test("money at stake writes the buy-in, payouts by place and each picked house rule with its outcome", async () => {
@@ -346,6 +353,25 @@ test("money at stake writes the buy-in, payouts by place and each picked house r
   });
   expect(data.stakes).toBeUndefined();
   expect(await familyLeague(ws)).toBe(false);
+  // What init writes loads under league.md's full schema.
+  expect((await loadLeagueFile(ws)).stakes).toMatchObject({
+    kind: "recorded",
+    buyIn: 50,
+    payouts: [{ share: 70 }, { dollars: 100 }],
+    lastPlace: "standings",
+    houseRules: [
+      {
+        id: "high-score",
+        trigger: { kind: "high-score", per: "week" },
+        outcome: { kind: "dollars", amount: 10 },
+      },
+      {
+        id: "last-place",
+        trigger: { kind: "last-place", per: "season" },
+        outcome: { kind: "text", text: "Wears the jersey" },
+      },
+    ],
+  });
 });
 
 test("the family league is preselected on for a family league type, and an answer of on is written", async () => {

@@ -18,6 +18,7 @@ import {
 } from "./draft-context.ts";
 import { type DraftData, draftData } from "./draft-data.ts";
 import type { League } from "./league.ts";
+import { loadLeagueFile } from "./league-file.ts";
 import { type CallSetup, LlmStopped, llmAsk, MAX_TOKENS } from "./llm-call.ts";
 import {
   type FailedSection,
@@ -47,6 +48,11 @@ import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
 import { dataChangedWarning, fetchFresh } from "./refresh.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
+import {
+  changedOutcomeWarnings,
+  houseRuleOutcomes,
+  stakesWarnings,
+} from "./stakes.ts";
 import { stripTags } from "./validator.ts";
 import {
   rankingsDir,
@@ -101,6 +107,8 @@ export async function draft(
   const lore = await loadLore(ws);
   refuseLocal(lore);
   warn(lore.warnings);
+  // Before the fetch, so a malformed league.md costs nothing.
+  const { stakes } = await loadLeagueFile(ws);
   const settings = await loadPunditSettings(ws);
   const fetched = await fetchFresh(ws, deps);
   const names = validatorNames(lore, fetched.league, ws.handles);
@@ -122,7 +130,17 @@ export async function draft(
   const league = normalizeSleeper(snapshot);
   const method = methodForWeek(settings, league, week);
   const order = startingOrder(league, week, method);
-  const data = draftData(league, week);
+  const data = draftData(league, week, stakes);
+  const earlier = await lastPublished(dir, week);
+  warn([
+    ...stakesWarnings(stakes, league),
+    ...changedOutcomeWarnings(
+      stakes,
+      earlier?.ranking.meta.house_rule_outcomes,
+      earlier?.week ?? 0,
+    ),
+  ]);
+  const outcomes = houseRuleOutcomes(stakes);
   const { anthropicApiKey, warnings: credentialWarnings } =
     await loadCredentials(deps);
   const { persona, warnings: personaWarnings } = await loadPersona(
@@ -180,6 +198,7 @@ export async function draft(
       starting_order: order,
       power_score: method,
       persona: personaRecord(persona),
+      ...(outcomes && { house_rule_outcomes: outcomes }),
       created_at: now,
     },
     league,

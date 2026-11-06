@@ -19,7 +19,7 @@ const TEAM_STATS =
   /^(opponent|trade\.\d+\.with|wk\.\w+_team|wk\.upset|wk\.upset_over|wk\.robbed)$/;
 
 /** League items whose value is a comma-separated list of team IDs. */
-const TEAM_LIST_STATS = /^wk\.(clinched|eliminated)$/;
+const TEAM_LIST_STATS = /^wk\.(clinched|eliminated|rule\.[a-z0-9-]+)$/;
 
 /** What the league stat line's `wk.clinched` tag says before the teams. */
 export const CLINCHED_LABEL = "Clinched this week:";
@@ -47,11 +47,15 @@ export function resolve(
   id: string,
   section: TeamId | null,
 ): Resolved | null {
-  if (id.startsWith("wk.") || /^w\d+\.correction$/.test(id)) {
+  if (
+    id.startsWith("wk.") ||
+    id.startsWith("stakes.") ||
+    /^w\d+\.correction$/.test(id)
+  ) {
     const value = ctx.evidence.league[id];
     return value === undefined
       ? null
-      : { team: null, stat: id, value, kind: kindOf(id, value) };
+      : { team: null, stat: id, value, kind: kindOf(id, value), section };
   }
   let team = section;
   let stat = id;
@@ -96,13 +100,18 @@ export function agrees(ctx: Ctx, r: Resolved, words: string): boolean {
       return namesTeam(ctx, String(value) as TeamId, t);
     case "teams": {
       // Naming some of the list is true; naming a team outside it isn't.
-      // The league stat line's own label names no team.
+      // The league stat line's own label names no team. Words in a team's
+      // section that name none, such as a stat line's "Weekly high score",
+      // are about that team.
       const listed = String(value).split(",");
       const names = t.replace(CLINCHED_LABEL.toLowerCase(), "");
       const named = Object.keys(ctx.input.nicknames).filter((team) =>
         namesTeam(ctx, team as TeamId, names),
       );
-      return named.length > 0 && named.every((team) => listed.includes(team));
+      if (named.length === 0) {
+        return r.section != null && listed.includes(r.section);
+      }
+      return named.every((team) => listed.includes(team));
     }
     case "playoffs": {
       const want = playoffWant(t);

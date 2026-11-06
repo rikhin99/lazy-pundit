@@ -118,4 +118,6 @@ export interface Resolved {
   stat: string;
   value: EvidenceValue;
   kind: Kind;
+  /** For a league item cited in a team's section: that team. */
+  section?: TeamId | null;
 }

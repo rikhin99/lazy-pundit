@@ -1,6 +1,13 @@
 import { buildEvidencePack, injuredPlayers, list } from "./evidence-pack.ts";
 import type { League, TeamId } from "./league.ts";
 import type { PlayoffStatus } from "./playoff-status.ts";
+import {
+  leagueTriggerParts,
+  type Stakes,
+  stakesEvidence,
+  triggerParts,
+  UNRECORDED,
+} from "./stakes.ts";
 import type { EvidencePack, EvidenceValue } from "./validator/types.ts";
 import { CLINCHED_LABEL } from "./validator.ts";
 
@@ -24,15 +31,29 @@ export interface StatSet {
   injuries: { name: string; status: string; bodyPart: string | null }[];
 }
 
-/** The evidence pack, stat lines and editing-view stats for the ranking week. */
-export function draftData(league: League, week: number): DraftData {
+/**
+ * The evidence pack, stat lines and editing-view stats for the ranking week,
+ * with the stakes' evidence and this week's triggers when stakes are recorded.
+ */
+export function draftData(
+  league: League,
+  week: number,
+  stakes: Stakes = UNRECORDED,
+): DraftData {
   const evidence = buildEvidencePack(league, week);
+  const fromStakes = stakesEvidence(stakes, league, week);
+  Object.assign(evidence.league, fromStakes.league);
+  for (const [team, ev] of Object.entries(fromStakes.teams)) {
+    const id = team as TeamId;
+    evidence.teams[id] = { ...evidence.teams[id], ...ev };
+  }
   const names = new Map(league.teams.map((t) => [t.id, t.name]));
   const teams: DraftData["teams"] = {};
   for (const team of league.teams) {
     const ev = evidence.teams[team.id] ?? {};
+    const triggers = triggerParts(stakes, team.id, evidence.league, ev, names);
     teams[team.id] = {
-      statLine: statLine(ev, names),
+      statLine: [statLine(ev, names), ...triggers].filter(Boolean).join(" · "),
       stats: {
         ...pick(ev, "record", "streak", "allplay"),
         ...pickNumbers(ev, "pf", "form3", "luck"),
@@ -44,7 +65,11 @@ export function draftData(league: League, week: number): DraftData {
       },
     };
   }
-  return { week, evidence, intro: leagueStatLine(evidence, names), teams };
+  const intro = [
+    leagueStatLine(evidence, names),
+    ...leagueTriggerParts(stakes, evidence.league, names),
+  ].filter(Boolean);
+  return { week, evidence, intro: intro.join(" · "), teams };
 }
 
 /** A settled playoff status, as a stat line says it. */

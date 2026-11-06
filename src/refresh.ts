@@ -8,12 +8,14 @@ import {
 import { type DataChange, diff } from "./data-diff.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
+import { list } from "./evidence-pack.ts";
 import { type FrontMatterValue, setFrontMatterValue } from "./front-matter.ts";
-import type { League } from "./league.ts";
+import type { League, TeamId } from "./league.ts";
 import { validatorNames } from "./lore.ts";
 import { startingOrder } from "./power-score.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
+import { triggerWinnerChanges } from "./stakes.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
 
@@ -125,7 +127,8 @@ export async function refresh(
 
 /**
  * The data-changed warning for a checked draft against freshly fetched data,
- * or none when the data through the draft's week is the same.
+ * or none when the data through the draft's week is the same. A drastic
+ * correction that changes a trigger winner adds its own line.
  */
 export function dataChangedWarning(
   checked: CheckedDraft,
@@ -135,7 +138,29 @@ export function dataChangedWarning(
   if (diff(checked.league, fresh, week).length === 0) return undefined;
   const stale = claimsGoingStale(checked, checked.league, fresh).length;
   const claims = stale === 1 ? "1 claim" : `${stale} claims`;
-  return `data changed since ${data_as_of}: ${claims} would go stale, run \`refresh\``;
+  const lines = [
+    `data changed since ${data_as_of}: ${claims} would go stale, run \`refresh\``,
+  ];
+  const changes = triggerWinnerChanges(
+    checked.stakes,
+    checked.league,
+    fresh,
+    week,
+  );
+  if (changes.length > 0) {
+    const names = new Map(fresh.teams.map((t) => [t.id, t.name]));
+    const who = (teams: TeamId[]) =>
+      teams.length === 0 ? "nobody" : list(teams.map((t) => names.get(t) ?? t));
+    const each = changes.map(
+      (c) => `${c.rule.name} in week ${c.week}, ${who(c.from)} → ${who(c.to)}`,
+    );
+    const count =
+      changes.length === 1
+        ? "1 trigger winner"
+        : `${changes.length} trigger winners`;
+    lines.push(`${count} changed: ${each.join("; ")}`);
+  }
+  return lines.join("\n");
 }
 
 /**

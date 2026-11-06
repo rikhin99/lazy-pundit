@@ -62,6 +62,11 @@ export const metaSchema = z.object({
   power_score: powerScoreRecordSchema,
   /** The persona the draft was written in. */
   persona: personaRecordSchema,
+  /**
+   * Each house rule's outcome when the draft began, by rule ID, so the next
+   * week's draft can warn about an outcome changed in place.
+   */
+  house_rule_outcomes: z.record(z.string(), z.string()).optional(),
   created_at: z.string(),
   /** A frozen copy's edition: 1 on the first publish, one more on each republish. */
   edition: z.number().int().positive().optional(),

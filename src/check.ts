@@ -4,6 +4,7 @@ import type { Deps } from "./deps.ts";
 import { draftData } from "./draft-data.ts";
 import { WorkspaceFileError } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
+import { loadLeagueFile } from "./league-file.ts";
 import type { FailedSection, SectionKey } from "./llm-gate.ts";
 import {
   type Lore,
@@ -21,6 +22,7 @@ import { isSmallSample } from "./power-score.ts";
 import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
+import { type Stakes, stakesWarnings } from "./stakes.ts";
 import {
   applyAutoTags,
   type ClaimStatus,
@@ -114,6 +116,8 @@ export interface CheckedDraft extends CheckResult {
   league: League;
   /** The workspace's lore and handles, to name teams in a later league. */
   lore: Lore;
+  /** The season's stakes, for evidence on a later league. */
+  stakes: Stakes;
   handles: Workspace["handles"];
   /** Each team's order evidence in the checked order. */
   order: Record<TeamId, OrderEvidence>;
@@ -144,7 +148,8 @@ export async function checkDraft(
   );
   checkOrder(name, ranking, league);
 
-  const { evidence } = draftData(league, ranking.meta.week);
+  const { stakes } = await loadLeagueFile(ws);
+  const { evidence } = draftData(league, ranking.meta.week, stakes);
   const baseline = await movementBaseline(dir, week);
   const order = orderEvidence(ranking, baseline);
   const startingOrder = Object.fromEntries(
@@ -163,7 +168,7 @@ export async function checkDraft(
     validatorNames: validatorNames(lore, league, ws.handles),
     before: {
       order: startingOrder,
-      evidence: await earlierEvidence(ws, ranking),
+      evidence: await earlierEvidence(ws, ranking, stakes),
     },
   });
   problems.push(
@@ -183,13 +188,14 @@ export async function checkDraft(
     path,
     problems,
     autoTagged: tagging ? autoTags.length : 0,
-    warnings: lore.warnings,
+    warnings: [...lore.warnings, ...stakesWarnings(stakes, league)],
     stem,
     dir,
     text,
     ranking: tagging ? parseRanking(name, text) : ranking,
     league,
     lore,
+    stakes,
     handles: ws.handles,
     order,
     ...(baseline ? { baseline } : {}),
@@ -210,10 +216,10 @@ export function claimsGoingStale(
     text: checked.text,
     ranking: checked.ranking,
     league: to,
-    evidence: draftData(to, week).evidence,
+    evidence: draftData(to, week, checked.stakes).evidence,
     order: checked.order,
     validatorNames: validatorNames(checked.lore, to, checked.handles),
-    before: { evidence: [draftData(from, week).evidence] },
+    before: { evidence: [draftData(from, week, checked.stakes).evidence] },
   });
   return problems.filter((p) => p.kind === "stale" && p.cause === "refresh");
 }
@@ -227,12 +233,13 @@ export function claimsGoingStale(
 async function earlierEvidence(
   ws: Workspace,
   ranking: RankingFile,
+  stakes: Stakes,
 ): Promise<EvidencePack[]> {
   const packs: EvidencePack[] = [];
   for (const id of (ranking.meta.earlier_snapshots ?? []).toReversed()) {
     try {
       const league = normalizeSleeper(await readSnapshot(snapshotsDir(ws), id));
-      packs.push(draftData(league, ranking.meta.week).evidence);
+      packs.push(draftData(league, ranking.meta.week, stakes).evidence);
     } catch {
       // Left out, as above.
     }

@@ -193,12 +193,18 @@ _Avoid_: Rules (for the whole thing), settings
 **Pot**:
 The buy-in times the number of teams. Payouts are stated as amounts or shares of it.
 
+**Payout**:
+What one final place wins: an amount or a share of the pot. Winner takes all unless the stakes say otherwise.
+
 **House rule**:
-A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words) and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize.
+A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words) and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize. `from:` and `until:` weeks limit a rule, so splitting a rule in two keeps the old outcome for earlier weeks, while changing an outcome in place recomputes winnings to date as if it had always applied, with a warning.
 _Avoid_: Side bet, punishment (for the whole thing)
 
 **Trigger**:
-The measurable event that decides who a house rule applies to, such as high score, low score, most points left on the bench, last place or champion, for a week or a season. A rule without a trigger is applied by hand through log entries.
+The measurable event that decides who a house rule applies to, such as high score, low score, most points left on the bench, last place or champion, for a week or a season. A rule without a trigger is applied by hand through log entries. A trigger the platform can't work out, such as a losers-bracket last place in a league without one, has no trigger winner and loads with a warning to log it by hand.
+
+**Trigger winner**:
+A team a house rule's trigger applies to for a week or a season, whether the outcome is a prize or a punishment. Every tied team is one. An in-progress week has none.
 
 **Points left on the bench**:
 The best possible lineup's points minus the points actually scored in a week.
@@ -234,7 +240,7 @@ _Avoid_: Final week
 A change the platform makes to a week's scores after it has been scored.
 
 **Drastic correction**:
-A stat correction that flips a matchup result or changes who a house-rule trigger applies to. It is found by comparing fresh data with the snapshot behind the latest published ranking, so it only covers weeks that a published ranking has already shown. It becomes evidence for the next draft, whichever week that is, and lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
+A stat correction that flips a matchup result or changes a trigger winner. It is found by comparing fresh data with the snapshot behind the latest published ranking, so it only covers weeks that a published ranking has already shown. It becomes evidence for the next draft, whichever week that is, and lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
 
 **Draft**:
 The pundit's working copy of a week's ranking. It can be edited freely, before and after publishing, and the league never sees it.
