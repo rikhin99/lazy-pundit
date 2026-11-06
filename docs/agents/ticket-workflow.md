@@ -16,6 +16,8 @@ Done when the list is in a message, each noun with its `GLOSSARY.md` line or a n
 
 `/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other. See each new test fail before writing the code that passes it. In #60 part (b), the checklist tests were written with their code and first seen red only by a mutation after the build.
 
+A pasted `/implement` arrives as text, and the skill can't be loaded with the Skill tool, so read `~/.claude/plugins/cache/mattpocock/mattpocock-skills/*/skills/engineering/implement/SKILL.md` directly. In #56 part (b), searching for it with `find` cost 7.4k.
+
 Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing. Write each run as a script file in the scratchpad that starts with `set -euo pipefail` and sets `HOME` and the working directory to a temp folder. Drive `init` with `npm run -s drive:wizard -- <scenario>`, adding a scenario if yours is missing."
 
 The same script rule holds for your own scratch runs. In #60 part (a), a one-liner's failed `cd` left its `mkdir` and `touch` running in the repo. A scratch run calls the library with `node`, which strips the types, or uses `npm run fixture:show`. In #56 part (a), a vitest run outside the repo root hung past its timeout.
@@ -48,9 +50,9 @@ Hand the sweep to one subagent, so the main session doesn't spend tokens reading
 > - Use `GLOSSARY.md` terms, and avoid its _Avoid_ terms.
 > - Write each new section or comment with the Write tool to a file in the scratchpad folder, and write only the new text. Pass a comment with `--body-file`. Append a section with `{ gh issue view <t> --json body --jq .body; echo; cat <file>; } | gh issue edit <t> --body-file -`. To correct a section, save the body to a scratch file, change it with Edit, then pass it with `--body-file`. No heredocs.
 >
-> Report each ticket you changed and what you changed, then list the other open tickets by number as unaffected.
+> Report each ticket you changed and what you changed, then list the other open tickets by number as unaffected. Then list each thing #<n> asked for that <sha> leaves undone and no open ticket owns.
 
-Done when the subagent's report accounts for every open ticket.
+Done when the subagent's report accounts for every open ticket, and the main session has asked the user whether to file each unowned item as a ticket. In #56, the changed-outcome warning in `check` and `publish` was left undone by both parts, and #56 was closed with no ticket owning it.
 
 ## 4. Measure
 
