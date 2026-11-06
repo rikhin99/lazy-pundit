@@ -146,13 +146,18 @@ function words(identifier: string): string {
     .toLowerCase();
 }
 
+/** A dashed slug such as "losers-bracket": a setting's key or value. */
+const SLUG = /^[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)+$/;
+
 /**
- * A file's identifiers and comments, as lowercase words. String and regex
- * literals are left out: they hold platform text and the pundit prose the
- * validator recognizes, such as "3-game heater".
+ * A file's identifiers, comments and slug strings, as lowercase words. Other
+ * string and regex literals are left out: they hold platform text and the
+ * pundit prose the validator recognizes, such as "3-game heater". A slug is
+ * kept, since it's a value a pundit types into a workspace file.
  */
 function namesAndComments(text: string): string[] {
   const comments: string[] = [];
+  const slugs: string[] = [];
   const code = text
     .replace(/\/\*[\s\S]*?\*\//g, (c) => {
       comments.push(c);
@@ -162,7 +167,13 @@ function namesAndComments(text: string): string[] {
       comments.push(c);
       return before;
     })
-    .replace(/`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g, " ")
+    .replace(
+      /`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g,
+      (s) => {
+        if (SLUG.test(s.slice(1, -1))) slugs.push(s.slice(1, -1));
+        return " ";
+      },
+    )
     .replace(
       /([=(,:!&|?{};[]\s*)\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\n\\[])+\/[a-z]*/g,
       "$1 ",
@@ -170,7 +181,7 @@ function namesAndComments(text: string): string[] {
   const identifiers = code.match(/[A-Za-z_$][\w$]*/g) ?? [];
   return [
     ...identifiers.map(words),
-    ...comments.map((c) => c.toLowerCase().replace(/-/g, " ")),
+    ...[...comments, ...slugs].map((c) => c.toLowerCase().replace(/-/g, " ")),
   ];
 }
 

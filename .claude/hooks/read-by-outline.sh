@@ -6,7 +6,11 @@
 # over its `cat`s and `sed -n` ranges, so a ticket's code isn't read whole a
 # few files at a time. To rewrite most of a file, read that one file whole
 # with `sed -n 1,999p <file>`, alone in its command.
+#
+# GLOSSARY.md is read by section too, never whole: in #56 part (a) one `cat`
+# of it beside the module map cost 16.8k, the ticket's largest jump.
 input=$(cat)
+gmsg="Read GLOSSARY.md by section: list the sections with \`grep -n '^## ' GLOSSARY.md\`, read the ticket's own with \`sed -n a,bp GLOSSARY.md\` or Read's offset and limit, and run \`grep -n -i -A3 '<noun>' GLOSSARY.md\` for each other noun."
 msg="Read src/ and test/ files by range: run \`npm run outline -- <file>\`, then read only the functions you need with \`sed -n a,bp\` or Read's offset and limit (150 lines per command at most). To rewrite most of a file, read that one file whole with \`sed -n 1,999p <file>\`, alone in its command."
 lines() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 abs() { case $1 in /*) echo "$1" ;; *) echo "$CLAUDE_PROJECT_DIR/$1" ;; esac; }
@@ -16,6 +20,10 @@ case $(printf '%s' "$input" | jq -r '.tool_name') in
 Read)
   path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')
   limit=$(printf '%s' "$input" | jq -r '.tool_input.limit // ""')
+  if [ "$path" = "$CLAUDE_PROJECT_DIR/GLOSSARY.md" ] && [ -z "$limit" ]; then
+    echo "$gmsg" >&2
+    exit 2
+  fi
   case $path in
   "$CLAUDE_PROJECT_DIR"/src/* | "$CLAUDE_PROJECT_DIR"/test/*)
     if [ -z "$limit" ] && [ "$(lines "$path")" -gt 150 ]; then
@@ -36,6 +44,11 @@ Bash)
   files=0
   # Each file argument of a `cat` that reads (not one writing with > or >>).
   for f in $(printf '%s' "$cmd" | grep -Eo '(^|[;&|(] *)cat( +[^ ;&|<>]+)+' | sed -E 's/^.*cat //'); do
+    case $f in GLOSSARY.md | */GLOSSARY.md)
+      echo "$gmsg" >&2
+      exit 2
+      ;;
+    esac
     if srcfile "$f"; then
       total=$((total + $(lines "$(abs "$f")")))
       files=$((files + 1))

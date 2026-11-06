@@ -29,7 +29,7 @@ export type Payout = { dollars: number } | { share: number };
 export const TRIGGER_KINDS = [
   "high-score",
   "low-score",
-  "most-bench-points",
+  "most-left-on-bench",
   "last-place",
   "champion",
 ] as const;
@@ -314,7 +314,7 @@ function weekScores(
   if (!w) return [];
   return w.matchups.flatMap((m) =>
     m.sides.map((side): [TeamId, number] => {
-      if (kind !== "most-bench-points") {
+      if (kind !== "most-left-on-bench") {
         return [side.team, Math.round(side.score * 100)];
       }
       const scored = side.lineup

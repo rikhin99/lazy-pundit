@@ -415,9 +415,9 @@ export const COMMON_HOUSE_RULES: CommonHouseRule[] = [
     per: "week",
   },
   {
-    id: "most-bench-points",
+    id: "most-left-on-bench",
     name: "Most points left on the bench in a week",
-    trigger: "most-bench-points",
+    trigger: "most-left-on-bench",
     per: "week",
   },
   {
