@@ -101,7 +101,7 @@ async function checkCap(
   const cap = config.spend_cap_usd;
   if (spent + ceiling <= cap) return;
   throw new LlmStopped(
-    `The next LLM call could cost up to ${usd(ceiling)}, and ${usd(spent)} of this month's ${usd(cap)} spend cap is spent, so it wasn't made: raise spend_cap_usd in ${configPath(deps)}, or wait for next month`,
+    `The next LLM call could cost up to ${usd(ceiling)}, and ${usd(spent)} of this month's ${usd(cap)} spend cap is spent, so it wasn't made: raise the cap with lazy-pundit setup cap, or wait for next month`,
   );
 }
 

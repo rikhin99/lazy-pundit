@@ -72,7 +72,6 @@ export {
   proposedHandles,
   proposedNicknames,
   punditNameProblem,
-  rerunNotBuilt,
   SetupRefusal,
   STAKES_QUESTION,
   type StakesAnswers,
@@ -80,6 +79,7 @@ export {
   setUpWorkspace,
   setupChecklist,
   sleeperLeagues,
+  spendCapNote,
   spendCapProblem,
   spendCapWarning,
   type TeamNicknames,
@@ -137,6 +137,18 @@ export {
 } from "./pundit-settings.ts";
 export { RankingFileError } from "./ranking-file.ts";
 export { type RefreshResult, refresh } from "./refresh.ts";
+export {
+  type HandEdit,
+  isRerunStep,
+  linkedHandles,
+  RERUN_STEPS,
+  type RerunStep,
+  rerunLeague,
+  rerunPreselections,
+  rerunStep,
+  rerunStop,
+  type StepRerun,
+} from "./rerun.ts";
 export {
   type FetchSleeperOptions,
   fetchSleeperSnapshot,

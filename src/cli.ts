@@ -34,7 +34,9 @@ import {
   familyLeagueLowers,
   findWorkspace,
   HANDLES_SKIPPED,
+  type HandEdit,
   handleProblem,
+  isRerunStep,
   KEY_EXPLANATION,
   KEY_SKIPPED,
   LEAGUE_TYPE_CHOICES,
@@ -62,15 +64,21 @@ import {
   proposedNicknames,
   publish,
   punditNameProblem,
+  type RerunStep,
   refresh,
-  rerunNotBuilt,
+  rerunLeague,
+  rerunPreselections,
+  rerunStep,
+  rerunStop,
   SetupRefusal,
   STAKES_QUESTION,
   type StakesAnswers,
   type StakesFields,
+  type StepRerun,
   setUpWorkspace,
   setupChecklist,
   sleeperLeagues,
+  spendCapNote,
   spendCapProblem,
   spendCapWarning,
   systemDeps,
@@ -371,12 +379,16 @@ const SKIPS = [
   { value: SKIP, label: "Skip" },
   { value: SKIP_REST, label: "Skip the rest" },
 ];
+/** A re-run step has no later steps to skip. */
+const RERUN_SKIPS = SKIPS.slice(0, 1);
 
 /** Step 3: the proposed handles, accepted as a list or renamed one at a time. */
 async function askHandles(
   league: LeagueCheck,
+  skips = SKIPS,
+  proposed = proposedHandles(league),
 ): Promise<{ handles?: ManagerHandle[]; skipRest: boolean }> {
-  let handles = proposedHandles(league);
+  let handles = proposed;
   if (handles.length === 0) return { skipRest: false };
   for (;;) {
     const picked = answered(
@@ -389,7 +401,7 @@ async function askHandles(
             value: h.account,
             label: `${h.handle} (${h.displayName})`,
           })),
-          ...SKIPS,
+          ...skips,
         ],
       }),
     );
@@ -412,14 +424,14 @@ async function askHandles(
 }
 
 /** Step 6: the power-score method, the default on the first key. */
-async function askMethod(): Promise<{
+async function askMethod(skips = SKIPS): Promise<{
   method?: PowerScoreMethod;
   skipRest: boolean;
 }> {
   const picked = answered(
     await select<string>({
       message: "How should the starting order be worked out?",
-      options: [...METHOD_CHOICES, ...SKIPS],
+      options: [...METHOD_CHOICES, ...skips],
     }),
   );
   if (picked === SKIP || picked === SKIP_REST) {
@@ -440,61 +452,78 @@ async function askKeyAndCap(
   }
   let key: string | undefined;
   if (steps.askKey) {
-    log.info(KEY_EXPLANATION);
-    while (key === undefined) {
-      const picked = answered(
-        await select({
-          message: "Add an Anthropic key?",
-          options: [{ value: "key", label: "Enter a key" }, ...SKIPS],
-        }),
-      );
-      if (picked !== "key") {
-        log.warn(KEY_SKIPPED);
-        return { skipRest: picked === SKIP_REST };
-      }
-      const typed = answered(
-        await password({
-          message: "Anthropic key",
-          validate: (v) => (v?.trim() ? undefined : "Enter the key, or Esc."),
-        }),
-      ).trim();
-      log.info("Checking the key with Anthropic…");
-      const { problem, warning } = await checkKey(deps, typed);
-      if (problem) log.error(problem);
-      else {
-        if (warning) log.warn(warning);
-        key = typed;
-      }
-    }
+    const asked = await askKey(deps);
+    if (asked.key === undefined) return asked;
+    key = asked.key;
   }
   if (!steps.askCap) {
     return key === undefined ? { skipRest: false } : { key, skipRest: false };
   }
+  const spendCap = await askCap(deps, steps.spendCap);
+  return { ...(key === undefined ? {} : { key }), spendCap, skipRest: false };
+}
+
+/** The Anthropic key, asked until one passes the live check or the step is skipped. */
+async function askKey(
+  deps: Deps,
+  skips = SKIPS,
+): Promise<{ key?: string; skipRest: boolean }> {
+  log.info(KEY_EXPLANATION);
+  for (;;) {
+    const picked = answered(
+      await select({
+        message: "Add an Anthropic key?",
+        options: [{ value: "key", label: "Enter a key" }, ...skips],
+      }),
+    );
+    if (picked !== "key") {
+      log.warn(KEY_SKIPPED);
+      return { skipRest: picked === SKIP_REST };
+    }
+    const typed = answered(
+      await password({
+        message: "Anthropic key",
+        validate: (v) => (v?.trim() ? undefined : "Enter the key, or Esc."),
+      }),
+    ).trim();
+    log.info("Checking the key with Anthropic…");
+    const { problem, warning } = await checkKey(deps, typed);
+    if (problem) log.error(problem);
+    else {
+      if (warning) log.warn(warning);
+      return { key: typed, skipRest: false };
+    }
+  }
+}
+
+/** The spend cap, which has no Skip, warned of when one call can't fit under it. */
+async function askCap(deps: Deps, initial: number): Promise<number> {
   const spendCap = Number(
     answered(
       await text({
         message:
           "Spend cap: the most LLM calls may spend in a calendar month, in US dollars",
-        initialValue: String(steps.spendCap),
+        initialValue: String(initial),
         validate: (v) => spendCapProblem(v ?? ""),
       }),
     ).trim(),
   );
   const tooSmall = await spendCapWarning(deps, spendCap);
   if (tooSmall) log.warn(tooSmall);
-  return { ...(key === undefined ? {} : { key }), spendCap, skipRest: false };
+  return spendCap;
 }
 
 /** Step 4: the league type, then each team's nicknames, accepted as a list or changed a team at a time. */
 async function askLore(
   league: LeagueCheck,
   handles: ManagerHandle[],
+  skips = SKIPS,
 ): Promise<{ lore?: LoreAnswers; skipRest: boolean }> {
   log.info(LORE_NOTICE);
   const type = answered(
     await select<string>({
       message: "What kind of league is this?",
-      options: [...LEAGUE_TYPE_CHOICES, ...SKIPS],
+      options: [...LEAGUE_TYPE_CHOICES, ...skips],
     }),
   );
   if (type === SKIP || type === SKIP_REST) {
@@ -540,6 +569,7 @@ async function askLore(
 /** Step 5: the stakes, No on the first key, then the family league. */
 async function askStakes(
   type: LeagueType | undefined,
+  skips = SKIPS,
 ): Promise<{ stakes?: StakesAnswers; skipRest: boolean }> {
   const atStake = answered(
     await select<string>({
@@ -547,7 +577,7 @@ async function askStakes(
       options: [
         { value: "no", label: "No, bragging rights only" },
         { value: "yes", label: "Yes" },
-        ...SKIPS,
+        ...skips,
       ],
     }),
   );
@@ -732,14 +762,92 @@ const STATUS_MARKS: Record<ChecklistItem["status"], string> = {
 program
   .command("setup")
   .description("Show the setup checklist: each step, done, skipped or default.")
-  .argument("[step]", "a step to re-run (in a later release)")
+  .argument("[step]", "a step to re-run on its own, such as lore or cap")
   .action(async (step) => {
-    if (step !== undefined) throw new SetupRefusal(rerunNotBuilt(step));
     const deps = systemDeps();
-    for (const item of await setupChecklist(deps, await workspace(deps))) {
-      console.log(`${STATUS_MARKS[item.status]} ${item.step}: ${item.status}`);
+    if (step === undefined) {
+      for (const item of await setupChecklist(deps, await workspace(deps))) {
+        console.log(
+          `${STATUS_MARKS[item.status]} ${item.step}: ${item.status}`,
+        );
+      }
+      return;
     }
+    if (!isRerunStep(step)) {
+      throw new SetupRefusal(rerunStop(step) ?? `No setup step ${step}.`);
+    }
+    if (!process.stdin.isTTY) {
+      throw new SetupRefusal(
+        `setup ${step} asks questions, so run it in a terminal.`,
+      );
+    }
+    const dir = await workspace(deps);
+    intro(`Lazy Pundit setup ${step}`);
+    const rerun = await askRerun(deps, dir, step);
+    const { written, warnings } = await rerunStep(
+      deps,
+      dir,
+      rerun,
+      confirmOverwrite,
+    );
+    for (const warning of warnings) log.warn(warning);
+    outro(written ? `${step} set.` : `${step} left as it was.`);
   });
+
+/** One step's answers, asked as `init` asks them, with no Skip the rest. */
+async function askRerun(
+  deps: Deps,
+  dir: string,
+  step: RerunStep,
+): Promise<StepRerun> {
+  const { type, familyLeague } = await rerunPreselections(dir);
+  switch (step) {
+    case "handles": {
+      const { league, proposed } = await rerunLeague(deps, dir);
+      const { handles } = await askHandles(league, RERUN_SKIPS, proposed);
+      return { step, league, ...(handles ? { handles } : {}) };
+    }
+    case "lore": {
+      const { league, linked } = await rerunLeague(deps, dir);
+      const { lore } = await askLore(league, linked, RERUN_SKIPS);
+      return { step, league, ...(lore ? { lore } : {}) };
+    }
+    case "stakes": {
+      const { stakes } = await askStakes(type, RERUN_SKIPS);
+      return { step, ...(stakes ? { stakes } : {}) };
+    }
+    case "method": {
+      const { method } = await askMethod(RERUN_SKIPS);
+      return { step, ...(method ? { method } : {}) };
+    }
+    case "key": {
+      const { key } = await askKey(deps, RERUN_SKIPS);
+      return { step, ...(key ? { key } : {}) };
+    }
+    case "cap": {
+      log.info(await spendCapNote(deps));
+      const { spendCap } = await operatorSteps(deps);
+      return { step, spendCap: await askCap(deps, spendCap) };
+    }
+    case "persona": {
+      const persona = await askPersona(type, familyLeague);
+      return { step, ...(persona ? { persona } : {}) };
+    }
+  }
+}
+
+/** Shows a file's hand edits against the step's text and asks to overwrite, defaulting to No. */
+async function confirmOverwrite(edit: HandEdit): Promise<boolean> {
+  log.warn(
+    `${shown(edit.file)} differs from what this step writes (- the file, + the step):\n${edit.diff}`,
+  );
+  return answered(
+    await confirm({
+      message: `Overwrite ${shown(edit.file)}?`,
+      initialValue: false,
+    }),
+  );
+}
 
 program
   .command("doctor")

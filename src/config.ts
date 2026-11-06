@@ -194,6 +194,30 @@ export async function dropWorkspaces(
 }
 
 /**
+ * Sets `spend_cap_usd` in `config.yaml`, keeping the rest of the file as
+ * written, comments included. A missing file gets the defaults written out.
+ */
+export async function setSpendCap(
+  deps: Pick<Deps, "configDir">,
+  cap: number,
+): Promise<void> {
+  const path = configPath(deps);
+  if ((await readConfig(deps)) === undefined) {
+    const { model } = defaultConfig();
+    await writeConfigFile(
+      path,
+      stringify({ format: CONFIG_FORMAT, model, spend_cap_usd: cap }),
+      0o600,
+    );
+    return;
+  }
+  const doc = parseDocument(await readFile(path, "utf8"));
+  doc.set("spend_cap_usd", cap);
+  const mode = (await stat(path)).mode & 0o777;
+  await writeConfigFile(path, doc.toString(), mode);
+}
+
+/**
  * What's wrong with a credentials file's permission bits, and the fix, or
  * undefined when only its owning user can use it.
  */

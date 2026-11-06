@@ -43,14 +43,18 @@ test("init with no terminal says so, fails and writes nothing", async () => {
   expect(await readdir(home)).toEqual([]);
 });
 
-test("setup with a step, as doctor's fixes name, says re-running one step comes later", async () => {
+test("setup with a step asks questions, so it refuses to run outside a terminal, and setup espn comes later", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "lazy-pundit-cli-"));
   const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
 
-  const { code, stderr } = await cli(cwd, ["setup", "key"], "", home);
+  const key = await cli(cwd, ["setup", "key"], "", home);
+  const espn = await cli(cwd, ["setup", "espn"], "", home);
 
-  expect(code).toBe(1);
-  expect(stderr).toMatch(/setup key.*later release.*ANTHROPIC_API_KEY/s);
+  expect(key.code).toBe(1);
+  expect(key.stderr).toMatch(/setup key asks questions.*terminal/);
+  expect(espn.code).toBe(1);
+  expect(espn.stderr).toMatch(/later release/);
+  expect(await readdir(home)).toEqual([]);
 });
 
 test("outside a workspace, publish prints the library's message and fails", async () => {

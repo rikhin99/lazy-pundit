@@ -142,7 +142,7 @@ describe("the price table and spend cap", () => {
     // The ceiling: 12,855 chars of system and prompt ÷ 3 = 4,285 tokens at
     // $2/M ($0.0086), plus 16,000 max tokens at $10/M ($0.16): $0.17.
     expect(result.fallback).toMatch(
-      /^The next LLM call could cost up to \$0\.17, and \$4\.85 of this month's \$5\.00 spend cap is spent, so it wasn't made: raise spend_cap_usd in .*config\.yaml, or wait for next month; the draft has stat lines\.$/,
+      /^The next LLM call could cost up to \$0\.17, and \$4\.85 of this month's \$5\.00 spend cap is spent, so it wasn't made: raise the cap with lazy-pundit setup cap, or wait for next month; the draft has stat lines\.$/,
     );
   });
 

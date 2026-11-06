@@ -6,14 +6,17 @@ import {
   defaultConfig,
   listWorkspace,
   loadCredentials,
+  monthSpend,
   readConfig,
   saveCredentials,
+  spendMonth,
 } from "./config.ts";
 import type { Deps } from "./deps.ts";
 import { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 import type { LeagueSettings, TeamId } from "./league.ts";
 import { leagueFilePath } from "./league-file.ts";
 import { MAX_TOKENS } from "./llm-call.ts";
+import { GATE_RETRIES } from "./llm-gate.ts";
 import {
   type LeagueNames,
   type LeagueType,
@@ -504,9 +507,11 @@ export function outcomeProblem(typed: string): string | undefined {
 }
 
 /** The answered stakes step's `league.md`, or its placeholder when skipped. */
-function leagueText(
+export function leagueText(
   season: string,
   answers: StakesAnswers | undefined,
+  /** The family league to write; a skipped re-run passes the one recorded. */
+  familyLeague = answers?.familyLeague ?? false,
 ): string {
   const stakes = answers?.stakes;
   const fields =
@@ -539,7 +544,7 @@ function leagueText(
 league: 1
 season: "${season}"
 # On keeps every persona clean, whatever it asks for.
-family-league: ${answers?.familyLeague ? "on" : "off"}
+family-league: ${familyLeague ? "on" : "off"}
 ${fields}---
 
 <!--
@@ -667,7 +672,7 @@ ${LORE_COMMENT}
  * `persona.md` with this preset. Its explanation goes in YAML comments, since
  * all of the body is the style note, sent with every draft.
  */
-function personaText(preset: PresetName): string {
+export function personaText(preset: PresetName): string {
   return `---
 format: ${FORMAT}
 # The preset: broadcast, family, banter or roast. Any of its controls can be
@@ -721,24 +726,15 @@ async function writeStepFiles(
     persona?: PresetName;
   },
 ): Promise<void> {
-  const { method } = answers;
   await mkdir(punditDir(ws), { recursive: true });
   await mkdir(seasonDir(ws), { recursive: true });
-  const chosen =
-    method === undefined || method === DEFAULT_SETTINGS.method
-      ? ""
-      : `method: ${method}\n`;
   await writeWorkspaceFile(
     punditSettingsPath(ws),
-    `---
-format: ${FORMAT}
-# method: ${METHOD_CHOICES.map((c) => c.value).join(", ")}. With none, ${DEFAULT_SETTINGS.method}.
-${chosen}---
-`,
+    settingsText(answers.method),
   );
   await writeWorkspaceFile(
     join(ws.dir, "lore.md"),
-    answers.lore ? loreText(answers.lore, league) : LORE_PLACEHOLDER,
+    loreFileText(answers.lore, league),
     { versionKey: "lore" },
   );
   await writeWorkspaceFile(
@@ -752,20 +748,38 @@ ${chosen}---
   );
 }
 
+/** The method step's pundit settings: a file naming no method reads as the default. */
+export function settingsText(method: PowerScoreMethod | undefined): string {
+  const chosen =
+    method === undefined || method === DEFAULT_SETTINGS.method
+      ? ""
+      : `method: ${method}\n`;
+  return `---
+format: ${FORMAT}
+# method: ${METHOD_CHOICES.map((c) => c.value).join(", ")}. With none, ${DEFAULT_SETTINGS.method}.
+${chosen}---
+`;
+}
+
+/** The lore step's `lore.md`, or its placeholder when skipped. */
+export function loreFileText(
+  answers: LoreAnswers | undefined,
+  league: LeagueCheck,
+): string {
+  return answers ? loreText(answers, league) : LORE_PLACEHOLDER;
+}
+
 /** Broadcast, the persona with no `persona.md`, is the default. */
-function personaStatus(preset: PresetName | undefined): SetupStatus {
+export function personaStatus(preset: PresetName | undefined): SetupStatus {
   if (preset === undefined) return "skipped";
   return preset === "broadcast" ? "default" : "done";
 }
 
-function methodStatus(method: PowerScoreMethod | undefined): SetupStatus {
+export function methodStatus(
+  method: PowerScoreMethod | undefined,
+): SetupStatus {
   if (method === undefined) return "skipped";
   return method === DEFAULT_SETTINGS.method ? "default" : "done";
-}
-
-/** Why `setup <step>` stops: re-running one step isn't built yet (#61). */
-export function rerunNotBuilt(step: string): string {
-  return `Re-running one step, as lazy-pundit setup ${step} would, comes in a later release. For now, set ANTHROPIC_API_KEY for the key, or edit config.yaml or the workspace's files by hand.`;
 }
 
 /** One line of the setup checklist. */
@@ -903,16 +917,43 @@ export async function spendCapWarning(
   deps: Pick<Deps, "configDir">,
   cap: number,
 ): Promise<string | undefined> {
+  const { model, least } = await callCeiling(deps);
+  if (least === undefined || cap >= least) return undefined;
+  return `One LLM call on ${model} can cost more than ${usd(least)}, so under a spend cap of ${usd(cap)} every draft falls back to stat lines.`;
+}
+
+/**
+ * Said at the cap step when it's re-run: this month's spend so far, the cap,
+ * and what one draft can ask of it, so the new cap leaves room for a draft.
+ */
+export async function spendCapNote(
+  deps: Pick<Deps, "configDir" | "clock">,
+): Promise<string> {
+  const config = (await readConfig(deps)) ?? defaultConfig();
+  const spent = await monthSpend(deps, spendMonth(deps.clock.now()));
+  const { model, least } = await callCeiling(deps);
+  const ceiling =
+    least === undefined
+      ? `${model} has no price, so no LLM call is made.`
+      : `One LLM call on ${model} can cost more than ${usd(least)}, and a draft makes up to ${1 + GATE_RETRIES}.`;
+  return `This month's spend is ${usd(spent)} of a ${usd(config.spend_cap_usd)} spend cap. ${ceiling}`;
+}
+
+/** The model and the least one call is checked against: its whole `MAX_TOKENS` reply. */
+async function callCeiling(
+  deps: Pick<Deps, "configDir">,
+): Promise<{ model: string; least?: number }> {
   const config = (await readConfig(deps)) ?? defaultConfig();
   const price = priceOf(config);
-  if (price === undefined) return undefined;
-  const least = ceilingCost(price, {
-    system: "",
-    prompt: "",
-    maxTokens: MAX_TOKENS,
-  });
-  if (cap >= least) return undefined;
-  return `One LLM call on ${config.model} can cost more than ${usd(least)}, so under a spend cap of ${usd(cap)} every draft falls back to stat lines.`;
+  if (price === undefined) return { model: config.model };
+  return {
+    model: config.model,
+    least: ceilingCost(price, {
+      system: "",
+      prompt: "",
+      maxTokens: MAX_TOKENS,
+    }),
+  };
 }
 
 /** Everything `setUpWorkspace` writes in the workspace, which a failure takes back. */

@@ -14,6 +14,8 @@
 #   another         every default, then a second league, cancelled at its name
 #   stakes          money at stake: buy-in 50, the default payouts, a $10 weekly high score
 #   family          a family league type, so the family league and Family persona are preselected
+#   setup-lore      every default into <home>/ws, a hand edit to lore.md, then setup lore
+#                   declined at the diff and run again confirmed
 #
 # It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
 # with the wizard's code. Look in that home for what the wizard wrote. A new
@@ -21,8 +23,8 @@
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another stakes family}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|stakes|family"
+if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another stakes family setup-lore}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|stakes|family|setup-lore"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -95,7 +97,13 @@ send "900000000000000001\r"
 
 need "Workspace folder"
 if {$scenario eq "cancel-folder"} { send $CTRL_C; finish }
-if {$scenario eq "folder"} { send "$folder\r" } else { send "\r" }
+if {$scenario eq "folder"} {
+  send "$folder\r"
+} elseif {$scenario eq "setup-lore"} {
+  send "$home/ws\r"
+} else {
+  send "\r"
+}
 
 set UP "\033\[A"
 need "Manager handles"
@@ -163,4 +171,28 @@ if {$scenario eq "another"} {
   finish
 }
 send "\r"
+if {$scenario ne "setup-lore"} { finish }
+
+expect eof
+wait
+set lore [open "$home/ws/lore.md" a]
+puts $lore "\n## Running jokes\n\n- The trade that never was."
+close $lore
+cd "$home/ws"
+foreach answer {n y} {
+  spawn node "$repo/src/cli.ts" setup lore
+  need "What kind of league"
+  send "\r"
+  need "nicknames each team"
+  send "\r"
+  need "Overwrite"
+  send "$answer"; after 200; send "\r"
+  if {$answer eq "n"} {
+    need "left as it was"
+    expect eof
+    wait
+  } else {
+    need "lore set"
+  }
+}
 finish
