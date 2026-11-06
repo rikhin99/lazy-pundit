@@ -9,6 +9,7 @@ import {
   WorkspaceFileError,
 } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
+import { scriptedLlm } from "./support/llm.ts";
 import {
   atWeek,
   FEAR_THE_TURTLE_ID,
@@ -36,7 +37,11 @@ ${extra}`;
 }
 
 /** The 2025 season's `league.md` with `fields` of stakes front matter. */
-async function writeLeagueFile(dir: string, fields: string): Promise<void> {
+async function writeLeagueFile(
+  dir: string,
+  fields: string,
+  body = "<!-- Free text rules go under a heading. -->\n",
+): Promise<void> {
   const season = join(dir, "seasons", "2025");
   await mkdir(season, { recursive: true });
   await writeFile(
@@ -47,8 +52,7 @@ season: "2025"
 family-league: off
 ${fields}---
 
-Free text rules.
-`,
+${body}`,
   );
 }
 
@@ -82,7 +86,75 @@ async function claimProblems(
   const text = await readFile(ws.path, "utf8");
   await writeFile(ws.path, text.replace(heading, `${heading}${words}\n`));
   const { problems } = await check(ws.dir, ws.deps);
-  return problems.filter((p) => /^(wk\.)?(rule|stakes)\./.test(p.id ?? ""));
+  return problems.filter((p) =>
+    /^(wk\.)?(rule|stakes|platform)\./.test(p.id ?? ""),
+  );
+}
+
+/** Each handle's account in Fear The Turtle; any other handle links to no team. */
+const ACCOUNTS: Record<string, string> = {
+  gus: "sleeper:800000000000000001",
+  wendy: "sleeper:800000000000000002",
+  frank: "sleeper:800000000000000004",
+  pete: "sleeper:800000000000000006",
+};
+
+/** Links each handle to its account in `workspace.md`. */
+async function linkHandles(dir: string, handles: string[]): Promise<void> {
+  const path = join(dir, "workspace.md");
+  const text = await readFile(path, "utf8");
+  const lines = handles
+    .map((h) => `  ${h}: ["${ACCOUNTS[h] ?? "sleeper:no-such-account"}"]`)
+    .join("\n");
+  await writeFile(path, text.replace("\n---\n", `\nhandles:\n${lines}\n---\n`));
+}
+
+/**
+ * Fear The Turtle drafted at `week` (default 8) with `league.md`'s `fields`
+ * and `body`, `handles` linked, and with `reply` the LLM's answer, if given.
+ */
+async function stakesDraft(opts: {
+  week?: number;
+  fields?: string;
+  body?: string;
+  handles?: string[];
+  reply?: string;
+}) {
+  const week = opts.week ?? 8;
+  const ws = await fearTheTurtle(week);
+  await writeLeagueFile(ws.dir, opts.fields ?? "", opts.body);
+  if (opts.handles) await linkHandles(ws.dir, opts.handles);
+  const llm = opts.reply === undefined ? undefined : scriptedLlm(opts.reply);
+  if (llm) {
+    ws.deps.llm = llm;
+    ws.deps.env.anthropicApiKey = "sk-ant-test";
+  }
+  const result = await draft(ws.dir, ws.deps);
+  const text = await readFile(result.path, "utf8");
+  return {
+    ...ws,
+    result,
+    path: result.path,
+    text,
+    requests: llm?.requests ?? [],
+    prompt: llm?.requests[0]?.prompt ?? "",
+    system: llm?.requests[0]?.system ?? "",
+  };
+}
+
+/** `check`'s problems of `kind` after adding `words` under `heading`, as [text, kind]. */
+async function problemsOf(
+  ws: { dir: string; deps: Deps; path: string },
+  heading: string,
+  words: string,
+  kind: string,
+) {
+  const text = await readFile(ws.path, "utf8");
+  await writeFile(ws.path, text.replace(heading, `${heading}${words}\n`));
+  const { problems } = await check(ws.dir, ws.deps);
+  return problems
+    .filter((p) => p.kind === kind)
+    .map((p) => [p.text, p.severity]);
 }
 
 /** Bye Bye Bea's week-8 score raised by `points`, as a stat correction. */
@@ -231,6 +303,24 @@ ${highScore("$20", "    from: 5\n")}`,
     );
   });
 
+  test("a most-left-on-bench rule per season goes to the season's total, not its worst week", async () => {
+    // Through week 14: Wendy's Wire left 276.80 on the bench in all; Kim
+    // Possible Kicks left the most in one week, 60.75.
+    const ws = await drafted(
+      14,
+      `house-rules:
+  - id: bench-season
+    name: Season's most left on the bench
+    trigger: most-left-on-bench
+    per: season
+    outcome: $25
+`,
+    );
+    expect(lineAfter(ws.text, INTRO)).toContain(
+      "[Season's most left on the bench: Wendy's Wire]{ev=wk.rule.bench-season}",
+    );
+  });
+
   test("a trigger the platform can't work out warns to log it by hand and has no winner", async () => {
     const ws = await drafted(
       14,
@@ -298,6 +388,26 @@ describe("league.md", () => {
       "until: before from:",
       `house-rules:\n${highScore("$10", "    from: 6\n    until: 3\n")}`,
       /until/,
+    ],
+    [
+      "a spirit that isn't serious or joke",
+      `house-rules:\n${highScore("$10", "    spirit: silly\n")}`,
+      /spirit/,
+    ],
+    [
+      "a rivalry pair of one handle",
+      "rivalry-weeks:\n  - week: 8\n    pairs: [[gus, gus]]\n",
+      /gus.*itself/,
+    ],
+    [
+      "a handle in two rivalry pairs of one week",
+      "rivalry-weeks:\n  - week: 8\n    pairs: [[gus, pete], [gus, wendy]]\n",
+      /gus in two pairs/,
+    ],
+    [
+      "a rivalry week given twice",
+      "rivalry-weeks:\n  - week: 8\n    pairs: [[gus, pete]]\n  - week: 8\n    pairs: [[gus, wendy]]\n",
+      /week 8.*twice/,
     ],
   ])("%s stops the draft", async (_, fields, message) => {
     const ws = await fearTheTurtle(8);
@@ -380,5 +490,279 @@ ${highScore("$20", "    from: 8\n")}`,
     const result = await draft(ws.dir, atWeek(ws.deps, 8));
 
     expect(result.warnings.filter((w) => /pays/.test(w))).toEqual([]);
+  });
+});
+
+const BODY = `## Bye fines
+- A bye week costs whoever forgot to set a lineup $5.
+
+## Log
+- {week=3}{rule=high-score}{pinned} Bea took the first prize of the year.
+- {week=5}{rule=high-score} The Rascals cashed in.
+- {week=7} Bo was fined for a late lineup.
+- {week=8}{rule=high-score} Gus collected.
+`;
+
+describe("league.md's body", () => {
+  test("a blurb may cite a stakes section, a house rule or a week's Log entries, and nothing else", async () => {
+    const ws = await stakesDraft({
+      fields: `house-rules:\n${highScore()}`,
+      body: BODY,
+    });
+    expect(
+      await problemsOf(
+        ws,
+        BEA,
+        "Bea [owes a bye fine]{stakes=bye-fines}, chases [the high-score prize]{stakes=high-score} and [cashed in once]{log=w5}. [A side pot]{stakes=side-pots} and [a week-4 fine]{log=w4}.",
+        "unknown-id",
+      ),
+    ).toEqual([
+      ["A side pot", "hard"],
+      ["a week-4 fine", "hard"],
+    ]);
+  });
+
+  test.each([
+    [
+      "an unknown tag in a stakes section",
+      "## Fines\n- {fine} $5\n",
+      /\{fine\}/,
+    ],
+    [
+      "an unknown tag in the Log",
+      "## Log\n- {week=3}{paid} Bea paid.\n",
+      /\{paid\}/,
+    ],
+    ["a Log entry with no week", "## Log\n- Bea paid.\n", /\{week=/],
+    [
+      "a Log entry naming no house rule",
+      "## Log\n- {week=3}{rule=nope} Bea paid.\n",
+      /nope/,
+    ],
+    ["a heading with no words", "## ***\n- a\n", /no words/],
+    [
+      "two sections with one name",
+      "## Fines\n- a\n\n## fines\n- b\n",
+      /two sections/,
+    ],
+    [
+      "a {local} marker",
+      "## Fines\n- {local} Bo owes $5.\n",
+      /local-only isn't supported yet; remove the entry or the marker/,
+    ],
+  ])("%s stops the draft", async (_, body, message) => {
+    const ws = await fearTheTurtle(8);
+    await writeLeagueFile(ws.dir, `house-rules:\n${highScore()}`, body);
+    const failed = draft(ws.dir, ws.deps);
+    await expect(failed).rejects.toThrow(WorkspaceFileError);
+    await expect(failed).rejects.toThrow(message);
+  });
+
+  test("stakes: none beside rules in the body stops the draft", async () => {
+    const ws = await fearTheTurtle(8);
+    await writeLeagueFile(ws.dir, "stakes: none\n", "## Fines\n- $5 a week.\n");
+    await expect(draft(ws.dir, ws.deps)).rejects.toThrow(/stakes: none/);
+  });
+
+  test("text above the first heading warns that it isn't sent", async () => {
+    const ws = await stakesDraft({ body: "Loose words.\n\n## Fines\n- $5.\n" });
+    expect(ws.result.warnings).toContainEqual(
+      expect.stringMatching(
+        /^league\.md line \d+ is above the first ## heading/,
+      ),
+    );
+  });
+});
+
+describe("rivalry weeks", () => {
+  const RIVALS = (pair: string, week = 8) =>
+    `rivalry-weeks:\n  - week: ${week}\n    pairs: [[${pair}]]\n`;
+  const PYLON = "## Pylon Patrol {team=sleeper:6}\n";
+
+  test("a rivalry week the schedule pairs gives each team its rival, and the league its rivalry", async () => {
+    // Week 8: Gus Bus plays Pylon Patrol.
+    const ws = await stakesDraft({
+      fields: RIVALS("gus, pete"),
+      handles: ["gus", "pete"],
+    });
+    expect(lineAfter(ws.text, GUS)).toContain(
+      "Rivalry: [Pylon Patrol]{ev=rival}",
+    );
+    expect(lineAfter(ws.text, PYLON)).toContain("Rivalry: [Gus Bus]{ev=rival}");
+    // Gus Bus's 133.22 was the week's high.
+    expect(lineAfter(ws.text, INTRO)).toContain(
+      "[Rivalry week: Gus Bus and Pylon Patrol]{ev=wk.rivalry.1}, won by [Gus Bus]{ev=wk.rivalry.1.winner}",
+    );
+    expect(ws.result.warnings.filter((w) => /rivalry/i.test(w))).toEqual([]);
+    expect(
+      ws.result.problems.filter(
+        (p) => /rival/.test(p.id ?? "") || p.section === "Intro",
+      ),
+    ).toEqual([]);
+  });
+
+  test("each rivalry pair is its own league item, so a claim mixing two pairs is wrong", async () => {
+    // Week 8: Gus Bus plays Pylon Patrol, Wendy's Wire plays Frank's FAAB Fund.
+    const ws = await stakesDraft({
+      fields:
+        "rivalry-weeks:\n  - week: 8\n    pairs: [[gus, pete], [wendy, frank]]\n",
+      handles: ["gus", "pete", "wendy", "frank"],
+    });
+    expect(lineAfter(ws.text, INTRO)).toContain(
+      "[Rivalry week: Wendy's Wire and Frank's FAAB Fund]{ev=wk.rivalry.2}",
+    );
+    expect(
+      await problemsOf(
+        ws,
+        INTRO,
+        "[Gus Bus and Wendy's Wire]{ev=wk.rivalry.1} met.",
+        "wrong",
+      ),
+    ).toEqual([["Gus Bus and Wendy's Wire", "hard"]]);
+  });
+
+  test("a rivalry week whose handles the schedule doesn't pair warns, and gives no rival", async () => {
+    const ws = await stakesDraft({
+      fields: RIVALS("gus, wendy"),
+      handles: ["gus", "wendy"],
+    });
+    expect(ws.result.warnings).toContainEqual(
+      "league.md: rivalry week 8 pairs gus and wendy, but the schedule doesn't: Gus Bus plays Pylon Patrol that week.",
+    );
+    expect(ws.text).not.toContain("rival");
+  });
+
+  test("a rivalry handle linked to no team in the league warns", async () => {
+    const ws = await stakesDraft({
+      fields: RIVALS("gus, nobody"),
+      handles: ["gus"],
+    });
+    expect(ws.result.warnings).toContainEqual(
+      expect.stringMatching(
+        /^league\.md: rivalry week 8 names nobody, .*no team/,
+      ),
+    );
+    expect(ws.text).not.toContain("rival");
+  });
+
+  test("next week's rivalry shows as upcoming", async () => {
+    const ws = await stakesDraft({
+      fields: RIVALS("gus, pete", 9),
+      handles: ["gus", "pete"],
+    });
+    expect(lineAfter(ws.text, GUS)).toContain(
+      "Rivalry next week: [Pylon Patrol]{ev=next_rival}",
+    );
+  });
+});
+
+describe("platform settings", () => {
+  test("are league evidence, read fresh and never written to league.md", async () => {
+    const ws = await drafted(8, "");
+    const before = await readFile(
+      join(ws.dir, "seasons", "2025", "league.md"),
+      "utf8",
+    );
+    expect(
+      await claimProblems(
+        ws,
+        INTRO,
+        "[6]{ev=platform.playoff_spots} teams make it from week [15]{ev=platform.playoff_start}, not [8]{ev=platform.playoff_spots}, with [100]{ev=platform.faab_budget} FAAB.",
+      ),
+    ).toEqual([
+      expect.objectContaining({ kind: "wrong", text: "8" }),
+      // Fear The Turtle has no FAAB.
+      expect.objectContaining({ kind: "unknown-id", text: "100" }),
+    ]);
+    expect(
+      await readFile(join(ws.dir, "seasons", "2025", "league.md"), "utf8"),
+    ).toBe(before);
+  });
+});
+
+describe("the no-stakes flag", () => {
+  test("stakes: none flags a prize mention in a blurb; unrecorded stakes don't", async () => {
+    const words = "Bea is chasing the prize.";
+    const none = await drafted(8, "stakes: none\n");
+    expect(await problemsOf(none, BEA, words, "no-stakes")).toEqual([
+      ["prize", "hard"],
+    ]);
+    const unrecorded = await drafted(8, "");
+    expect(await problemsOf(unrecorded, BEA, words, "no-stakes")).toEqual([]);
+  });
+});
+
+describe("stakes sent to the LLM", () => {
+  const REPLY = "## {intro}\nA quiet week.";
+
+  test("only this and last week's Log entries, plus pinned ones, reach the prompt", async () => {
+    const ws = await stakesDraft({
+      fields: `house-rules:\n${highScore()}`,
+      body: BODY,
+      reply: REPLY,
+    });
+    expect(ws.prompt).toContain("Gus collected.");
+    expect(ws.prompt).toContain("Bo was fined for a late lineup.");
+    expect(ws.prompt).toContain("Bea took the first prize of the year.");
+    expect(ws.prompt).not.toContain("The Rascals cashed in.");
+    expect(ws.prompt).toContain(
+      "A bye week costs whoever forgot to set a lineup $5.",
+    );
+  });
+
+  test("recorded stakes reach the prompt, with the rules for using them", async () => {
+    const ws = await stakesDraft({
+      fields: `buy-in: $50\nhouse-rules:\n${highScore()}  - id: sacko
+    name: The Sacko
+    outcome: wears the jersey
+    spirit: joke
+`,
+      reply: REPLY,
+    });
+    expect(ws.prompt).toContain("## Stakes");
+    expect(ws.prompt).toContain("Buy-in: $50 per team");
+    expect(ws.prompt).toContain("high-score: Weekly high score, $10");
+    expect(ws.prompt).toContain("sacko: The Sacko, wears the jersey (a joke)");
+    expect(ws.system).not.toContain(
+      "Don't mention money, prizes or punishments.",
+    );
+    expect(ws.system).toContain("{stakes=<section>}");
+    expect(ws.system).toContain("wk.rule.<id>");
+  });
+
+  test("stakes: none tells the LLM it's bragging rights only; unrecorded stakes say nothing", async () => {
+    const none = await stakesDraft({ fields: "stakes: none\n", reply: REPLY });
+    expect(none.prompt).toMatch(/## Stakes\n.*bragging rights only/);
+    const unrecorded = await stakesDraft({ reply: REPLY });
+    expect(unrecorded.prompt).not.toContain("## Stakes");
+  });
+
+  test("{stakes=…} and a sent {log=w<N>} pass the LLM gate; an unsent Log week fails it", async () => {
+    const fields = `house-rules:\n${highScore()}`;
+    const passed = await stakesDraft({
+      fields,
+      body: BODY,
+      reply:
+        "## {intro}\nGus [collected again]{log=w8}, and [bye fines]{stakes=bye-fines} loom.",
+    });
+    expect(passed.requests).toHaveLength(1);
+    const failed = await stakesDraft({
+      fields,
+      body: BODY,
+      reply: "## {intro}\nThe Rascals [cashed in]{log=w5}.",
+    });
+    expect(failed.requests).toHaveLength(3);
+    // `check` accepts any Log week, so only the draft can say it wasn't sent.
+    expect(failed.result.warnings).toContainEqual(
+      'The LLM cited lore or stakes it wasn\'t sent, so it may have made this up: "cashed in".',
+    );
+  });
+
+  test("under stakes: none, LLM prose mentioning a prize fails the LLM gate", async () => {
+    const ws = await stakesDraft({
+      fields: "stakes: none\n",
+      reply: "## {intro}\nEveryone wants the prize.",
+    });
+    expect(ws.requests).toHaveLength(3);
   });
 });

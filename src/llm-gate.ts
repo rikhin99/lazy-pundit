@@ -29,6 +29,8 @@ export interface GateFaults {
   claims: CheckedClaim[];
   /** Word-list hits, when swearing is off. */
   swears: Swear[];
+  /** Under `stakes: none`, each mention of money, a prize or a punishment. */
+  stakesMentions: Swear[];
 }
 
 /** A section that failed the gate: its text and the faults found in it. */
@@ -125,12 +127,19 @@ function gate(
   );
   return result.pass
     ? undefined
-    : { key, text, claims: result.claims, swears: result.swears };
+    : {
+        key,
+        text,
+        claims: result.claims,
+        swears: result.swears,
+        stakesMentions: result.stakesMentions,
+      };
 }
 
 /** Fewer hard faults is better, then fewer faults in all. */
 function score(f: GateFaults): number {
-  const hard = f.claims.filter((c) => isHard(c.status)).length;
+  const hard =
+    f.claims.filter((c) => isHard(c.status)).length + f.stakesMentions.length;
   return hard * 1000 + f.claims.length + f.swears.length;
 }
 

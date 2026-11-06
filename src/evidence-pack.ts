@@ -76,6 +76,11 @@ export function buildEvidencePack(league: League, week: number): EvidencePack {
   const { clinched, eliminated } = settledThisWeek(league, week);
   if (clinched.length > 0) items["wk.clinched"] = clinched.join(",");
   if (eliminated.length > 0) items["wk.eliminated"] = eliminated.join(",");
+  // The platform settings, read from the fetch and never from a pundit's file.
+  const { playoffTeams, playoffStartWeek, faabBudget } = league.settings;
+  items["platform.playoff_spots"] = playoffTeams;
+  items["platform.playoff_start"] = playoffStartWeek;
+  if (faabBudget !== null) items["platform.faab_budget"] = faabBudget;
 
   return { week, teams, league: items };
 }

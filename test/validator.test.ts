@@ -65,6 +65,7 @@ describe("grounding prototype scenarios, format A (tags in the file)", () => {
       pass: false,
       claims: [expect.objectContaining({ text: "118.6", tagged: false })],
       swears: [],
+      stakesMentions: [],
     });
 
     const clean = validate(
@@ -893,6 +894,26 @@ test("plain 'new' about a new team is verified", () => {
   expect(only(2, "A new high for the bench.", { order })).toEqual([]);
 });
 
+describe("the no-stakes flag", () => {
+  test("under stakes: none, money, prize and punishment words are flagged, outside team names; otherwise nothing is", () => {
+    const text =
+      "Playing for the $50 pot, Bea was fined, and the punishment is cruel. A fine week, a punishing schedule, and I'd bet on Frank's FAAB Fund.";
+    expect(
+      validate(blurb(3, text, { noStakes: true })).stakesMentions.map(
+        (m) => m.word,
+      ),
+    ).toEqual(["$50", "pot", "fined", "punishment"]);
+    expect(validate(blurb(3, text)).stakesMentions).toEqual([]);
+  });
+
+  test("a stakes mention fails the LLM gate", () => {
+    const result = validate(
+      blurb(3, "They want the prize.", { noStakes: true }),
+    );
+    expect(gateLlm(result).pass).toBe(false);
+  });
+});
+
 describe("invariants over a corpus", () => {
   const TEAMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, null];
 
@@ -907,6 +928,12 @@ describe("invariants over a corpus", () => {
       }
     },
   );
+
+  test.each(PLAIN_PROSE)("no stakes mention under stakes: none: %s", (text) => {
+    expect(validate(blurb(3, text, { noStakes: true })).stakesMentions).toEqual(
+      [],
+    );
+  });
 
   const isWord = (ch: string | undefined) => !!ch && /\w/.test(ch);
 

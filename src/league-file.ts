@@ -3,10 +3,19 @@ import { join } from "node:path";
 import { z } from "zod";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
 import {
+  HEADING,
+  headingName,
+  refuseLocalLines,
+  withoutComments,
+} from "./lore.ts";
+import {
   type HouseRule,
+  type LogEntry,
   type Outcome,
   type Payout,
+  type Rival,
   type Stakes,
+  type StakesSection,
   TRIGGER_KINDS,
 } from "./stakes.ts";
 import { seasonDir, type Workspace } from "./workspace.ts";
@@ -20,6 +29,8 @@ export function leagueFilePath(ws: Workspace): string {
 export interface LeagueFile {
   familyLeague: boolean;
   stakes: Stakes;
+  /** What the body holds that isn't sent, by line. */
+  warnings: string[];
 }
 
 const DOLLARS = /^\$(\d+(?:\.\d{1,2})?)$/;
@@ -52,6 +63,9 @@ const houseRuleSchema = z
       .refine((o) => !/[{}]/.test(String(o)), {
         error: "an outcome can't hold a brace",
       }),
+    spirit: z
+      .enum(["serious", "joke"], { error: 'spirit is "serious" or "joke"' })
+      .optional(),
     from: week.optional(),
     until: week.optional(),
   })
@@ -73,6 +87,36 @@ const houseRuleSchema = z
         code: "custom",
         message: `${r.id}: until: week ${r.until} comes before from: week ${r.from}`,
       });
+    }
+  });
+
+const HANDLE = z.string().regex(/^[^\s{}=]+$/, {
+  error: "a rivalry names managers by handle, such as bo",
+});
+
+const rivalryWeekSchema = z
+  .strictObject({
+    week,
+    pairs: z.array(z.tuple([HANDLE, HANDLE])).min(1),
+  })
+  .superRefine((r, ctx) => {
+    const seen = new Set<string>();
+    for (const [a, b] of r.pairs) {
+      if (a === b) {
+        ctx.addIssue({
+          code: "custom",
+          message: `rivalry week ${r.week} pairs ${a} with itself`,
+        });
+      }
+      for (const h of [a, b]) {
+        if (seen.has(h) && a !== b) {
+          ctx.addIssue({
+            code: "custom",
+            message: `rivalry week ${r.week} names ${h} in two pairs`,
+          });
+        }
+        seen.add(h);
+      }
     }
   });
 
@@ -101,6 +145,7 @@ export const leagueFileSchema = z
       .optional(),
     "last-place": z.enum(["standings", "losers-bracket"]).optional(),
     "house-rules": z.array(houseRuleSchema).optional(),
+    "rivalry-weeks": z.array(rivalryWeekSchema).optional(),
   })
   .superRefine((f, ctx) => {
     const fields = STAKES_FIELDS.filter((k) => f[k] !== undefined);
@@ -129,6 +174,16 @@ export const leagueFileSchema = z
       }
       seen.add(r.id);
     }
+    const weeks = new Set<number>();
+    for (const r of f["rivalry-weeks"] ?? []) {
+      if (weeks.has(r.week)) {
+        ctx.addIssue({
+          code: "custom",
+          message: `rivalry week ${r.week} is there twice: list all its pairs under one week`,
+        });
+      }
+      weeks.add(r.week);
+    }
   });
 
 const STAKES_FIELDS = [
@@ -136,17 +191,39 @@ const STAKES_FIELDS = [
   "payouts",
   "last-place",
   "house-rules",
+  "rivalry-weeks",
 ] as const;
 
-/** Reads a `league.md`'s text, refusing unknown keys and malformed stakes. */
-export function readLeagueFile(text: string): LeagueFile {
-  const { data } = readFrontMatter("league.md", text, "league");
+/**
+ * Reads a `league.md`'s text, refusing unknown keys, unknown tags and
+ * malformed stakes. `handles` are `workspace.md`'s, which a rivalry week's
+ * handles resolve through.
+ */
+export function readLeagueFile(
+  text: string,
+  handles: Workspace["handles"] = {},
+): LeagueFile {
+  const { data, body, bodyLine } = readFrontMatter("league.md", text, "league");
   const parsed = leagueFileSchema.safeParse(data);
   if (!parsed.success) {
     throw new WorkspaceFileError(`league.md: ${z.prettifyError(parsed.error)}`);
   }
   const f = parsed.data;
-  return { familyLeague: f["family-league"] === "on", stakes: stakesOf(f) };
+  const ruleIds = new Set((f["house-rules"] ?? []).map((r) => r.id));
+  const read = readBody(body, bodyLine, ruleIds);
+  if (
+    f.stakes === "none" &&
+    (read.sections.length > 0 || read.log.length > 0)
+  ) {
+    throw new WorkspaceFileError(
+      "league.md: stakes: none means bragging rights only, so the body can't hold rules or a Log: remove them, or stakes: none",
+    );
+  }
+  return {
+    familyLeague: f["family-league"] === "on",
+    stakes: stakesOf(f, read, handles),
+    warnings: read.warnings,
+  };
 }
 
 /** The season's `league.md`; a missing file has the family league off and the stakes unrecorded. */
@@ -156,9 +233,126 @@ export async function loadLeagueFile(ws: Workspace): Promise<LeagueFile> {
     text = await readFile(leagueFilePath(ws), "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    return { familyLeague: false, stakes: { kind: "unrecorded" } };
+    return {
+      familyLeague: false,
+      stakes: { kind: "unrecorded" },
+      warnings: [],
+    };
   }
-  return readLeagueFile(text);
+  return readLeagueFile(text, ws.handles);
+}
+
+const TAGS = /\{[^{}]*\}/g;
+const LOG_TAGS = /^((?:\{[^{}]*\})+)\s*(.*)$/;
+
+interface Body {
+  sections: StakesSection[];
+  log: LogEntry[];
+  warnings: string[];
+}
+
+/**
+ * The body's free-text rules by heading and its `## Log`. Comments aren't
+ * read, but a `{local}` anywhere stops the load, so it never fails open.
+ */
+function readBody(body: string, bodyLine: number, ruleIds: Set<string>): Body {
+  refuseLocalLines(
+    "league.md",
+    body
+      .split(/\r?\n/)
+      .flatMap((line, i) => (line.includes("{local}") ? [bodyLine + i] : [])),
+  );
+  const out: Body = { sections: [], log: [], warnings: [] };
+  const unknown: string[] = [];
+  const lines: { name: string; line: number }[] = [];
+  let section: StakesSection | "log" | undefined;
+  withoutComments(body)
+    .split(/\r?\n/)
+    .forEach((raw, i) => {
+      const text = raw.trim();
+      const at = bodyLine + i;
+      const heading = HEADING.exec(text)?.[1];
+      if (heading !== undefined) {
+        for (const [tag] of heading.matchAll(TAGS))
+          unknown.push(`line ${at}: ${tag}`);
+        const name = headingName(heading);
+        if (!name) {
+          throw new WorkspaceFileError(
+            `league.md line ${at}: this heading has no words a {stakes=…} tag could cite`,
+          );
+        }
+        const earlier = lines.find((l) => l.name === name);
+        if (earlier) {
+          throw new WorkspaceFileError(
+            `league.md has two sections named ${name}, on lines ${earlier.line} and ${at}`,
+          );
+        }
+        lines.push({ name, line: at });
+        if (name === "log") {
+          section = "log";
+        } else {
+          section = { name, entries: [] };
+          out.sections.push(section);
+        }
+        return;
+      }
+      if (!text || /^(?:[-*_]{3,}|#\s.*)$/.test(text)) return; // A rule or a title.
+      const item = text.replace(/^[-*]\s+/, "");
+      if (section === undefined) {
+        out.warnings.push(
+          `league.md line ${at} is above the first ## heading, so it isn't sent. Move it under a heading.`,
+        );
+      } else if (section === "log") {
+        out.log.push(logEntry(item, at, ruleIds, unknown));
+      } else {
+        for (const [tag] of item.matchAll(TAGS))
+          unknown.push(`line ${at}: ${tag}`);
+        section.entries.push(item);
+      }
+    });
+  if (unknown.length > 0) {
+    throw new WorkspaceFileError(
+      `league.md has tags this version doesn't know, so remove each one (a Log entry starts with {week=N}, then {rule=<id>} and {pinned} if wanted): ${unknown.join(", ")}`,
+    );
+  }
+  out.sections = out.sections.filter((s) => s.entries.length > 0);
+  return out;
+}
+
+/** One `## Log` bullet: `{week=N}`, then `{rule=<id>}` and `{pinned}` if wanted, then its text. */
+function logEntry(
+  item: string,
+  at: number,
+  ruleIds: Set<string>,
+  unknown: string[],
+): LogEntry {
+  const [, tags = "", text = ""] = LOG_TAGS.exec(item) ?? [];
+  const entry: Partial<LogEntry> & { pinned: boolean } = { pinned: false };
+  for (const [tag] of tags.matchAll(TAGS)) {
+    const week = /^\{week=(\d+)\}$/.exec(tag)?.[1];
+    const rule = /^\{rule=([^{}\s]+)\}$/.exec(tag)?.[1];
+    if (week !== undefined && entry.week === undefined && Number(week) >= 1) {
+      entry.week = Number(week);
+    } else if (rule !== undefined && entry.rule === undefined) {
+      if (!ruleIds.has(rule)) {
+        throw new WorkspaceFileError(
+          `league.md line ${at}: {rule=${rule}} names no house rule; use a house rule's id`,
+        );
+      }
+      entry.rule = rule;
+    } else if (tag === "{pinned}" && !entry.pinned) {
+      entry.pinned = true;
+    } else {
+      unknown.push(`line ${at}: ${tag}`);
+    }
+  }
+  for (const [tag] of text.matchAll(TAGS)) unknown.push(`line ${at}: ${tag}`);
+  if (entry.week === undefined) {
+    throw new WorkspaceFileError(
+      `league.md line ${at}: a Log entry starts with the week it's about, as {week=N}`,
+    );
+  }
+  return { ...entry, week: entry.week, text: text.trim() };
 }
 
 /** Whether the season's `league.md` turns the family league on. A missing file means off. */
@@ -166,10 +360,22 @@ export async function familyLeague(ws: Workspace): Promise<boolean> {
   return (await loadLeagueFile(ws)).familyLeague;
 }
 
-function stakesOf(f: z.infer<typeof leagueFileSchema>): Stakes {
+function stakesOf(
+  f: z.infer<typeof leagueFileSchema>,
+  body: Body,
+  handles: Workspace["handles"],
+): Stakes {
   if (f.stakes === "none") return { kind: "none" };
-  if (STAKES_FIELDS.every((k) => f[k] === undefined))
+  if (
+    STAKES_FIELDS.every((k) => f[k] === undefined) &&
+    body.sections.length === 0 &&
+    body.log.length === 0
+  )
     return { kind: "unrecorded" };
+  const rival = (handle: string): Rival => ({
+    handle,
+    accounts: handles[handle] ?? [],
+  });
   const buyIn = f["buy-in"];
   return {
     kind: "recorded",
@@ -189,10 +395,17 @@ function stakesOf(f: z.infer<typeof leagueFileSchema>): Stakes {
             }
           : {}),
         outcome: outcomeOf(String(r.outcome).trim()),
+        ...(r.spirit === undefined ? {} : { spirit: r.spirit }),
         ...(r.from === undefined ? {} : { from: r.from }),
         ...(r.until === undefined ? {} : { until: r.until }),
       }),
     ),
+    rivalryWeeks: (f["rivalry-weeks"] ?? []).map((r) => ({
+      week: r.week,
+      pairs: r.pairs.map(([a, b]): [Rival, Rival] => [rival(a), rival(b)]),
+    })),
+    sections: body.sections,
+    log: body.log,
   };
 }
 

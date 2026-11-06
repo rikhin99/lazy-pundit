@@ -1,4 +1,4 @@
-import { SWEAR_REASON } from "./check.ts";
+import { NO_STAKES_REASON, SWEAR_REASON } from "./check.ts";
 import type { DraftContext } from "./draft-context.ts";
 import type { TeamId } from "./league.ts";
 import type { FailedSection, GateFaults } from "./llm-gate.ts";
@@ -20,7 +20,8 @@ Claims must be cited
 - A superlative needs a rank or league item behind it: [the league's top scorer]{ev=pf_rank} only when pf_rank is 1.
 - Never write a claim without a citation, and never state a fact that isn't in the evidence or, for a personal fact, in the lore. If they don't support something, leave it out.
 - Don't say where a team sits in this power ranking, how far it rose or fell, or which tier it's in: the pundit hasn't set the order yet. Standings ranks from the evidence (standing, pf_rank and the like) are fine.
-- State a personal fact about a manager (a job, family, habit, relationship or history) only from the lore in the prompt, and tag it with the section it came from, as {lore=<section>}: [the league's dentist]{lore=manager:bo}. With no lore on it, say nothing about the managers as people beyond their names. Never invent a personal fact. Don't mention money, prizes or punishments.
+- State a personal fact about a manager (a job, family, habit, relationship or history) only from the lore or the stakes in the prompt, and tag it with the section it came from, as {lore=<section>} or, from the stakes, {stakes=<section>} or {log=w<N>}: [the league's dentist]{lore=manager:bo}. With no lore on it, say nothing about the managers as people beyond their names. Never invent a personal fact.
+- Money, prizes and punishments come only from the Stakes part of the prompt. With no Stakes part, say nothing about them either way. When it says bragging rights only, mention no money, prize or punishment at all. Otherwise cite a stakes number by its evidence ID, anything else under Stakes as {stakes=<section>} (a house rule's id or the name after ###), and a Log entry as {log=w<N>} for its week: [the bye-fine rule]{stakes=bye-fines}, [paid up last week]{log=w7}. A joke rule may be played for laughs; a serious one isn't mocked.
 - Opinions, jokes and predictions need no citation, as long as they claim no fact.
 
 Reading the evidence
@@ -29,6 +30,9 @@ Reading the evidence
 - w<N>. IDs are that week's stats; w<N>.top, .zeros and .benchmiss name players, with their points under _points.
 - luck is actual wins minus the wins expected from all-play; form3 averages the last three weeks played.
 - A value that names a team is shown as the team's name. wk.clinched and wk.eliminated can name several: the teams whose playoff status changed this week.
+- stakes.pot is the pot and stakes.payout_<n> what final place n wins, in dollars. wk.rule.<id> names this week's trigger winners for house rule <id>, several when tied; rule.<id>.count is how many times the team has triggered it this season, and rule.<id>.winnings what those come to so far: a stat, not money paid or owed.
+- rival is the team's rival in this week's rivalry week, next_rival its rival next week; wk.rivalry.<n> names the two teams of this week's rivalry n, and wk.rivalry.<n>.winner the one that won it.
+- platform.playoff_spots, platform.playoff_start and platform.faab_budget are the platform's own settings: how many teams make the playoffs, the week they start and the FAAB budget.
 - playoffs is clinched_bye, clinched or eliminated, and is there only when settled. A team with no playoffs ID has no status to state: playoff words about it are wrong claims. Say only clinched a spot, clinched a bye or eliminated; looser phrases such as "playoff lock" or "on the bubble" can never pass.
 
 Reply format
@@ -69,6 +73,7 @@ export function firstDraftPrompt(ctx: DraftContext): string {
   });
 
   const lore = loreBlock(ctx);
+  const stakes = stakesBlock(ctx);
 
   return [
     `League: ${ctx.league}, ${ctx.season} season, after week ${ctx.week}.`,
@@ -77,11 +82,79 @@ export function firstDraftPrompt(ctx: DraftContext): string {
     personaInstructions(ctx.persona),
     "",
     ...(lore ? [lore, ""] : []),
+    ...(stakes ? [stakes, ""] : []),
     "## League-wide items",
     ...lines(ctx.evidence.league),
     "",
     "## Teams",
     teams.join("\n\n"),
+  ].join("\n");
+}
+
+/** A final place as words: 1st, 2nd, 3rd, 4th, 11th, 21st. */
+function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
+/**
+ * The stakes as the prompt holds them: nothing when unrecorded, a line for
+ * bragging rights only, or the recorded rules, rivalry weeks, stakes
+ * sections and the Log entries sent.
+ */
+export function stakesBlock(ctx: DraftContext): string {
+  const { stakes } = ctx;
+  if (stakes.kind === "unrecorded") return "";
+  if (stakes.kind === "none") {
+    return "## Stakes\nThis league plays for bragging rights only: there's no money, prize or punishment, so mention none.";
+  }
+  const nameOf = (id: TeamId) => ctx.teams.find((t) => t.id === id)?.name ?? id;
+  const rule = (r: (typeof stakes.houseRules)[number]) => {
+    const about = [
+      ...(r.trigger
+        ? [`trigger: ${r.trigger.kind}, per ${r.trigger.per}`]
+        : []),
+      ...(r.from ? [`from week ${r.from}`] : []),
+      ...(r.until ? [`until week ${r.until}`] : []),
+      ...(r.spirit === "joke" ? ["a joke"] : []),
+      ...(r.spirit === "serious" ? ["meant seriously"] : []),
+    ];
+    return `- ${r.id}: ${r.name}, ${r.outcome}${about.length > 0 ? ` (${about.join("; ")})` : ""}`;
+  };
+  return [
+    "## Stakes",
+    "What the league plays for this season, as the pundits recorded it. Cite a number by its evidence ID, a house rule by its id or a section by the name after ### as {stakes=…}, and a Log entry as {log=w<N>}.",
+    ...(stakes.buyIn === undefined
+      ? []
+      : [`Buy-in: $${stakes.buyIn} per team`]),
+    `Payouts by final place: ${stakes.payouts.map((p, i) => `${ordinal(i + 1)} ${p}`).join(", ")}${stakes.buyIn === undefined ? "" : " of the pot"}`,
+    ...(stakes.houseRules.length > 0
+      ? ["House rules:", ...stakes.houseRules.map(rule)]
+      : []),
+    ...(stakes.rivalryWeeks.length > 0
+      ? [
+          "Rivalry weeks:",
+          ...stakes.rivalryWeeks.map(
+            (w) =>
+              `- week ${w.week}: ${w.pairs.map(([a, b]) => `${nameOf(a)} v ${nameOf(b)}`).join(", ")}`,
+          ),
+        ]
+      : []),
+    ...stakes.sections.flatMap((s) => [
+      "",
+      `### ${s.name}`,
+      ...s.entries.map((e) => `- ${e}`),
+    ]),
+    ...(stakes.log.length > 0
+      ? [
+          "",
+          "### Log (this week's and last week's entries, and pinned ones)",
+          ...stakes.log.map(
+            (e) => `- w${e.week}${e.rule ? ` (${e.rule})` : ""}: ${e.text}`,
+          ),
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -110,7 +183,7 @@ export function loreBlock(ctx: DraftContext): string {
   });
   return [
     "## Lore",
-    "What the pundits have written about the league and its people: the only source for personal facts. A number here is no stat. Cite a section by the name after ###.",
+    "What the pundits have written about the league and its people: with the stakes, the only source for personal facts. A number here is no stat. Cite a section by the name after ###.",
     ...(type ? [`League type: ${type}`] : []),
     "",
     blocks.join("\n\n"),
@@ -161,6 +234,7 @@ function complaints(f: GateFaults): string[] {
         : `"${c.text}": no citation, and ${c.reason}`;
     }),
     ...f.swears.map((s) => `"${s.word}": ${SWEAR_REASON}`),
+    ...f.stakesMentions.map((s) => `"${s.word}": ${NO_STAKES_REASON}`),
   ];
 }
 

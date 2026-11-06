@@ -51,6 +51,8 @@ import { readSnapshot } from "./snapshot.ts";
 import {
   changedOutcomeWarnings,
   houseRuleOutcomes,
+  sentStakes,
+  stakesSectionNames,
   stakesWarnings,
 } from "./stakes.ts";
 import { stripTags } from "./validator.ts";
@@ -108,10 +110,11 @@ export async function draft(
   refuseLocal(lore);
   warn(lore.warnings);
   // Before the fetch, so a malformed league.md costs nothing.
-  const { stakes } = await loadLeagueFile(ws);
+  const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
+  warn(leagueFileWarnings);
   const settings = await loadPunditSettings(ws);
   const fetched = await fetchFresh(ws, deps);
-  const names = validatorNames(lore, fetched.league, ws.handles);
+  const names = validatorNames(lore, fetched.league, ws.handles, stakes);
   const week = fetched.league.lastScoredWeek;
   const dir = rankingsDir(ws);
   const path = join(dir, `${weekStem(week)}.md`);
@@ -153,11 +156,13 @@ export async function draft(
   let outcome: ProseOutcome;
   if (anthropicApiKey) {
     const sent = sentLore(lore, league, ws.handles);
+    const stakesSent = sentStakes(stakes, league, week);
     const ctx = draftContext(
       league,
       data,
       persona,
       sent.lore,
+      stakesSent,
       await lastBlurbs(dir, week),
     );
     const config =
@@ -169,6 +174,7 @@ export async function draft(
       sections: {
         ...names.sections,
         lore: sent.lore.sections.map((s) => s.name),
+        log: stakesSectionNames(stakesSent).log,
       },
     };
     outcome = await llmProse(ctx, gateNames, data, {
@@ -225,7 +231,7 @@ export async function draft(
       )
       .map(
         (c) =>
-          `The LLM cited lore it wasn't sent, so it may have made this up: "${c.text}".`,
+          `The LLM cited lore or stakes it wasn't sent, so it may have made this up: "${c.text}".`,
       ),
   );
   return {

@@ -738,7 +738,9 @@ describe("what the LLM may cite and is told", () => {
     );
     expect(llm.requests.length).toBeGreaterThan(1);
     expect(result.warnings).toContainEqual(
-      expect.stringMatching(/cited lore it wasn't sent.*left for Perth/),
+      expect.stringMatching(
+        /cited lore or stakes it wasn't sent.*left for Perth/,
+      ),
     );
   });
 

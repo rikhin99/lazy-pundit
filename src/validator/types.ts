@@ -42,6 +42,11 @@ export interface ValidatorInput {
   sections: { lore: string[]; stakes: string[]; log: string[] };
   swearing: Swearing;
   /**
+   * The league's stakes say bragging rights only (`stakes: none`), so any
+   * mention of money, a prize or a punishment is flagged.
+   */
+  noStakes?: boolean;
+  /**
    * The evidence and order the text was earlier checked against, when they
    * differ from now, newest evidence first. A claim that held then and fails
    * now is stale.
@@ -90,6 +95,8 @@ export interface ValidationResult {
   claims: CheckedClaim[];
   autoTags: AutoTag[];
   swears: Swear[];
+  /** Under `noStakes`, each mention of money, a prize or a punishment. */
+  stakesMentions: Swear[];
 }
 
 export type Kind =

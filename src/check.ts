@@ -59,11 +59,12 @@ export interface Problem {
   text: string;
   /**
    * `moved`: a moved team, away from its starting place. `small-sample`: the
-   * small-sample flag, a league item.
+   * small-sample flag, a league item. `no-stakes`: the no-stakes flag.
    */
   kind:
     | Exclude<ClaimStatus, "verified">
     | "swear"
+    | "no-stakes"
     | "unreadable-tag"
     | "moved"
     | "small-sample";
@@ -148,7 +149,7 @@ export async function checkDraft(
   );
   checkOrder(name, ranking, league);
 
-  const { stakes } = await loadLeagueFile(ws);
+  const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
   const { evidence } = draftData(league, ranking.meta.week, stakes);
   const baseline = await movementBaseline(dir, week);
   const order = orderEvidence(ranking, baseline);
@@ -165,7 +166,7 @@ export async function checkDraft(
     league,
     evidence,
     order,
-    validatorNames: validatorNames(lore, league, ws.handles),
+    validatorNames: validatorNames(lore, league, ws.handles, stakes),
     before: {
       order: startingOrder,
       evidence: await earlierEvidence(ws, ranking, stakes),
@@ -188,7 +189,11 @@ export async function checkDraft(
     path,
     problems,
     autoTagged: tagging ? autoTags.length : 0,
-    warnings: [...lore.warnings, ...stakesWarnings(stakes, league)],
+    warnings: [
+      ...lore.warnings,
+      ...leagueFileWarnings,
+      ...stakesWarnings(stakes, league),
+    ],
     stem,
     dir,
     text,
@@ -218,7 +223,12 @@ export function claimsGoingStale(
     league: to,
     evidence: draftData(to, week, checked.stakes).evidence,
     order: checked.order,
-    validatorNames: validatorNames(checked.lore, to, checked.handles),
+    validatorNames: validatorNames(
+      checked.lore,
+      to,
+      checked.handles,
+      checked.stakes,
+    ),
     before: { evidence: [draftData(from, week, checked.stakes).evidence] },
   });
   return problems.filter((p) => p.kind === "stale" && p.cause === "refresh");
@@ -327,6 +337,16 @@ function reviewProse(input: {
         reason: SWEAR_REASON,
       });
     }
+    for (const w of result.stakesMentions) {
+      problems.push({
+        ...at,
+        severity: "hard",
+        line: lineAt(s.start + w.start),
+        text: w.word,
+        kind: "no-stakes",
+        reason: NO_STAKES_REASON,
+      });
+    }
     problems.push(...unreadableTags(s, at, lineAt));
     for (const t of result.autoTags) {
       autoTags.push({ ...t, start: s.start + t.start, end: s.start + t.end });
@@ -337,6 +357,10 @@ function reviewProse(input: {
 
 /** Why a word-list hit is a problem. */
 export const SWEAR_REASON = "on the word list, and swearing is off";
+
+/** Why a mention of money, a prize or a punishment is a problem under `stakes: none`. */
+export const NO_STAKES_REASON =
+  "mentions money, a prize or a punishment, and league.md says stakes: none (bragging rights only)";
 
 /** The small-sample flag. Worked out here, never written to the file, so nothing published can carry it. */
 function smallSampleFlag(week: number): Problem {
@@ -377,7 +401,9 @@ export function withGateFailures(
         team(f.key) === p.team &&
         (p.kind === "swear"
           ? f.swears.some((w) => w.word === p.text)
-          : f.claims.some((c) => c.text === p.text)),
+          : p.kind === "no-stakes"
+            ? f.stakesMentions.some((w) => w.word === p.text)
+            : f.claims.some((c) => c.text === p.text)),
     )
       ? { ...p, gate: true as const }
       : p,

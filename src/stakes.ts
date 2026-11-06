@@ -1,5 +1,10 @@
 import { list } from "./evidence-pack.ts";
-import { isStarter, type League, type TeamId } from "./league.ts";
+import {
+  isStarter,
+  type League,
+  type TeamId,
+  teamsOfAccounts,
+} from "./league.ts";
 import { bestLineupPoints } from "./lineup.ts";
 import { standingsThrough } from "./standings.ts";
 import type { EvidenceValue } from "./validator/types.ts";
@@ -20,6 +25,38 @@ export interface RecordedStakes {
   /** What a `last-place` trigger reads. */
   lastPlace: "standings" | "losers-bracket";
   houseRules: HouseRule[];
+  rivalryWeeks: RivalryWeek[];
+  /** The body's free-text rules, by heading. */
+  sections: StakesSection[];
+  /** The body's `## Log`, in the file's order. */
+  log: LogEntry[];
+}
+
+/** A week in which pairs of managers, by handle, are meant to face each other. */
+export interface RivalryWeek {
+  week: number;
+  pairs: [Rival, Rival][];
+}
+
+/** A rivalry's manager: the handle, and the accounts `workspace.md` links it to. */
+export interface Rival {
+  handle: string;
+  accounts: string[];
+}
+
+/** One headed part of `league.md`'s body, cited as `{stakes=<name>}`. */
+export interface StakesSection {
+  name: string;
+  entries: string[];
+}
+
+/** One bullet of the `## Log`, cited as `{log=w<week>}`. */
+export interface LogEntry {
+  week: number;
+  /** The house rule it's about, by ID. */
+  rule?: string;
+  pinned: boolean;
+  text: string;
 }
 
 /** One final place's payout: dollars, or a share of the pot in percent. */
@@ -41,6 +78,8 @@ export interface HouseRule {
   name: string;
   trigger?: { kind: TriggerKind; per: "week" | "season" };
   outcome: Outcome;
+  /** Whether the rule is meant seriously or as a joke, if `league.md` says. */
+  spirit?: "serious" | "joke";
   /** The first week the rule applies to. */
   from?: number;
   /** The last week the rule applies to. */
@@ -107,18 +146,199 @@ export function stakesEvidence(
       }
     }
   }
+  for (const { week: w, pairs } of stakes.rivalryWeeks) {
+    if (w !== week && w !== week + 1) continue;
+    const id = w === week ? "rival" : "next_rival";
+    pairs.forEach(([a, b], i) => {
+      const rivals = rivalsIn(league, w, a, b);
+      if (!rivals) return;
+      const [x, y] = rivals;
+      (out.teams[x] as Record<string, EvidenceValue>)[id] = y;
+      (out.teams[y] as Record<string, EvidenceValue>)[id] = x;
+      if (w !== week) return;
+      // Numbered by the pair's place in league.md, so a pair that isn't one
+      // doesn't renumber the others.
+      const pair = `wk.rivalry.${i + 1}`;
+      out.league[pair] = inLeagueOrder(league, rivals).join(",");
+      const winner = rivalryWinner(league, w, x, y);
+      if (winner) out.league[`${pair}.winner`] = winner;
+    });
+  }
   return out;
 }
 
-/** The warnings the stakes load with against the league: triggers to log by hand. */
+/** Who won a rivalry's matchup in a scored week; none for a tie. */
+function rivalryWinner(
+  league: League,
+  week: number,
+  x: TeamId,
+  y: TeamId,
+): TeamId | undefined {
+  const sides = scheduleOf(league, week)
+    ?.find((m) => m.sides.some((s) => s.team === x))
+    ?.sides.filter((s) => s.team === x || s.team === y);
+  if (sides?.length !== 2) return undefined;
+  const [p, q] = sides as [(typeof sides)[0], (typeof sides)[0]];
+  if (p.score === q.score) return undefined;
+  return p.score > q.score ? p.team : q.team;
+}
+
+/** A week's matchups, or undefined before the schedule holds them. */
+function scheduleOf(league: League, week: number) {
+  const matchups = league.weeks.find((w) => w.week === week)?.matchups;
+  return matchups && matchups.length > 0 ? matchups : undefined;
+}
+
+/**
+ * The stakes as a draft may send them: no accounts, rivalry weeks as the
+ * teams they pair, and of the Log only the ranking week's and last week's
+ * entries plus pinned ones, so an old fine doesn't keep resurfacing.
+ */
+export type SentStakes =
+  | { kind: "unrecorded" }
+  | { kind: "none" }
+  | {
+      kind: "recorded";
+      buyIn?: number;
+      /** By place, first place first, as written: `$100` or `70%`. */
+      payouts: string[];
+      houseRules: (Omit<HouseRule, "outcome"> & { outcome: string })[];
+      rivalryWeeks: { week: number; pairs: [TeamId, TeamId][] }[];
+      sections: StakesSection[];
+      log: LogEntry[];
+    };
+
+export function sentStakes(
+  stakes: Stakes,
+  league: League,
+  week: number,
+): SentStakes {
+  if (stakes.kind !== "recorded") return stakes;
+  return {
+    kind: "recorded",
+    ...(stakes.buyIn === undefined ? {} : { buyIn: stakes.buyIn }),
+    payouts: stakes.payouts.map((p) =>
+      "dollars" in p ? `$${p.dollars}` : `${p.share}%`,
+    ),
+    houseRules: stakes.houseRules.map((r) => ({
+      ...r,
+      outcome: r.outcome.text,
+    })),
+    rivalryWeeks: stakes.rivalryWeeks.flatMap(({ week: w, pairs }) => {
+      const sent = pairs.flatMap(([a, b]) => {
+        const rivals = rivalsIn(league, w, a, b);
+        return rivals ? [rivals] : [];
+      });
+      return sent.length > 0 ? [{ week: w, pairs: sent }] : [];
+    }),
+    sections: stakes.sections,
+    log: sentLog(stakes.log, week),
+  };
+}
+
+/**
+ * What `{stakes=…}` and `{log=…}` may cite: each stakes section and house
+ * rule by name, and each week `log` has an entry for, as `w<N>`. Pass a sent
+ * stakes' Log to hold the LLM to what it was sent.
+ */
+export function stakesSectionNames(stakes: Stakes | SentStakes): {
+  stakes: string[];
+  log: string[];
+} {
+  if (stakes.kind !== "recorded") return { stakes: [], log: [] };
+  return {
+    stakes: [
+      ...stakes.sections.map((s) => s.name),
+      ...stakes.houseRules.map((r) => r.id),
+    ],
+    log: [...new Set(stakes.log.map((e) => `w${e.week}`))],
+  };
+}
+
+/** The Log entries a draft of `week` may send: that week's and last week's, and pinned ones. */
+export function sentLog(log: LogEntry[], week: number): LogEntry[] {
+  return log.filter((e) => e.pinned || e.week === week || e.week === week - 1);
+}
+
+/** The teams in this league a rivalry's handle runs, through its linked accounts. */
+function teamsOfRival(league: League, rival: Rival): TeamId[] {
+  return teamsOfAccounts(league, rival.accounts);
+}
+
+/**
+ * A rivalry's two teams in `week`: the matchup between them when the
+ * schedule holds that week, or, before it does, each handle's one team.
+ * None when a handle has no team or the schedule doesn't pair them.
+ */
+function rivalsIn(
+  league: League,
+  week: number,
+  a: Rival,
+  b: Rival,
+): [TeamId, TeamId] | undefined {
+  const as = teamsOfRival(league, a);
+  const bs = teamsOfRival(league, b);
+  const scheduled = scheduleOf(league, week);
+  if (!scheduled) {
+    const [x] = as;
+    const [y] = bs;
+    return as.length === 1 && bs.length === 1 && x !== y && x && y
+      ? [x, y]
+      : undefined;
+  }
+  for (const m of scheduled) {
+    const teams = m.sides.map((s) => s.team);
+    const x = teams.find((t) => as.includes(t));
+    const y = teams.find((t) => bs.includes(t) && t !== x);
+    if (x && y) return [x, y];
+  }
+  return undefined;
+}
+
+/** Why a rivalry week's pair isn't a rivalry, or undefined when it is or can't be told yet. */
+function rivalryWarning(
+  league: League,
+  week: number,
+  a: Rival,
+  b: Rival,
+): string | undefined {
+  const [team] = teamsOfRival(league, a);
+  for (const r of [a, b]) {
+    if (teamsOfRival(league, r).length === 0) {
+      return `league.md: rivalry week ${week} names ${r.handle}, whom workspace.md's handles link to no team in this league, so it's no rivalry: link the handle, or fix the pair.`;
+    }
+  }
+  const scheduled = scheduleOf(league, week);
+  if (!scheduled || !team || rivalsIn(league, week, a, b)) return undefined;
+  const name = (t: TeamId) => league.teams.find((x) => x.id === t)?.name ?? t;
+  const opponent = scheduled
+    .map((m) => m.sides.map((s) => s.team))
+    .find((teams) => teams.includes(team))
+    ?.find((t) => t !== team);
+  const plays = opponent
+    ? `${name(team)} plays ${name(opponent)} that week`
+    : `${name(team)} has no matchup that week`;
+  return `league.md: rivalry week ${week} pairs ${a.handle} and ${b.handle}, but the schedule doesn't: ${plays}.`;
+}
+
+/**
+ * The warnings the stakes load with against the league: triggers to log by
+ * hand, and rivalry pairs that name a handle with no team or that the
+ * schedule doesn't pair.
+ */
 export function stakesWarnings(stakes: Stakes, league: League): string[] {
   if (stakes.kind !== "recorded") return [];
-  return stakes.houseRules
-    .filter((r) => r.trigger && !computable(stakes, r, league))
-    .map(
-      (r) =>
-        `league.md: ${r.name} (${r.id}) has a trigger the platform data can't work out, so it has no winner: log it by hand.`,
-    );
+  return [
+    ...stakes.houseRules
+      .filter((r) => r.trigger && !computable(stakes, r, league))
+      .map(
+        (r) =>
+          `league.md: ${r.name} (${r.id}) has a trigger the platform data can't work out, so it has no winner: log it by hand.`,
+      ),
+    ...stakes.rivalryWeeks.flatMap(({ week, pairs }) =>
+      pairs.flatMap(([a, b]) => rivalryWarning(league, week, a, b) ?? []),
+    ),
+  ];
 }
 
 /** Each house rule's outcome by ID, for a draft to record, or none without house rules. */
@@ -192,6 +412,8 @@ export function triggerWinnerChanges(
  * score]{ev=wk.rule.high-score} ([2]{ev=rule.high-score.count} this season) ·
  * [$20]{ev=rule.high-score.winnings} to date`, with ", tied with …" inside the
  * first tag for a tie, and the winnings only when the outcome is dollars or FAAB.
+ * Then its rivalry: `Rivalry: [Pylon Patrol]{ev=rival}` this week, and
+ * `Rivalry next week: [Pylon Patrol]{ev=next_rival}`.
  */
 export function triggerParts(
   stakes: Stakes,
@@ -218,24 +440,50 @@ export function triggerParts(
     }
     parts.push(part);
   }
+  const rival = ev.rival as TeamId | undefined;
+  if (rival) parts.push(`Rivalry: [${names.get(rival) ?? rival}]{ev=rival}`);
+  const next = ev.next_rival as TeamId | undefined;
+  if (next) {
+    parts.push(
+      `Rivalry next week: [${names.get(next) ?? next}]{ev=next_rival}`,
+    );
+  }
   return parts;
 }
 
-/** The league stat line's part for each trigger this week: `[Weekly high score: Gus Bus]{ev=wk.rule.high-score}`. */
+/**
+ * The league stat line's part for each trigger this week, `[Weekly high
+ * score: Gus Bus]{ev=wk.rule.high-score}`, then each of this week's
+ * rivalries, `[Rivalry week: Gus Bus and Pylon Patrol]{ev=wk.rivalry.1}, won
+ * by [Gus Bus]{ev=wk.rivalry.1.winner}`, with no winner for a tie.
+ */
 export function leagueTriggerParts(
   stakes: Stakes,
   league: Record<string, EvidenceValue>,
   names: Map<TeamId, string>,
 ): string[] {
   if (stakes.kind !== "recorded") return [];
-  return stakes.houseRules.flatMap((rule) => {
-    const id = `wk.rule.${rule.id}`;
-    if (league[id] === undefined) return [];
-    const teams = String(league[id]).split(",") as TeamId[];
-    return [
-      `[${rule.name}: ${list(teams.map((t) => names.get(t) ?? t))}]{ev=${id}}`,
-    ];
-  });
+  const named = (id: string) =>
+    list(
+      (String(league[id]).split(",") as TeamId[]).map((t) => names.get(t) ?? t),
+    );
+  return [
+    ...stakes.houseRules.flatMap((rule) => {
+      const id = `wk.rule.${rule.id}`;
+      return league[id] === undefined
+        ? []
+        : [`[${rule.name}: ${named(id)}]{ev=${id}}`];
+    }),
+    ...Object.keys(league)
+      .filter((id) => /^wk\.rivalry\.\d+$/.test(id))
+      .map((id) => {
+        const winner = league[`${id}.winner`] as TeamId | undefined;
+        const won = winner
+          ? `, won by [${names.get(winner) ?? winner}]{ev=${id}.winner}`
+          : "";
+        return `[Rivalry week: ${named(id)}]{ev=${id}}${won}`;
+      }),
+  ];
 }
 
 /** An amount in the outcome's unit: `$20` or `10 FAAB`. */
@@ -298,10 +546,16 @@ function triggersThrough(
       winners: best(league, scores, trigger.kind),
     }));
   }
-  // Per season: the season's single best week, decided once its last week is scored.
+  // Per season, decided once its last week is scored: a high or low score is
+  // the season's single best or worst week, points left on the bench the total.
   if (week < last || league.lastScoredWeek < last) return [];
   const all = perWeek.flatMap((w) => w.scores);
-  return [{ week: last, winners: best(league, all, trigger.kind) }];
+  if (trigger.kind !== "most-left-on-bench") {
+    return [{ week: last, winners: best(league, all, trigger.kind) }];
+  }
+  const totals = new Map<TeamId, number>();
+  for (const [team, n] of all) totals.set(team, (totals.get(team) ?? 0) + n);
+  return [{ week: last, winners: best(league, [...totals], trigger.kind) }];
 }
 
 /** Each team's number for a score trigger in one week, in cents. */

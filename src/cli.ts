@@ -109,6 +109,7 @@ const KINDS: Record<Problem["kind"], string> = {
   loose: "loose",
   unchecked: "unchecked",
   swear: "word list",
+  "no-stakes": "bragging rights only",
   "unreadable-tag": "unreadable tag",
   moved: "you moved this team",
   "small-sample": "small sample",

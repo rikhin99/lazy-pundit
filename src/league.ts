@@ -154,6 +154,26 @@ export interface LineupEntry {
 /** The slot of every lineup entry that didn't start. */
 export const BENCH = "BN";
 
+/**
+ * The teams a manager handle runs in this league, through the accounts
+ * `workspace.md` links it to (`sleeper:<account ID>`). None for a departed
+ * manager or a handle with no link.
+ */
+export function teamsOfAccounts(
+  league: Pick<League, "platform"> & {
+    teams: Pick<Team, "id" | "managers">[];
+  },
+  accounts: string[],
+): TeamId[] {
+  return league.teams
+    .filter((t) =>
+      t.managers.some((m) =>
+        accounts.includes(`${league.platform}:${m.accountId}`),
+      ),
+    )
+    .map((t) => t.id);
+}
+
 /** Whether a lineup entry started: the one test, so every stat agrees. */
 export function isStarter(e: LineupEntry): boolean {
   return e.slot !== BENCH;

@@ -16,10 +16,11 @@ export function statOf(id: string): string {
  * a trade partner, and league items such as `wk.high_team` or `wk.upset`.
  */
 const TEAM_STATS =
-  /^(opponent|trade\.\d+\.with|wk\.\w+_team|wk\.upset|wk\.upset_over|wk\.robbed)$/;
+  /^(opponent|rival|next_rival|wk\.rivalry\.\d+\.winner|trade\.\d+\.with|wk\.\w+_team|wk\.upset|wk\.upset_over|wk\.robbed)$/;
 
 /** League items whose value is a comma-separated list of team IDs. */
-const TEAM_LIST_STATS = /^wk\.(clinched|eliminated|rule\.[a-z0-9-]+)$/;
+const TEAM_LIST_STATS =
+  /^wk\.(clinched|eliminated|rivalry\.\d+|rule\.[a-z0-9-]+)$/;
 
 /** What the league stat line's `wk.clinched` tag says before the teams. */
 export const CLINCHED_LABEL = "Clinched this week:";
@@ -50,6 +51,7 @@ export function resolve(
   if (
     id.startsWith("wk.") ||
     id.startsWith("stakes.") ||
+    id.startsWith("platform.") ||
     /^w\d+\.correction$/.test(id)
   ) {
     const value = ctx.evidence.league[id];

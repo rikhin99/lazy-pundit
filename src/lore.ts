@@ -2,7 +2,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { readFrontMatter, WorkspaceFileError } from "./front-matter.ts";
-import type { League, Team, TeamId } from "./league.ts";
+import {
+  type League,
+  type Team,
+  type TeamId,
+  teamsOfAccounts,
+} from "./league.ts";
+import { type Stakes, stakesSectionNames, UNRECORDED } from "./stakes.ts";
 import { normalize, type ValidatorInput, wholeWords } from "./validator.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -42,7 +48,10 @@ export type LeagueNames = Pick<League, "platform"> & {
 };
 
 /** The names `validate` takes: what a team goes by, and what may be cited. */
-export type ValidatorNames = Pick<ValidatorInput, "nicknames" | "sections">;
+export type ValidatorNames = Pick<
+  ValidatorInput,
+  "nicknames" | "sections" | "noStakes"
+>;
 
 /**
  * Reads the workspace's `lore.md`, refusing an unknown tag or a malformed
@@ -175,11 +184,12 @@ function refuseUnknownTags(lines: { text: string; at: number }[]): void {
   }
 }
 
-const HEADING = /^##(?!#)\s*(.*)$/;
+/** A `## ` heading line, capturing its text; a `###` is no heading. */
+export const HEADING = /^##(?!#)\s*(.*)$/;
 const SECTION_TAG = /^\{(?:manager=([^{}\s=]+)|team=([a-z]+:[^{}\s:=]+))\}$/;
 
 /** A comment's text removed, its line breaks kept so line numbers hold. */
-function withoutComments(body: string): string {
+export function withoutComments(body: string): string {
   return body.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ""));
 }
 
@@ -209,7 +219,7 @@ function newSection(
 }
 
 /** A heading as a tag can cite it, since a tag holds no spaces. */
-function headingName(heading: string): string {
+export function headingName(heading: string): string {
   return heading
     .replace(/\{[^{}]*\}/g, "")
     .toLowerCase()
@@ -318,10 +328,14 @@ export function sentLore(
 
 /** Stops a draft on any `{local}`: no entry marked so may reach the LLM. */
 export function refuseLocal(lore: Lore): void {
-  if (lore.localLines.length > 0) {
-    const lines = lore.localLines.join(", ");
+  refuseLocalLines("lore.md", lore.localLines);
+}
+
+/** Stops on any `{local}` at these lines of `file`, which isn't supported yet. */
+export function refuseLocalLines(file: string, lines: number[]): void {
+  if (lines.length > 0) {
     throw new WorkspaceFileError(
-      `lore.md line${lore.localLines.length > 1 ? "s" : ""} ${lines}: local-only isn't supported yet; remove the entry or the marker`,
+      `${file} line${lines.length > 1 ? "s" : ""} ${lines.join(", ")}: local-only isn't supported yet; remove the entry or the marker`,
     );
   }
 }
@@ -338,14 +352,7 @@ function teamsOf(
 ): TeamId[] {
   const manager = handleOf(s);
   if (manager !== undefined) {
-    const accounts = handles[manager] ?? [];
-    return league.teams
-      .filter((t) =>
-        t.managers.some((m) =>
-          accounts.includes(`${league.platform}:${m.accountId}`),
-        ),
-      )
-      .map((t) => t.id);
+    return teamsOfAccounts(league, handles[manager] ?? []);
   }
   const team = /^team:(.*)$/.exec(s.name)?.[1];
   return league.teams.filter((t) => t.id === team).map((t) => t.id);
@@ -361,6 +368,7 @@ export function validatorNames(
   lore: Lore,
   league: LeagueNames,
   handles: Workspace["handles"],
+  stakes: Stakes = UNRECORDED,
 ): ValidatorNames {
   const nicknames = Object.fromEntries(
     league.teams.map((t) => [
@@ -397,9 +405,9 @@ export function validatorNames(
     nicknames,
     sections: {
       lore: lore.sections.map((s) => s.name),
-      stakes: [],
-      log: [],
+      ...stakesSectionNames(stakes),
     },
+    ...(stakes.kind === "none" ? { noStakes: true } : {}),
   };
 }
 

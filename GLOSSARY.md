@@ -58,7 +58,7 @@ A warning when the lore a draft would send passes about 2,000 tokens, with the d
 What kind of group a league is: work, family, friends or other. It is written in the lore, and setup reads it to preselect the persona and the family-league setting.
 
 **Reserved tag**:
-A braced marker that means something to the tool in a file the pundit writes, such as `{manager=bo}` or `{local}`. Any other braced text in lore is an error, so a marker meant to keep something private never silently does nothing.
+A braced marker that means something to the tool in a file the pundit writes, such as `{manager=bo}` or `{local}`. Any other braced text in lore or a season's stakes file is an error, so a marker meant to keep something private never silently does nothing.
 
 **Nickname**:
 Another name for a manager or a team, such as "Karna" or "Rad Team". The validator uses nicknames to work out which team a sentence is about. A team's current name and its manager's display name always count as nicknames.
@@ -92,6 +92,9 @@ Whether a persona writes a team's blurb as prose or as bullets, and about how lo
 
 **Platform**:
 The fantasy service a league's season is played on, such as Sleeper, ESPN or Yahoo. Each season is played on one platform.
+
+**Platform settings**:
+The league settings the platform owns, such as the FAAB budget, how many teams make the playoffs and the week they start. They are read fresh from the platform on every fetch and shown read-only, never copied into a file the pundit writes, so they can't drift.
 
 **Season**:
 One year of a league, named by the platform's season year. Stakes, teams, rankings and movement belong to a season. Lore and personas carry over between seasons.
@@ -197,11 +200,11 @@ The buy-in times the number of teams. Payouts are stated as amounts or shares of
 What one final place wins: an amount or a share of the pot. Winner takes all unless the stakes say otherwise.
 
 **House rule**:
-A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words) and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize. `from:` and `until:` weeks limit a rule, so splitting a rule in two keeps the old outcome for earlier weeks, while changing an outcome in place recomputes winnings to date as if it had always applied, with a warning.
+A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words), optionally its spirit (whether it is meant seriously or as a joke), and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize. `from:` and `until:` weeks limit a rule, so splitting a rule in two keeps the old outcome for earlier weeks, while changing an outcome in place recomputes winnings to date as if it had always applied, with a warning.
 _Avoid_: Side bet, punishment (for the whole thing)
 
 **Trigger**:
-The measurable event that decides who a house rule applies to, such as high score, low score, most points left on the bench, last place or champion, for a week or a season. A rule without a trigger is applied by hand through log entries. A trigger the platform can't work out, such as a losers-bracket last place in a league without one, has no trigger winner and loads with a warning to log it by hand.
+The measurable event that decides who a house rule applies to, such as high score, low score, most points left on the bench, last place or champion, for a week or a season. A season's high or low score is its single best or worst week, while a season's most points left on the bench is the total over its weeks. A rule without a trigger is applied by hand through log entries. A trigger the platform can't work out, such as a losers-bracket last place in a league without one, has no trigger winner and loads with a warning to log it by hand.
 
 **Trigger winner**:
 A team a house rule's trigger applies to for a week or a season, whether the outcome is a prize or a punishment. Every tied team is one. An in-progress week has none.
@@ -215,6 +218,12 @@ A week in which named pairs of managers are meant to face each other. A pairing 
 
 **Log entry**:
 A dated record of something that happened under the stakes in a given week, such as a fine issued or how a punishment turned out. It belongs to one season, and the prose uses it only around the week it happened unless the pundit pins it.
+
+**Stakes section**:
+One headed part of the free-text rules a season's stakes hold beside the structured ones. A sentence that uses one cites the section's name, and the validator checks only that the section exists.
+
+**No-stakes flag**:
+A hard problem on prose that mentions money, a prize or a punishment in a league whose stakes say it plays for bragging rights only. With no stakes recorded at all, nothing is flagged either way.
 
 **Winnings to date**:
 How many times a team has won each house-rule prize so far in the season, multiplied by the prize's amount. A stat drawn from the recorded rules, not a record of money paid or owed.

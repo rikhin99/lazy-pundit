@@ -2,13 +2,13 @@ import type { DraftData } from "./draft-data.ts";
 import type { League, TeamId } from "./league.ts";
 import type { SentLore } from "./lore.ts";
 import type { Persona } from "./persona.ts";
+import type { SentStakes } from "./stakes.ts";
 import type { EvidencePack } from "./validator/types.ts";
 
 /**
  * Everything the LLM may be told about a league-week, gathered once when a
  * draft begins. An LLM draft, a revision and the eval harness all write from
- * it, and the prompt is built from nothing else. Stakes join it in a later
- * ticket.
+ * it, and the prompt is built from nothing else.
  *
  * Never in it: credentials, raw payloads, platform account IDs or the
  * platform's emails. Lore is the pundits' own words, so it can hold what they
@@ -25,6 +25,8 @@ export interface DraftContext {
   persona: Persona;
   /** The lore, without what a departed manager's sections or comments hold. */
   lore: SentLore;
+  /** The season's stakes, with only the Log entries a draft may send. */
+  stakes: SentStakes;
   /**
    * Each team's last published blurb, if a ranking was published before. It's
    * the pundit's published words, so it may repeat lore about a manager who
@@ -49,6 +51,7 @@ export function draftContext(
   data: DraftData,
   persona: Persona,
   lore: SentLore,
+  stakes: SentStakes,
   lastBlurbs?: LastBlurbs,
 ): DraftContext {
   return {
@@ -63,6 +66,7 @@ export function draftContext(
     evidence: data.evidence,
     persona,
     lore,
+    stakes,
     ...(lastBlurbs ? { lastBlurbs } : {}),
   };
 }

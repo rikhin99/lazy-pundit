@@ -15,7 +15,7 @@ import {
   type Verdict,
 } from "./validator/judge.ts";
 import { namesTeam, type Span } from "./validator/names.ts";
-import { swears } from "./validator/swears.ts";
+import { stakesMentions, swears } from "./validator/swears.ts";
 import { type Tag, unwrap } from "./validator/tags.ts";
 import type {
   AutoTag,
@@ -224,6 +224,12 @@ export function validate(input: ValidatorInput): ValidationResult {
       input.swearing === "off"
         ? swears(ctx, plain).map((w) => ({ ...w, ...written(w.start, w.end) }))
         : [],
+    stakesMentions: input.noStakes
+      ? stakesMentions(ctx, plain).map((w) => ({
+          ...w,
+          ...written(w.start, w.end),
+        }))
+      : [],
   };
 }
 
@@ -234,19 +240,25 @@ export function isHard(status: ClaimStatus): boolean {
 
 /**
  * The LLM gate: an LLM draft passes only if every claim is tagged and
- * verified and the word list is clean.
+ * verified, the word list is clean and, under `stakes: none`, nothing
+ * mentions money, a prize or a punishment.
  */
 export function gateLlm(result: ValidationResult): {
   pass: boolean;
   claims: CheckedClaim[];
   swears: Swear[];
+  stakesMentions: Swear[];
 } {
   const claims = result.claims.filter(
     (c) => !c.tagged || c.status !== "verified",
   );
   return {
-    pass: claims.length === 0 && result.swears.length === 0,
+    pass:
+      claims.length === 0 &&
+      result.swears.length === 0 &&
+      result.stakesMentions.length === 0,
     claims,
     swears: result.swears,
+    stakesMentions: result.stakesMentions,
   };
 }
