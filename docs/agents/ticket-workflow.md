@@ -24,7 +24,7 @@ The same script rule holds for your own scratch runs. In #60 part (a), a one-lin
 
 See each review fix's test go red, by writing it before the fix or by undoing the fix. Tighten any test that stays green. A review fix that adds behaviour gets its own scratch run through the ticket's commands before committing, since no review sees it. A fix that no portable test can show failing, such as one that needs a write to fail, gets a scratch run that shows it instead, named in the commit message. Done when every fix has a test seen red, or that scratch run, and each added behaviour has had its run. In #55 part (a), one of six fixes' tests stayed green: it missed the snapshot a late failure leaves behind. In #55 part (b), a warning added after review misfired on auto-tagged stats, and only the sweep's scratch script caught it.
 
-While building, run only the affected test files. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
+While building, run the affected test files plus `test/glossary-terms.test.ts` and `test/module-map.test.ts`, which check every new comment and module. In #47 part (a), both failed only after the build was done. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 
 ## 3. Sweep the tickets in one subagent
 
