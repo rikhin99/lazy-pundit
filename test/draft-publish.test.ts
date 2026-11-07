@@ -12,6 +12,7 @@ import {
   fearTheTurtle,
   frontMatter,
   onStandings,
+  patchingTransport,
   published,
   rankingsDir,
   withoutReminder,
@@ -41,6 +42,29 @@ describe("draft: a failed fetch", () => {
         severity: "soft",
         section: "League",
         reason: `couldn't fetch: GET ${WEEK_10} failed. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
+      }),
+    );
+  });
+
+  test("a league the platform doesn't know gives the league ID to check", async () => {
+    const { dir, deps } = await onStandings(8);
+    const first = await draft(dir, deps);
+    await rm(first.path);
+    const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
+    const unknown = {
+      ...deps,
+      transport: patchingTransport(deps.transport, {
+        [LEAGUE]: { replaceWith: null },
+      }),
+    };
+
+    const result = await draft(dir, unknown);
+
+    expect(result.snapshot).toBe(first.snapshot);
+    expect(result.problems).toContainEqual(
+      expect.objectContaining({
+        kind: "failed-fetch",
+        reason: `couldn't fetch: Sleeper league ${FEAR_THE_TURTLE_ID} is not a league payload. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.`,
       }),
     );
   });

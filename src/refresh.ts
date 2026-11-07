@@ -19,7 +19,12 @@ import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { applyRetention } from "./retention.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
-import { FetchError, listSnapshots, readSnapshot } from "./snapshot.ts";
+import {
+  FetchError,
+  type FetchFix,
+  listSnapshots,
+  readSnapshot,
+} from "./snapshot.ts";
 import { triggerWinnerChanges } from "./stakes.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
@@ -281,10 +286,19 @@ export async function fetchOrContinue(
   }
 }
 
-/** The failed-fetch item: a soft league item with the fix to run. */
+/** What the failed-fetch item tells the pundit to do, for each kind of failure. */
+const FETCH_FIXES: Record<FetchFix, string> = {
+  refresh: "Once fetching works, run: lazy-pundit refresh",
+  league_id:
+    "The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.",
+  update:
+    "This version can't read what the platform answered: check for a newer Lazy Pundit.",
+};
+
+/** The failed-fetch item: a soft league item with the fix for what failed. */
 function failedFetchItem(err: FetchError, dataAsOf: string): Problem {
   return leagueItem(
     "failed-fetch",
-    `couldn't fetch: ${err.message}. Continuing from the last complete snapshot, data as of ${dataAsOf}. Once fetching works, run: lazy-pundit refresh`,
+    `couldn't fetch: ${err.message}. Continuing from the last complete snapshot, data as of ${dataAsOf}. ${FETCH_FIXES[err.fix]}`,
   );
 }

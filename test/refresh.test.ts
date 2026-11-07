@@ -21,6 +21,7 @@ import {
   frontMatter,
   type Json,
   onStandings,
+  type Patch,
   patchingTransport,
   published,
   statCorrection,
@@ -31,10 +32,7 @@ const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
 const LATER = "2025-10-30T09:00:00.000Z";
 
 /** Deps a day later, whose fetch sees `patches` (by URL) on the replayed data. */
-function later(
-  deps: Deps,
-  patches: Record<string, (payload: Json) => void> = {},
-): Deps {
+function later(deps: Deps, patches: Record<string, Patch> = {}): Deps {
   return {
     ...deps,
     clock: fixedClock(LATER),
@@ -460,6 +458,46 @@ describe("refresh", () => {
       kind: "failed-fetch",
       reason: `couldn't fetch: GET ${WEEK_8} failed. Continuing from the last complete snapshot, data as of ${data_as_of}. Once fetching works, run: lazy-pundit refresh`,
     });
+  });
+
+  test("a league the platform doesn't know gives the league ID to check, not refresh", async () => {
+    const { dir, deps, read, snapshots } = await drafted();
+    const text = await read();
+    const before = await snapshots();
+    const { data_as_of } = frontMatter(text);
+
+    const unknown = later(deps, { [LEAGUE]: { replaceWith: null } });
+
+    const result = await refresh(dir, unknown);
+
+    expect(await read()).toBe(text);
+    expect(await snapshots()).toEqual(before);
+    expect(result.fromLastComplete).toBe(true);
+    expect(result.problems).toContainEqual({
+      severity: "soft",
+      team: null,
+      section: "League",
+      line: null,
+      text: "",
+      kind: "failed-fetch",
+      reason: `couldn't fetch: Sleeper league ${FEAR_THE_TURTLE_ID} is not a league payload. Continuing from the last complete snapshot, data as of ${data_as_of}. The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.`,
+    });
+  });
+
+  test("a league payload of another shape, not Sleeper's null, says to check for a newer version", async () => {
+    const { dir, deps } = await drafted();
+    const patched = later(deps, {
+      [LEAGUE]: (league) => {
+        delete league.settings;
+      },
+    });
+
+    const { problems } = await refresh(dir, patched);
+
+    const item = problems.find((p) => p.kind === "failed-fetch");
+    expect(item?.reason).toMatch(
+      /Z\. This version can't read what the platform answered: check for a newer Lazy Pundit\.$/,
+    );
   });
 
   test("reports a later scored week and leaves the draft's week", async () => {

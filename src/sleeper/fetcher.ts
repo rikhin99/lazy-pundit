@@ -73,13 +73,13 @@ export async function fetchSleeper(
   const recorder = new SnapshotRecorder(opts.transport, opts.headers);
   const base = `${SLEEPER_API}/league/${encodeURIComponent(opts.leagueId)}`;
 
-  const parsed = leagueSchema.safeParse(await recorder.getJson(base));
+  const payload = await recorder.getJson(base);
+  const parsed = leagueSchema.safeParse(payload);
   if (!parsed.success) {
+    // Sleeper answers `null` for a league ID it doesn't know.
     throw new FetchError(
       `Sleeper league ${opts.leagueId} is not a league payload`,
-      {
-        cause: parsed.error,
-      },
+      { cause: parsed.error, fix: payload === null ? "league_id" : "update" },
     );
   }
   const league = parsed.data;

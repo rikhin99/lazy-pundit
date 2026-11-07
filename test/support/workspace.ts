@@ -171,20 +171,28 @@ export function statCorrection(rosterId: number, points: number) {
 }
 
 /**
+ * A change to one payload: a function that changes it in place (what it
+ * returns is ignored), or `{ replaceWith }` for a whole new answer, such as
+ * the `null` Sleeper answers for a league it doesn't know.
+ */
+export type Patch = ((payload: Json) => unknown) | { replaceWith: Json };
+
+/**
  * Wraps a transport so each payload whose URL has a patch is changed before
  * it's recorded: a real payload, varied the way a real fetch could see it.
  */
 export function patchingTransport(
   inner: Transport,
-  patches: Record<string, (payload: Json) => void>,
+  patches: Record<string, Patch>,
 ): Transport {
   return {
     async request(req) {
       const res = await inner.request(req);
       const patch = patches[req.url];
       if (!patch) return res;
-      const payload = JSON.parse(new TextDecoder().decode(res.body));
-      patch(payload);
+      let payload = JSON.parse(new TextDecoder().decode(res.body));
+      if (typeof patch === "function") patch(payload);
+      else payload = patch.replaceWith;
       return {
         status: 200,
         body: new TextEncoder().encode(JSON.stringify(payload)),

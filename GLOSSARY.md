@@ -426,7 +426,7 @@ _Avoid_: Errors, issues, warnings (for the whole list)
 A problems-list item about the whole league rather than a team or a line of the draft, such as the small-sample flag.
 
 **Failed-fetch item**:
-A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix to run once fetching works. Only the command that fetched lists it; `check` never does.
+A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix for what failed: `lazy-pundit refresh` once fetching works; checking `league_id` in `workspace.md` when the platform doesn't know the league; or checking for a newer Lazy Pundit when the platform answers in a shape this version can't read. Only the command that fetched lists it; `check` never does.
 
 **Correction-timing reminder**:
 A soft league item on a draft of a scored week, since nothing signals when stat corrections stop: "Scored. Corrections may land through Thursday" on Sleeper.

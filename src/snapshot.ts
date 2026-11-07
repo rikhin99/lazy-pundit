@@ -47,8 +47,22 @@ export type ManifestRequest = z.infer<typeof manifestRequest>;
 
 export type Platform = Manifest["platform"];
 
+/**
+ * What the pundit can do about a failed fetch: `refresh` once fetching works
+ * again, check the `league_id` in `workspace.md` when the platform doesn't
+ * know the league, or `update` when the platform answers in a shape this
+ * version can't read. A throw that passes none gets `refresh`.
+ */
+export type FetchFix = "refresh" | "league_id" | "update";
+
 export class FetchError extends Error {
   override name = "FetchError";
+  readonly fix: FetchFix;
+
+  constructor(message: string, opts: { cause?: unknown; fix?: FetchFix } = {}) {
+    super(message, { cause: opts.cause });
+    this.fix = opts.fix ?? "refresh";
+  }
 }
 
 /** One payload fetched and held in memory until the whole snapshot is complete. */
