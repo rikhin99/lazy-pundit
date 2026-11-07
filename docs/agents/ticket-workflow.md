@@ -8,13 +8,13 @@ Before reading code, list what the ticket adds. If it adds two or more commands 
 
 List every domain noun the ticket brings or renames: a file, a setting, each value a setting can take, a role, a command, a state. `test/glossary-terms.test.ts` checks dashed values such as `losers-bracket` too: in #61 part (a), `most-bench-points` carried the _Avoid_ term "bench points" into `league.md`. Run `/domain-modeling` for each one that `GLOSSARY.md` doesn't define, at the same time as agreeing the test seams. Then name files, fields and functions after the glossary terms.
 
-Read the ticket and the spec sections it cites. When the user names a comment, such as the latest, read that comment (`gh issue view <n> --json comments --jq '.comments[-1].body'`), not the whole thread. To find where a neighbouring ticket's scope begins, ask an Explore subagent for a short brief rather than reading the ticket. To find code, start from the module map's exports column and read only the functions you need, not whole files.
+Read the ticket with `gh issue view <n> --json title,body,labels --jq '.title, .body'`, and the spec sections it cites. When the user names a comment, such as the latest, read that comment (`gh issue view <n> --json comments --jq '.comments[-1].body'`), not the whole thread. To find where a neighbouring ticket's scope begins, ask an Explore subagent for a short brief rather than reading the ticket. To find code, start from the module map's exports column and read only the functions you need, not whole files.
 
 Done when the list is in a message, each noun with its `GLOSSARY.md` line or a new entry. The code and tickets then use those names from the start. In #51 the glossary came last, which forced a code rename (`usage.yaml` → `spend.yaml`) and a second pass over 10 tickets and comments.
 
 ## 2. Build and review
 
-`/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other. See each new test fail before writing the code that passes it. In #60 part (b), the checklist tests were written with their code and first seen red only by a mutation after the build.
+`/implement`: TDD at the agreed seams, then `/code-review` in two subagents, then commit to `main`. A seam the ticket names is agreed; ask before testing at any other. See each new test fail before writing the code that passes it. For a test of code that already exists, see it go red with `npm run -s mutate -- <src-file> '<old>' '<new>' <test-file>`: it changes one place, runs that test file, prints the tests that went red (or "survived", exit 1) and puts the file back. In #77, nine mutations by hand (Edit, test run, `git checkout`, re-Read) cost about 25k. In #60 part (b), the checklist tests were written with their code and first seen red only by a mutation after the build.
 
 A pasted `/implement` arrives as text, and the skill can't be loaded with the Skill tool, so read `~/.claude/plugins/cache/mattpocock/mattpocock-skills/*/skills/engineering/implement/SKILL.md` directly. In #56 part (b), searching for it with `find` cost 7.4k.
 
