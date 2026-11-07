@@ -19,6 +19,11 @@ export interface DraftContext {
   season: string;
   /** The ranking week. */
   week: number;
+  /**
+   * The in-progress week whose own stats the evidence holds
+   * (`--include-in-progress`): scores so far, which can still change.
+   */
+  inProgressWeek?: number;
   /** Each team by name, with its managers' display names. */
   teams: { id: TeamId; name: string; managers: string[] }[];
   evidence: EvidencePack;
@@ -58,6 +63,9 @@ export function draftContext(
     league: league.name,
     season: league.season,
     week: data.week,
+    ...(data.inProgressWeek !== undefined && {
+      inProgressWeek: data.inProgressWeek,
+    }),
     teams: league.teams.map((t) => ({
       id: t.id,
       name: t.name,

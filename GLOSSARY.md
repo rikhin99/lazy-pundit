@@ -259,7 +259,7 @@ A week the platform has finished scoring. Until then the week is in progress and
 _Avoid_: Final week
 
 **In-progress week**:
-The week the platform hasn't finished scoring yet. A routine fetch always asks for it, but its results aren't evidence. Drafting while one is in progress warns and builds through the last scored week; `--include-in-progress` adds its own week's stats as evidence for provisional claims, recorded in the draft as `in_progress_week`.
+The week the platform hasn't finished scoring yet. A routine fetch always asks for it, but its results aren't evidence. Drafting while one is in progress warns and builds through the last scored week; `--include-in-progress` adds its own week's stats as evidence for provisional claims, recorded in the draft as `in_progress_week`, and tells the LLM that week's scores can still change, so it gives no result for it.
 
 **Stat correction**:
 A change the platform makes to a week's scores after it has been scored.

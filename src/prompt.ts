@@ -43,6 +43,20 @@ Reply with nothing but the sections below, each a heading line then its text, in
 <that team's blurb>
 Write one section for every team listed, using its team id exactly as given.`;
 
+/**
+ * What the prompt says about the in-progress week whose stats the evidence
+ * holds, or nothing when it holds none: those scores can still change, so
+ * the week gets no result, only "so far".
+ */
+function inProgressBlock(ctx: DraftContext): string {
+  const week = ctx.inProgressWeek;
+  if (week === undefined) return "";
+  return [
+    "## In-progress week",
+    `Week ${week} is still being played: its w${week}. stats are scores so far, and they can change before it's scored. Give no result for week ${week}: no "beat", "lost to", "won" or "lost". w${week}.margin is a lead or deficit so far and w${week}.rank a rank so far, not a margin of victory or a final rank. Say "so far" with any week ${week} number: [<the w${week}.points value>]{ev=w${week}.points} so far.`,
+  ].join("\n");
+}
+
 /** The material for one first draft: the persona, the teams and their evidence. */
 export function firstDraftPrompt(ctx: DraftContext): string {
   const names = new Map(ctx.teams.map((t) => [t.id, t.name]));
@@ -74,10 +88,12 @@ export function firstDraftPrompt(ctx: DraftContext): string {
 
   const lore = loreBlock(ctx);
   const stakes = stakesBlock(ctx);
+  const inProgress = inProgressBlock(ctx);
 
   return [
     `League: ${ctx.league}, ${ctx.season} season, after week ${ctx.week}.`,
     "",
+    ...(inProgress ? [inProgress, ""] : []),
     "## Persona",
     personaInstructions(ctx.persona),
     "",

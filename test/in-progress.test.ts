@@ -1,7 +1,14 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
-import { check, type Deps, draft, refresh } from "../src/index.ts";
+import {
+  check,
+  type Deps,
+  draft,
+  type LlmRequest,
+  refresh,
+} from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
+import { scriptedLlm } from "./support/llm.ts";
 import {
   FEAR_THE_TURTLE_ID,
   frontMatter,
@@ -168,5 +175,38 @@ describe("--include-in-progress", () => {
 
     const fm = frontMatter(await readFile(result.path, "utf8"));
     expect(fm).not.toHaveProperty("in_progress_week");
+  });
+});
+
+describe("the first-draft request mid-week", () => {
+  /** `midWeek8` with an Anthropic key and an LLM that records each request. */
+  async function withLlm() {
+    const ws = await midWeek8();
+    const llm = scriptedLlm("");
+    ws.deps.llm = llm;
+    ws.deps.env.anthropicApiKey = "sk-ant-api03-test-key";
+    return { ...ws, llm };
+  }
+
+  test("with --include-in-progress, names the week as in progress and says its scores can change", async () => {
+    const { dir, deps, llm } = await withLlm();
+
+    await draft(dir, deps, { includeInProgress: true });
+
+    const { prompt } = llm.requests[0] as LlmRequest;
+    expect(prompt).toContain("## In-progress week");
+    expect(prompt).toContain(
+      "Week 8 is still being played: its w8. stats are scores so far, and they can change before it's scored.",
+    );
+  });
+
+  test("without it, the request says nothing about an unfinished week", async () => {
+    const { dir, deps, llm } = await withLlm();
+
+    await draft(dir, deps);
+
+    const { prompt } = llm.requests[0] as LlmRequest;
+    expect(prompt).not.toContain("## In-progress week");
+    expect(prompt).not.toContain("is still being played");
   });
 });

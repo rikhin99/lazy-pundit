@@ -14,6 +14,8 @@ import { CLINCHED_LABEL } from "./validator.ts";
 /** What a draft carries for its ranking week, all from the model. */
 export interface DraftData {
   week: number;
+  /** The in-progress week whose own stats the evidence lets in, if any. */
+  inProgressWeek?: number;
   evidence: EvidencePack;
   /** The league stat line, the week intro when there's no LLM. Empty before week 1. */
   intro: string;
@@ -72,7 +74,13 @@ export function draftData(
     leagueStatLine(evidence, names),
     ...leagueTriggerParts(stakes, evidence.league, names),
   ].filter(Boolean);
-  return { week, evidence, intro: intro.join(" · "), teams };
+  return {
+    week,
+    ...(inProgressWeek !== undefined && { inProgressWeek }),
+    evidence,
+    intro: intro.join(" · "),
+    teams,
+  };
 }
 
 /** A settled playoff status, as a stat line says it. */
