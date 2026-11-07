@@ -26,6 +26,8 @@ See each review fix's test go red, by writing it before the fix or by undoing th
 
 While building, run the affected test files plus `test/glossary-terms.test.ts` and `test/module-map.test.ts`, which check every new comment and module. In #47 part (a), both failed only after the build was done. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 
+A change that adds something to every draft's output, such as a league item or a warning: right after its first test is green, run the full suite once to see which tests break. Before fixing them, add one shared helper or constant in `test/support/workspace.ts` and update the tests with it in one pass. In #47 part (b), the correction-timing reminder broke 41 tests, which were fixed file by file before `withoutReminder` existed.
+
 ## 3. Sweep the tickets in one subagent
 
 Hand the sweep to one subagent, so the main session doesn't spend tokens reading tickets. Give it this prompt, with the blanks filled:

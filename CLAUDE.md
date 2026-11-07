@@ -14,7 +14,7 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 
 ### Code layout
 
-Before reading source files, read `docs/agents/module-map.md`: which module owns what, the test seams and their helpers.
+Before reading source files, read `docs/agents/module-map.md`: which module owns what, the test seams and their helpers. In `src/` and `test/`, read with `npm run outline -- <file>` and then ranges of 150 lines or fewer, and edit with the Edit tool. The repo's hooks refuse whole-file reads and shell edits there.
 
 ### Implementing a ticket
 
