@@ -21,6 +21,9 @@
 # It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
 # with the wizard's code. Look in that home for what the wizard wrote. A new
 # wizard step needs its prompt and answer added at the bottom of this file.
+# Wait for the prompt's own line, "\u25c6  <label>": a label alone also matches
+# the explanation and earlier redraws, so the answer can arrive before the
+# prompt listens.
 
 # The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
 # setup does. drive-wizard-all.sh reads this line.

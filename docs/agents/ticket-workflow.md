@@ -26,6 +26,8 @@ See each review fix's test go red, by writing it before the fix or by undoing th
 
 While building, run `npm run -s format` (it fixes formatting itself and fails on any other lint problem) with the typecheck, and the affected test files plus `test/glossary-terms.test.ts` and `test/module-map.test.ts`, which check every new comment and module. In #47 part (a), both failed only after the build was done; in #79, lint failed only at the commit. The commit's pre-commit hook runs typecheck, lint and the full suite, and that is the final full-suite run.
 
+A change to a wizard prompt (`cli.ts`) or a setup step (`init.ts`): run `npm run -s drive:wizard:all` (about a minute) before committing, since CI runs it only after the push and the pre-commit hook doesn't.
+
 A change to a helper in `test/support/`: run the full suite once, right after the change, since other test files call the helper too. In #79, `patchingTransport` took a patch's return value as a new payload, and two `init` tests whose patches return one by accident broke only at the commit, after both reviews.
 
 A change that adds something to every draft's output, such as a league item or a warning: right after its first test is green, run the full suite once to see which tests break. Before fixing them, add one shared helper or constant in `test/support/workspace.ts` and update the tests with it in one pass. In #47 part (b), the correction-timing reminder broke 41 tests, which were fixed file by file before `withoutReminder` existed.
@@ -60,4 +62,4 @@ Done when the subagent's report accounts for every open ticket, and the main ses
 
 ## 4. Measure
 
-Run `/context` and compare it with the 150k smart zone, run `npm run trace` for where the context went, then run `/retro`. The user pushes `main` (`! git push origin main`); `git push` is blocked for agents.
+Run `/context` and compare it with the 150k smart zone, run `npm run trace` for where the context went, then run `/retro`. The user pushes `main` (`! git push origin main`); `git push` is blocked for agents. After the push, run `gh run watch` (or `gh run list --limit 1` once it's done) and report the CI result.
