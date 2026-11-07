@@ -59,8 +59,7 @@ function turnsOf(log: string): Turn[] {
         tool: c.name,
         target: String(target)
           .replaceAll("\n", " ")
-          .replace(`${process.cwd()}/`, "")
-          .slice(0, 70),
+          .replace(`${process.cwd()}/`, ""),
       });
     }
     turns.set(message.id, turn);
@@ -100,5 +99,6 @@ const jumps = turns
   .slice(0, 8);
 for (const { by, at, calls } of jumps) {
   console.log(`+${k(by).trim()} to ${k(at).trim()}`);
-  for (const c of calls) console.log(`    ${c.tool}: ${c.target}`);
+  // Cut only for display: the stage checks above match on the whole target.
+  for (const c of calls) console.log(`    ${c.tool}: ${c.target.slice(0, 70)}`);
 }
