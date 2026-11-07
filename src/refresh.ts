@@ -3,7 +3,9 @@ import {
   type CheckedDraft,
   checkDraft,
   claimsGoingStale,
+  leagueItem,
   type Problem,
+  withLeagueItem,
 } from "./check.ts";
 import { type DataChange, diff } from "./data-diff.ts";
 import { dataHash } from "./data-hash.ts";
@@ -16,6 +18,8 @@ import { startingOrder } from "./power-score.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { applyRetention } from "./retention.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
+import { normalizeSleeper } from "./sleeper/normalizer.ts";
+import { FetchError, listSnapshots, readSnapshot } from "./snapshot.ts";
 import { triggerWinnerChanges } from "./stakes.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
@@ -38,6 +42,10 @@ export interface RefreshResult {
   problems: Problem[];
   /** What reading the lore has to say, personal data included. */
   warnings: string[];
+  /** The newest scored week, when it's later than the draft's: time for its own draft. */
+  scoredWeek?: number;
+  /** The fetch failed, so this refresh continued from the last complete snapshot. */
+  fromLastComplete: boolean;
 }
 
 /**
@@ -46,7 +54,9 @@ export interface RefreshResult {
  * settings recomputes the order too, with no new snapshot if the data stands.
  * It never touches the pundit's order, blurbs, week or persona, and doesn't
  * auto-tag. With neither change it only updates `checked_at`. A failed fetch
- * or a bad settings file throws and changes nothing.
+ * continues from the last complete snapshot, leaving `checked_at`, with the
+ * failed-fetch item; with no snapshot to continue from it throws, as a bad
+ * settings file does, and changes nothing.
  */
 export async function refresh(
   workspaceDir: string,
@@ -57,8 +67,20 @@ export async function refresh(
   const { meta } = checked.ranking;
   const ws = await readWorkspace(workspaceDir);
   const settings = await loadPunditSettings(ws);
-  const fresh = await fetchFresh(ws, deps, opts);
-  const changes = diff(checked.league, fresh.league, meta.week);
+  const fresh = await fetchOrContinue(ws, deps, opts);
+  const withFailedFetch = (problems: Problem[]) =>
+    withLeagueItem(problems, fresh.failedFetch);
+  const changes = diff(
+    checked.league,
+    fresh.league,
+    meta.week,
+    meta.in_progress_week,
+  );
+  const newestScored = fresh.league.lastScoredWeek;
+  const outcome = {
+    fromLastComplete: fresh.failedFetch !== undefined,
+    ...(newestScored > meta.week && { scoredWeek: newestScored }),
+  };
   const method = methodForWeek(settings, fresh.league, meta.week);
   const methodChanged = !isDeepStrictEqual(meta.power_score, method);
   const now = deps.clock.now().toISOString();
@@ -72,14 +94,19 @@ export async function refresh(
       method,
     );
 
+  // A draft continuing from the last complete snapshot wasn't checked against
+  // fresh data, so its `checked_at` stands.
+  const checkedAt = (text: string) =>
+    fresh.failedFetch ? text : set(text, "checked_at", now);
+
   if (changes.length === 0) {
-    let text = set(checked.text, "checked_at", now);
+    let text = checkedAt(checked.text);
     if (methodChanged) {
       // On the draft's own league: fresh names or positions aren't a data
       // change, but a lineup's best points read them.
       text = setOrder(text, checked.league);
     }
-    await writeWorkspaceFile(checked.path, text);
+    if (text !== checked.text) await writeWorkspaceFile(checked.path, text);
     const { problems, warnings } = methodChanged
       ? await checkDraft(workspaceDir, { autoTag: false })
       : checked;
@@ -91,8 +118,9 @@ export async function refresh(
       dataAsOf: meta.data_as_of,
       snapshot: meta.snapshot,
       newlyStale: [],
-      problems,
+      problems: withFailedFetch(problems),
       warnings,
+      ...outcome,
     };
   }
 
@@ -100,8 +128,7 @@ export async function refresh(
   // would otherwise stop the check below, leaving the draft half refreshed.
   validatorNames(checked.lore, fresh.league, checked.handles);
   const { id, manifest } = await fresh.write();
-  let text = checked.text;
-  text = set(text, "checked_at", now);
+  let text = checkedAt(checked.text);
   text = set(text, "data_as_of", manifest.fetched_at);
   text = set(text, "snapshot", id);
   text = set(text, "data_hash", dataHash(fresh.league, meta.week));
@@ -122,8 +149,9 @@ export async function refresh(
     snapshot: id,
     // Measured on the new text, so its lines match the problems list.
     newlyStale: claimsGoingStale(refreshed, checked.league, fresh.league),
-    problems: refreshed.problems,
+    problems: withFailedFetch(refreshed.problems),
     warnings: refreshed.warnings,
+    ...outcome,
   };
 }
 
@@ -136,8 +164,10 @@ export function dataChangedWarning(
   checked: CheckedDraft,
   fresh: League,
 ): string | undefined {
-  const { week, data_as_of } = checked.ranking.meta;
-  if (diff(checked.league, fresh, week).length === 0) return undefined;
+  const { week, data_as_of, in_progress_week } = checked.ranking.meta;
+  if (diff(checked.league, fresh, week, in_progress_week).length === 0) {
+    return undefined;
+  }
   const stale = claimsGoingStale(checked, checked.league, fresh).length;
   const claims = stale === 1 ? "1 claim" : `${stale} claims`;
   const lines = [
@@ -211,4 +241,50 @@ export async function fetchFresh(
       return written;
     },
   };
+}
+
+/** A fetch, or the last complete snapshot when the fetch failed. */
+export interface FetchedOrContinued extends FetchedSleeper {
+  /** The failed-fetch item, when this continues from the last complete snapshot. */
+  failedFetch?: Problem;
+}
+
+/**
+ * `fetchFresh`, except that a failed or partial fetch continues from the last
+ * complete snapshot: the season's newest, whose `write` writes nothing and
+ * gives it back. With no snapshot to continue from, the fetch's error stands.
+ */
+export async function fetchOrContinue(
+  ws: Workspace,
+  deps: Deps,
+  opts: { full?: boolean } = {},
+): Promise<FetchedOrContinued> {
+  try {
+    return await fetchFresh(ws, deps, opts);
+  } catch (err) {
+    if (!(err instanceof FetchError)) throw err;
+    const dir = snapshotsDir(ws);
+    const last = (await listSnapshots(dir))
+      .filter(
+        ({ manifest: m }) =>
+          m.platform === ws.season.platform &&
+          m.league_id === ws.season.leagueId &&
+          m.season === ws.season.year,
+      )
+      .at(-1);
+    if (!last) throw err;
+    return {
+      league: normalizeSleeper(await readSnapshot(dir, last.id)),
+      write: async () => last,
+      failedFetch: failedFetchItem(err, last.manifest.fetched_at),
+    };
+  }
+}
+
+/** The failed-fetch item: a soft league item with the fix to run. */
+function failedFetchItem(err: FetchError, dataAsOf: string): Problem {
+  return leagueItem(
+    "failed-fetch",
+    `couldn't fetch: ${err.message}. Continuing from the last complete snapshot, data as of ${dataAsOf}. Once fetching works, run: lazy-pundit refresh`,
+  );
 }

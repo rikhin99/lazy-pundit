@@ -50,6 +50,7 @@ const ENFORCED = [
   "previous ranking",
   "last week's ranking",
   "template",
+  "fallback snapshot",
 ];
 
 /**

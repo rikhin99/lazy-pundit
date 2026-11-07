@@ -7,7 +7,6 @@ import {
   type Deps,
   DraftExistsError,
   draft,
-  FetchError,
   publish,
   refresh,
   WorkspaceFileError,
@@ -17,6 +16,7 @@ import { scriptedLlm } from "./support/llm.ts";
 import {
   atWeek,
   FEAR_THE_TURTLE_ID,
+  failingOn,
   fixedClock,
   frontMatter,
   type Json,
@@ -24,6 +24,7 @@ import {
   patchingTransport,
   published,
   statCorrection,
+  writeSettings,
 } from "./support/workspace.ts";
 
 const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
@@ -438,16 +439,57 @@ describe("refresh", () => {
     expect(frontMatter(set).note).toBe("a: b # c");
   });
 
-  test("a failed fetch stops refresh and leaves the draft", async () => {
-    const { dir, deps, read } = await drafted();
+  test("a fetch failing on one request continues from the last complete snapshot, writing nothing", async () => {
+    const { dir, deps, read, snapshots } = await drafted();
     const text = await read();
-    const offline: Deps = {
-      ...deps,
-      transport: { request: () => Promise.reject(new Error("offline")) },
-    };
+    const before = await snapshots();
+    const { data_as_of } = frontMatter(text);
 
-    await expect(refresh(dir, offline)).rejects.toThrow(FetchError);
+    const result = await refresh(dir, failingOn(later(deps), WEEK_8));
+
     expect(await read()).toBe(text);
+    expect(await snapshots()).toEqual(before);
+    expect(result.changes).toEqual([]);
+    expect(result.fromLastComplete).toBe(true);
+    expect(result.problems).toContainEqual({
+      severity: "soft",
+      team: null,
+      section: "League",
+      line: null,
+      text: "",
+      kind: "failed-fetch",
+      reason: `couldn't fetch: GET ${WEEK_8} failed. Continuing from the last complete snapshot, data as of ${data_as_of}. Once fetching works, run: lazy-pundit refresh`,
+    });
+  });
+
+  test("reports a later scored week and leaves the draft's week", async () => {
+    const { dir, deps, read } = await drafted();
+
+    const result = await refresh(dir, atWeek(deps, 10));
+
+    expect(result.week).toBe(8);
+    expect(result.scoredWeek).toBe(10);
+    expect(frontMatter(await read()).week).toBe(8);
+  });
+
+  test("reports no scored week while the draft's week is still the last", async () => {
+    const { dir, deps } = await drafted();
+
+    const result = await refresh(dir, later(deps));
+
+    expect(result.scoredWeek).toBeUndefined();
+    expect(result.fromLastComplete).toBe(false);
+  });
+
+  test("a failed fetch still applies a changed method, on the draft's own data", async () => {
+    const { dir, deps, read } = await drafted();
+    await writeSettings(dir, "method: form");
+
+    const result = await refresh(dir, failingOn(later(deps), WEEK_8));
+
+    expect(result.methodChanged).toBe(true);
+    expect(frontMatter(await read()).power_score).toEqual({ method: "form" });
+    expect(result.problems.map((p) => p.kind)).toContain("failed-fetch");
   });
 
   test("front matter it can't add a key to is refused, and the draft is left", async () => {

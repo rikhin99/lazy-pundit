@@ -49,6 +49,11 @@ export interface TeamEntry {
 export const metaSchema = z.object({
   season: z.number().int(),
   week: z.number().int().nonnegative(),
+  /**
+   * The in-progress week a draft made with `--include-in-progress` lets in:
+   * its stats are evidence, and each claim citing them is provisional.
+   */
+  in_progress_week: z.number().int().positive().optional(),
   pundit: z.string(),
   data_as_of: z.string(),
   checked_at: z.string(),

@@ -1,17 +1,60 @@
 import { existsSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { setFrontMatterKey } from "../src/front-matter.ts";
-import { draft, publish, RankingFileError } from "../src/index.ts";
+import { draft, FetchError, publish, RankingFileError } from "../src/index.ts";
+import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
   atWeek,
+  FEAR_THE_TURTLE_ID,
+  failingOn,
   fearTheTurtle,
   frontMatter,
   onStandings,
   published,
   rankingsDir,
+  withoutReminder,
 } from "./support/workspace.ts";
+
+describe("draft: a failed fetch", () => {
+  const WEEK_10 = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}/matchups/10`;
+
+  test("continues from the last complete snapshot, with the failed-fetch item", async () => {
+    const { dir, deps } = await onStandings(8);
+    const first = await draft(dir, deps);
+    await rm(first.path);
+    const snapshots = await readdir(join(dir, ".snapshots"));
+
+    const result = await draft(dir, failingOn(atWeek(deps, 10), WEEK_10));
+
+    expect(result.week).toBe(8);
+    expect(result.snapshot).toBe(first.snapshot);
+    expect(await readdir(join(dir, ".snapshots"))).toEqual(snapshots);
+    expect(frontMatter(await readFile(result.path, "utf8"))).toMatchObject({
+      snapshot: first.snapshot,
+      data_as_of: "2025-10-28T15:00:00.000Z",
+    });
+    expect(result.problems).toContainEqual(
+      expect.objectContaining({
+        kind: "failed-fetch",
+        severity: "soft",
+        section: "League",
+        reason: `couldn't fetch: GET ${WEEK_10} failed. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
+      }),
+    );
+  });
+
+  test("with no snapshot to continue from, stops with the fetch's error", async () => {
+    const { dir, deps } = await onStandings(8);
+    const WEEK_8 = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}/matchups/8`;
+
+    await expect(draft(dir, failingOn(deps, WEEK_8))).rejects.toThrow(
+      FetchError,
+    );
+    expect(existsSync(rankingsDir(dir))).toBe(false);
+  });
+});
 
 describe("draft", () => {
   test("writes the ranking file for the last scored week, in standings order", async () => {
@@ -23,7 +66,7 @@ describe("draft", () => {
     expect(result.path).toBe(path);
     expect(result.week).toBe(8);
     // Every stat line checks out against the evidence pack.
-    expect(result.problems).toEqual([]);
+    expect(withoutReminder(result.problems)).toEqual([]);
     const text = await readFile(path, "utf8");
     const fm = frontMatter(text);
     expect(fm).toMatchObject({

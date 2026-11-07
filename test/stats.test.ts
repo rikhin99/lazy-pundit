@@ -194,6 +194,48 @@ describe("which weeks count", () => {
       expect(rest, team).toEqual(rest7);
     }
   });
+
+  test("let in, the in-progress week adds only its own matchup stats, with no result and no transactions", async () => {
+    const inProgress = (league: Json) => {
+      league.settings.last_scored_leg = 7;
+    };
+    const midWeek = await patched(8, { "": inProgress });
+    const without = draftData(midWeek, 7).evidence;
+    const scored = draftData(await committed(8), 8).evidence;
+
+    const { evidence } = draftData(midWeek, 7, undefined, 8);
+
+    expect(evidence.week).toBe(7);
+    expect(evidence.league).toEqual(without.league);
+    // Gus Bus beat Pylon Patrol 133.22 to 78.22 in week 8.
+    expect(evidence.teams["sleeper:1"]).toMatchObject({
+      "w8.points": 133.22,
+      "w8.opp_points": 78.22,
+      "w8.margin": 55,
+      "w8.opponent": "sleeper:6",
+    });
+    for (const [team, stats] of Object.entries(evidence.teams)) {
+      // The week's transactions stay out with the rest of its activity.
+      const notMatchup = ["w8.result", "w8.adds", "w8.drops", "w8.trades"];
+      const w8 = (ev: Record<string, unknown>) =>
+        Object.fromEntries(
+          Object.entries(ev).filter(
+            ([k]) =>
+              k.startsWith("w8.") &&
+              !notMatchup.includes(k) &&
+              !k.startsWith("w8.faab"),
+          ),
+        );
+      const scoredStats = scored.teams[team as TeamId] ?? {};
+      expect(Object.keys(w8(stats)).length, team).toBeGreaterThan(0);
+      expect(w8(stats), team).toEqual(w8(scoredStats));
+      expect(stats["w8.result"], team).toBeUndefined();
+      const rest = Object.fromEntries(
+        Object.entries(stats).filter(([k]) => !k.startsWith("w8.")),
+      );
+      expect(rest, team).toEqual(without.teams[team as TeamId]);
+    }
+  });
 });
 
 describe("notes in the evidence pack", () => {

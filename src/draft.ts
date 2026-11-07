@@ -1,6 +1,11 @@
 import { access, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { checkDraft, type Problem, withGateFailures } from "./check.ts";
+import {
+  checkDraft,
+  type Problem,
+  withGateFailures,
+  withLeagueItem,
+} from "./check.ts";
 import {
   CONFIG_FORMAT,
   type Config,
@@ -45,7 +50,7 @@ import {
 import { FIRST_DRAFT_SYSTEM, firstDraftPrompt, loreBlock } from "./prompt.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
-import { dataChangedWarning, fetchFresh } from "./refresh.ts";
+import { dataChangedWarning, fetchOrContinue } from "./refresh.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
 import {
@@ -85,6 +90,11 @@ export interface DraftOptions {
    * sent is seen before the call.
    */
   onWarnings?: (warnings: string[]) => void;
+  /**
+   * `--include-in-progress`: let the in-progress week's stats in as evidence,
+   * every claim citing them provisional.
+   */
+  includeInProgress?: boolean;
 }
 
 export class DraftExistsError extends Error {
@@ -113,7 +123,7 @@ export async function draft(
   const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
   warn(leagueFileWarnings);
   const settings = await loadPunditSettings(ws);
-  const fetched = await fetchFresh(ws, deps);
+  const fetched = await fetchOrContinue(ws, deps);
   const names = validatorNames(lore, fetched.league, ws.handles, stakes);
   const week = fetched.league.lastScoredWeek;
   const dir = rankingsDir(ws);
@@ -133,7 +143,16 @@ export async function draft(
   const league = normalizeSleeper(snapshot);
   const method = methodForWeek(settings, league, week);
   const order = startingOrder(league, week, method);
-  const data = draftData(league, week, stakes);
+  const inProgress = league.weeks.find((w) => !w.scored && w.week > week)?.week;
+  const included = opts.includeInProgress ? inProgress : undefined;
+  if (inProgress !== undefined) {
+    warn([
+      included
+        ? `week ${inProgress} is in progress: its stats are in this week ${week} draft, and every claim citing them is provisional`
+        : `week ${inProgress} is in progress, so this is a week ${week} draft without it; \`--include-in-progress\` adds it as provisional`,
+    ]);
+  }
+  const data = draftData(league, week, stakes, included);
   const earlier = await lastPublished(dir, week);
   warn([
     ...stakesWarnings(stakes, league),
@@ -196,6 +215,7 @@ export async function draft(
     {
       season: Number(league.season),
       week,
+      ...(included && { in_progress_week: included }),
       pundit: ws.pundit,
       data_as_of: snapshot.manifest.fetched_at,
       checked_at: now,
@@ -219,7 +239,10 @@ export async function draft(
     throw await draftExists(workspaceDir, week, league);
   }
   const checked = await checkDraft(workspaceDir);
-  const problems = withGateFailures(checked, failed);
+  const problems = withLeagueItem(
+    withGateFailures(checked, failed),
+    fetched.failedFetch,
+  );
   // The gate knows what was sent and `check` doesn't, so `check` passes these.
   warn(
     failed

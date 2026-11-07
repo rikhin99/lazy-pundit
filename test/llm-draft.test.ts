@@ -9,7 +9,12 @@ import {
   saveCredentials,
 } from "../src/index.ts";
 import { scriptedLlm } from "./support/llm.ts";
-import { atWeek, committed, fearTheTurtle } from "./support/workspace.ts";
+import {
+  atWeek,
+  committed,
+  fearTheTurtle,
+  withoutReminder,
+} from "./support/workspace.ts";
 
 const KEY = "sk-ant-api03-test-key";
 
@@ -53,7 +58,7 @@ describe("draft with an Anthropic key", () => {
       "## Hail Mary Hustle {team=sleeper:9}\nSteady as ever. [10th]{ev=pf_rank} in points · [lost 4 straight]{ev=streak} · [lost to]{ev=w8.result} [Tank Brigade]{ev=w8.opponent} by [31.3]{ev=w8.margin}\n",
     );
     expect(text.match(/Steady as ever\./g)).toHaveLength(12);
-    expect(result.problems).toEqual([]);
+    expect(withoutReminder(result.problems)).toEqual([]);
   });
 
   test("uses the model named in config.yaml", async () => {
@@ -132,7 +137,7 @@ describe("draft with an Anthropic key", () => {
     expect(text).toMatch(/## Intro \{intro\}\nWeek high: /);
     expect(text).not.toContain("preamble");
     expect(text).not.toContain("Not a team");
-    expect(result.problems).toEqual([]);
+    expect(withoutReminder(result.problems)).toEqual([]);
   });
 
   test("last week's published blurb is in the prompt for that team, without its tags", async () => {
@@ -220,7 +225,7 @@ describe("the LLM gate", () => {
     );
     expect(text.match(/Steady as ever\./g)).toHaveLength(11);
     expect(text).toMatch(/## Intro \{intro\}\nWhat a week\./);
-    expect(result.problems).toEqual([]);
+    expect(withoutReminder(result.problems)).toEqual([]);
   });
 
   test("prose that never passes is written as its best attempt, with its faults flagged as gate failures", async () => {
@@ -239,7 +244,7 @@ describe("the LLM gate", () => {
     expect(text).toContain(
       "## Hail Mary Hustle {team=sleeper:9}\nStill rock bottom at [2-6]{ev=record}.\n",
     );
-    expect(result.problems).toEqual([
+    expect(withoutReminder(result.problems)).toEqual([
       expect.objectContaining({
         team: HUSTLE,
         section: "Hail Mary Hustle",
@@ -267,7 +272,7 @@ describe("the LLM gate", () => {
     const text = await readFile(result.path, "utf8");
     expect(text).toMatch(/## Intro \{intro\}\nWhat a damn week\. Week high/);
     const line = text.split("\n").indexOf("## Intro {intro}") + 2;
-    expect(result.problems).toEqual([
+    expect(withoutReminder(result.problems)).toEqual([
       {
         team: null,
         section: "Intro",
@@ -298,6 +303,6 @@ describe("the LLM gate", () => {
     expect(text).not.toContain("Not asked for.");
     // Written as the LLM wrote it; check then cites the claim it matches.
     expect(text).toContain("Lost again, now [1-7]{ev=record} on the year.");
-    expect(result.problems).toEqual([]);
+    expect(withoutReminder(result.problems)).toEqual([]);
   });
 });

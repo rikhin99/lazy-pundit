@@ -16,6 +16,7 @@ import {
   fearTheTurtle,
   type Json,
   patched,
+  withoutReminder,
 } from "./support/workspace.ts";
 
 type Patches = Record<string, (payload: Json) => void>;
@@ -288,7 +289,9 @@ describe("playoff words in a draft", () => {
     const { dir, deps } = await fearTheTurtle(14);
     await draft(dir, deps);
     const { problems } = await check(dir, deps);
-    expect(problems.map((p) => [p.text, p.reason])).toEqual([]);
+    expect(withoutReminder(problems).map((p) => [p.text, p.reason])).toEqual(
+      [],
+    );
   });
 
   test("clinched written about a team that has clinched is verified", async () => {
@@ -299,7 +302,7 @@ describe("playoff words in a draft", () => {
       path,
       text.replace(/(\{team=sleeper:3\}\n)/, "$1They have clinched a spot. "),
     );
-    expect((await check(dir, deps)).problems).toEqual([]);
+    expect(withoutReminder((await check(dir, deps)).problems)).toEqual([]);
   });
 });
 

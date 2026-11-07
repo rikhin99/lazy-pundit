@@ -11,7 +11,12 @@ import {
   type LlmReply,
 } from "../src/index.ts";
 import { type Scripted, scriptedLlm } from "./support/llm.ts";
-import { committed, fearTheTurtle, fixedClock } from "./support/workspace.ts";
+import {
+  committed,
+  fearTheTurtle,
+  fixedClock,
+  withoutReminder,
+} from "./support/workspace.ts";
 
 const KEY = "sk-ant-api03-test-key";
 
@@ -75,7 +80,7 @@ describe("the fallback", () => {
       expect(llm.requests).toHaveLength(1);
       await expectStatLines(result.path);
       expect(result.fallback).toMatch(reason);
-      expect(result.problems).toEqual([]);
+      expect(withoutReminder(result.problems)).toEqual([]);
     },
   );
 
@@ -240,7 +245,7 @@ describe("a stop partway through the LLM gate", () => {
     const text = await readFile(result.path, "utf8");
     expect(text.match(/Steady\./g)).toHaveLength(11);
     expect(text).toContain(`## Hail Mary Hustle {team=${HUSTLE}}\n${WRONG}\n`);
-    expect(result.problems).toEqual([
+    expect(withoutReminder(result.problems)).toEqual([
       expect.objectContaining({ team: HUSTLE, kind: "wrong", gate: true }),
     ]);
     expect(result.fallback).toBe(

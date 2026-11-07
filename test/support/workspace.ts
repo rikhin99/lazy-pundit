@@ -11,6 +11,7 @@ import {
   fileTransport,
   type League,
   normalizeSleeper,
+  type Problem,
   publish,
   readSnapshot,
   type Transport,
@@ -103,6 +104,27 @@ export function atWeek(deps: Deps, week: number): Deps {
   const snapshot = WEEKS[String(week)];
   if (!snapshot) throw new Error(`no committed snapshot for week ${week}`);
   return { ...deps, transport: fileTransport(FIXTURES, snapshot) };
+}
+
+/**
+ * A problems list without the correction-timing reminder, which every draft of
+ * a scored week carries, so "nothing else to fix" reads as `[]`.
+ */
+export function withoutReminder(problems: Problem[]): Problem[] {
+  return problems.filter((p) => p.kind !== "correction-timing");
+}
+
+/** The same deps, whose fetch fails on the request for `url` alone. */
+export function failingOn(deps: Deps, url: string): Deps {
+  return {
+    ...deps,
+    transport: {
+      request: (req) =>
+        req.url === url
+          ? Promise.reject(new Error("offline"))
+          : deps.transport.request(req),
+    },
+  };
 }
 
 /**

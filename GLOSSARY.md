@@ -160,6 +160,10 @@ A fetch of every week: the first fetch, any fetch more than 2 weeks after the la
 **Retention**:
 Which snapshots are kept: every snapshot a draft or frozen copy names, as its snapshot or one of its earlier snapshots, and the latest of each season. Others older than 14 days are deleted, along with stored payloads no kept snapshot uses.
 
+**Last complete snapshot**:
+The newest snapshot of the season in the league workspace. When a fetch fails or comes back partial, the command writes nothing and continues from it, saying its data as of and the command to run once fetching works. With none, the command stops.
+_Avoid_: Fallback snapshot (a fallback is the LLM's)
+
 ## Setup and cost
 
 **Setup step**:
@@ -255,7 +259,7 @@ A week the platform has finished scoring. Until then the week is in progress and
 _Avoid_: Final week
 
 **In-progress week**:
-The week the platform hasn't finished scoring yet. A routine fetch always asks for it, but its results aren't evidence.
+The week the platform hasn't finished scoring yet. A routine fetch always asks for it, but its results aren't evidence. Drafting while one is in progress warns and builds through the last scored week; `--include-in-progress` adds its own week's stats as evidence for provisional claims, recorded in the draft as `in_progress_week`.
 
 **Stat correction**:
 A change the platform makes to a week's scores after it has been scored.
@@ -420,6 +424,15 @@ _Avoid_: Errors, issues, warnings (for the whole list)
 
 **League item**:
 A problems-list item about the whole league rather than a team or a line of the draft, such as the small-sample flag.
+
+**Failed-fetch item**:
+A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix to run once fetching works. Only the command that fetched lists it; `check` never does.
+
+**Correction-timing reminder**:
+A soft league item on a draft of a scored week, since nothing signals when stat corrections stop: "Scored. Corrections may land through Thursday" on Sleeper.
+
+**Provisional claim**:
+A claim in a draft made with `--include-in-progress` that cites the in-progress week's stats and agrees with them. It is a soft problem, since the week can still change before it's scored. One that disagrees is wrong as usual.
 
 **Hard problem**:
 A problem that would put something false or garbled in front of the league: a wrong or stale claim, a cited evidence ID that doesn't exist, or a tag the tool can't read. Publishing with one asks the pundit first.

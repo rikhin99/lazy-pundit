@@ -20,6 +20,10 @@ import {
 
 const CLI = join(import.meta.dirname, "..", "src", "cli.ts");
 
+/** A clean week-8 draft's problems list: the correction-timing reminder alone. */
+const REMINDER_ONLY =
+  "Problems: 0 hard, 1 soft\n  · League: correction timing: Scored. Corrections may land through Thursday\n";
+
 test("the CLI imports only the library, the arg parser and the prompt", async () => {
   const text = await readFile(CLI, "utf8");
   const imports = [...text.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
@@ -132,7 +136,7 @@ test("check finds the workspace from a folder inside it", async () => {
   const { code, stdout } = await cli(inside, ["check"]);
 
   expect(code).toBe(0);
-  expect(stdout).toContain("No problems.");
+  expect(stdout).toContain(REMINDER_ONLY);
 });
 
 test("--league finds the workspace config.yaml lists, from any folder", async () => {
@@ -148,7 +152,7 @@ test("--league finds the workspace config.yaml lists, from any folder", async ()
   );
 
   expect(code).toBe(0);
-  expect(stdout).toContain("No problems.");
+  expect(stdout).toContain(REMINDER_ONLY);
 });
 
 test("doctor prints each check, a fix under each problem, and fails on a broken workspace", async () => {
@@ -213,7 +217,7 @@ test("refresh with no change says so, and updates checked_at", async () => {
   const { code, stdout } = await cli(dir, ["refresh"]);
 
   expect(code).toBe(0);
-  expect(stdout).toBe(`No changes since ${was.data_as_of}.\nNo problems.\n`);
+  expect(stdout).toBe(`No changes since ${was.data_as_of}.\n${REMINDER_ONLY}`);
   const now = frontMatter(await readFile(path, "utf8"));
   expect(now.checked_at).not.toBe(was.checked_at);
   expect({ ...now, checked_at: was.checked_at }).toEqual(was);
@@ -227,7 +231,7 @@ test("refresh --full takes a full fetch, and with no change says so", async () =
   const { code, stdout } = await cli(dir, ["refresh", "--full"]);
 
   expect(code).toBe(0);
-  expect(stdout).toBe(`No changes since ${was.data_as_of}.\nNo problems.\n`);
+  expect(stdout).toBe(`No changes since ${was.data_as_of}.\n${REMINDER_ONLY}`);
 });
 
 test("refresh after a settings change says the starting order follows them, not that nothing changed", async () => {
@@ -289,6 +293,15 @@ test("publish --yes doesn't ask", async () => {
   expect(code).toBe(0);
   expect(stdout).not.toContain("Publish anyway");
   expect(existsSync(txt)).toBe(true);
+});
+
+test("draft takes --include-in-progress, and with no week in progress drafts as usual", async () => {
+  const { dir } = await fearTheTurtle(8);
+
+  const { code, stdout } = await cli(dir, ["draft", "--include-in-progress"]);
+
+  expect(code).toBe(0);
+  expect(stdout).toContain("Drafted week 8:");
 });
 
 test("draft and check each print the personal-data warning once", async () => {

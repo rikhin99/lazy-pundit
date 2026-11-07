@@ -51,7 +51,8 @@ type CoveredWeek = Covered["weeks"][number];
 
 /**
  * The data changes from `old` to `next` through `throughWeek`, over what the
- * data hash covers. No changes means "data changed" doesn't apply.
+ * data hash covers, plus `inProgressWeek`'s matchups for a draft that let it
+ * in. No changes means "data changed" doesn't apply.
  *
  * With median scoring or divisions, standings are as reported as of the fetch
  * (`standingsThrough`), so they move whenever a later week is scored. They
@@ -61,9 +62,10 @@ export function diff(
   old: League,
   next: League,
   throughWeek: number,
+  inProgressWeek?: number,
 ): DataChange[] {
-  const a = coveredData(old, throughWeek);
-  const b = coveredData(next, throughWeek);
+  const a = coveredData(old, throughWeek, inProgressWeek);
+  const b = coveredData(next, throughWeek, inProgressWeek);
   return [
     ...settingChanges(a, b),
     ...weekChanges(a, b),

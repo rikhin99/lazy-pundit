@@ -7,6 +7,7 @@ import {
   type MatchupSide,
   type Result,
   type TeamId,
+  type Week,
 } from "./league.ts";
 import { bestLineupPoints } from "./lineup.ts";
 import { playoffStatuses, settledThisWeek } from "./playoff-status.ts";
@@ -49,8 +50,17 @@ interface WLT {
  * Weekly stats (`w<N>.…`) cover the ranking week, or a team's last played
  * week when it had no matchup in the ranking week. All-play, form, luck and
  * the lineup stats count only the weeks a team played.
+ *
+ * `inProgressWeek` (`--include-in-progress`) lets that week in, but only as
+ * its own weekly matchup stats, with a result only once it's scored (a later
+ * snapshot of the same draft): everything else, the playoff status and the
+ * week's transactions included, stays through the ranking week.
  */
-export function buildEvidencePack(league: League, week: number): EvidencePack {
+export function buildEvidencePack(
+  league: League,
+  week: number,
+  inProgressWeek?: number,
+): EvidencePack {
   const played = playedWeeks(league, week);
   const teams: EvidencePack["teams"] = {};
   for (const team of league.teams) teams[team.id] = {};
@@ -66,6 +76,10 @@ export function buildEvidencePack(league: League, week: number): EvidencePack {
       if (override !== 0) ev[`w${g.week}.override`] = override;
     }
     injuries(league, team.id, ev);
+  }
+  const inProgress = league.weeks.find((w) => w.week === inProgressWeek);
+  for (const g of inProgress ? playedIn(league, inProgress) : []) {
+    weekStats(league, g, teams[g.side.team] as Record<string, EvidenceValue>);
   }
   activity(league, week, played, teams);
   for (const [team, status] of playoffStatuses(league, week)) {
@@ -90,35 +104,40 @@ function playedWeeks(league: League, week: number): Map<TeamId, Played[]> {
   const out = new Map<TeamId, Played[]>(league.teams.map((t) => [t.id, []]));
   for (const w of league.weeks) {
     if (!w.scored || w.week > week) continue;
-    const sides = w.matchups.flatMap((m) => [
-      { kind: m.kind, side: m.sides[0], opp: m.sides[1] },
-      { kind: m.kind, side: m.sides[1], opp: m.sides[0] },
-    ]);
-    const cents = (s: MatchupSide) => Math.round(s.score * 100);
-    for (const { kind, side, opp } of sides) {
-      const others = sides.filter((o) => o.side !== side);
-      const starters = side.lineup.filter(isStarter);
-      out.get(side.team)?.push({
-        week: w.week,
-        kind,
-        side,
-        opp,
-        rank: 1 + others.filter((o) => cents(o.side) > cents(side)).length,
-        allplay: {
-          w: others.filter((o) => cents(o.side) < cents(side)).length,
-          l: others.filter((o) => cents(o.side) > cents(side)).length,
-          t: others.filter((o) => cents(o.side) === cents(side)).length,
-        },
-        playersPoints: sum(starters.map((e) => e.points)),
-        best: bestLineupPoints(
-          side.lineup,
-          league.settings.lineupSlots,
-          league.players,
-        ),
-      });
-    }
+    for (const g of playedIn(league, w)) out.get(g.side.team)?.push(g);
   }
   return out;
+}
+
+/** Each side of one week's matchups, as the team that played it. */
+function playedIn(league: League, w: Week): Played[] {
+  const sides = w.matchups.flatMap((m) => [
+    { kind: m.kind, side: m.sides[0], opp: m.sides[1] },
+    { kind: m.kind, side: m.sides[1], opp: m.sides[0] },
+  ]);
+  const cents = (s: MatchupSide) => Math.round(s.score * 100);
+  return sides.map(({ kind, side, opp }) => {
+    const others = sides.filter((o) => o.side !== side);
+    const starters = side.lineup.filter(isStarter);
+    return {
+      week: w.week,
+      kind,
+      side,
+      opp,
+      rank: 1 + others.filter((o) => cents(o.side) > cents(side)).length,
+      allplay: {
+        w: others.filter((o) => cents(o.side) < cents(side)).length,
+        l: others.filter((o) => cents(o.side) > cents(side)).length,
+        t: others.filter((o) => cents(o.side) === cents(side)).length,
+      },
+      playersPoints: sum(starters.map((e) => e.points)),
+      best: bestLineupPoints(
+        side.lineup,
+        league.settings.lineupSlots,
+        league.players,
+      ),
+    };
+  });
 }
 
 /** Record, standings, all-play, luck, form, points, streak and lineup totals. */

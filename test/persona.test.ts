@@ -5,7 +5,12 @@ import { check, draft, draftData, PRESETS, publish } from "../src/index.ts";
 import { validate } from "../src/validator.ts";
 import { scriptedLlm } from "./support/llm.ts";
 import { blurb } from "./support/week8-evidence.ts";
-import { atWeek, committed, fearTheTurtle } from "./support/workspace.ts";
+import {
+  atWeek,
+  committed,
+  fearTheTurtle,
+  withoutReminder,
+} from "./support/workspace.ts";
 
 const KEY = "sk-ant-api03-test-key";
 
@@ -225,8 +230,8 @@ describe("swearing", () => {
     const result = await draft(dir, deps);
 
     expect(llm.requests).toHaveLength(1);
-    expect(result.problems).toEqual([]);
-    expect((await check(dir, deps)).problems).toEqual([]);
+    expect(withoutReminder(result.problems)).toEqual([]);
+    expect(withoutReminder((await check(dir, deps)).problems)).toEqual([]);
   });
 
   test("off, the same word in a pundit edit only warns", async () => {
@@ -240,7 +245,7 @@ describe("swearing", () => {
     const result = await check(dir, deps);
 
     const line = text.split("\n").indexOf("## Intro {intro}") + 2;
-    expect(result.problems).toEqual([
+    expect(withoutReminder(result.problems)).toEqual([
       {
         team: null,
         section: "Intro",

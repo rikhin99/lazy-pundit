@@ -11,6 +11,7 @@ import {
   onStandings,
   published,
   rankingsDir,
+  withoutReminder,
 } from "./support/workspace.ts";
 
 /** Each team's line in the plain text: "N. Name · record (movement)". */
@@ -101,7 +102,7 @@ describe("movement", () => {
 
     const result = await publish(dir, deps, { yes: true });
 
-    expect(result.problems).toEqual([
+    expect(withoutReminder(result.problems)).toEqual([
       expect.objectContaining({
         severity: "hard",
         team: "sleeper:1",
@@ -123,10 +124,9 @@ describe("movement", () => {
     const GUS = "## Gus Bus {team=sleeper:1}\n";
     await edit((t) => t.replace(GUS, `${GUS}Gus Bus climbs 2 spots.\n`));
 
-    expect(await check(dir, deps)).toMatchObject({
-      problems: [],
-      autoTagged: 1,
-    });
+    const checked = await check(dir, deps);
+    expect(withoutReminder(checked.problems)).toEqual([]);
+    expect(checked.autoTagged).toBe(1);
     expect(await read()).toContain("Gus Bus [climbs 2 spots]{ev=move}.");
 
     // Gus Bus drops below Tank Brigade, to 7th: up 1 since week 7, not 2.
@@ -151,7 +151,7 @@ describe("movement", () => {
 
     const { problems } = await check(dir, deps);
 
-    expect(problems).toEqual([
+    expect(withoutReminder(problems)).toEqual([
       expect.objectContaining({
         severity: "soft",
         team: "sleeper:10",

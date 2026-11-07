@@ -7,6 +7,17 @@ import { onStandings, rankingsDir } from "./support/workspace.ts";
 
 const GUS = "## Gus Bus {team=sleeper:1}\n";
 
+/** The correction-timing reminder on a Sleeper draft of a scored week. */
+const CORRECTION_TIMING: Problem = {
+  severity: "soft",
+  team: null,
+  section: "League",
+  line: null,
+  text: "",
+  kind: "correction-timing",
+  reason: "Scored. Corrections may land through Thursday",
+};
+
 /** Drafts week 8, then lets the test edit the draft as the pundit would. */
 async function drafted() {
   const ws = await onStandings(8);
@@ -31,7 +42,11 @@ describe("check", () => {
 
     const result = await check(dir, deps);
 
-    expect(result).toMatchObject({ week: 8, path, problems: [] });
+    expect(result).toMatchObject({
+      week: 8,
+      path,
+      problems: [CORRECTION_TIMING],
+    });
     expect(await read()).toBe(before);
   });
 
@@ -53,6 +68,7 @@ describe("check", () => {
         text: "50",
         reason: "w8.margin is 55",
       }),
+      CORRECTION_TIMING,
     ]);
     expect(await read()).toBe(before);
   });
@@ -63,7 +79,7 @@ describe("check", () => {
 
     const result = await check(dir, deps);
 
-    expect(result.problems).toEqual([]);
+    expect(result.problems).toEqual([CORRECTION_TIMING]);
     expect(result.autoTagged).toBe(1);
     const text = await read();
     expect(text).toContain(`${GUS}They won by [55]{ev=w8.margin} this week.\n`);
@@ -79,7 +95,7 @@ describe("check", () => {
     const RASCALS = "## Red Zone Rascals {team=sleeper:8}\n";
     await edit((t) => t.replace(RASCALS, `${RASCALS}Sitting at #3 for now.\n`));
     expect(await check(dir, deps)).toMatchObject({
-      problems: [],
+      problems: [CORRECTION_TIMING],
       autoTagged: 1,
     });
     expect(await read()).toContain("Sitting at [#3]{ev=place} for now.");
@@ -105,6 +121,7 @@ describe("check", () => {
         id: "place",
         line: lineOf(await read(), "Sitting at"),
       }),
+      CORRECTION_TIMING,
       // The swap's two teams are each a moved team.
       expect.objectContaining({ kind: "moved", team: "sleeper:4" }),
       expect.objectContaining({ kind: "moved", team: "sleeper:8" }),
@@ -136,7 +153,7 @@ describe("publish confirm", () => {
       [expect.objectContaining({ kind: "wrong", reason: "w8.margin is 55" })],
     ]);
     expect(result).toMatchObject({ published: false, week: 8 });
-    expect(result.problems).toEqual(asked[0]);
+    expect(result.problems).toEqual([...(asked[0] ?? []), CORRECTION_TIMING]);
     const ranking = rankingsDir(dir);
     expect(existsSync(join(ranking, "week-08.published.md"))).toBe(false);
     expect(existsSync(join(ranking, "week-08.txt"))).toBe(false);
@@ -179,7 +196,10 @@ describe("publish confirm", () => {
     expect(asked).toEqual([]);
     expect(result).toMatchObject({
       published: true,
-      problems: [expect.objectContaining({ severity: "hard" })],
+      problems: [
+        expect.objectContaining({ severity: "hard" }),
+        CORRECTION_TIMING,
+      ],
     });
   });
 
@@ -190,7 +210,10 @@ describe("publish confirm", () => {
     const result = await publish(dir, deps, { confirm });
 
     expect(asked).toEqual([]);
-    expect(result).toMatchObject({ published: true, problems: [] });
+    expect(result).toMatchObject({
+      published: true,
+      problems: [CORRECTION_TIMING],
+    });
   });
 
   test("soft problems are listed without asking", async () => {
@@ -205,6 +228,7 @@ describe("publish confirm", () => {
     expect(result).toMatchObject({
       published: true,
       problems: [
+        CORRECTION_TIMING,
         expect.objectContaining({ severity: "soft", team: "sleeper:1" }),
       ],
     });
@@ -248,6 +272,7 @@ describe("publish confirm", () => {
           text: "[4-4]{ev = record}",
           line: lineOf(await read(), "They are"),
         }),
+        CORRECTION_TIMING,
       ],
     });
   });

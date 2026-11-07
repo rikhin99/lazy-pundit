@@ -22,6 +22,7 @@ import {
   operator,
   patchingTransport,
   statCorrection,
+  withoutReminder,
 } from "./support/workspace.ts";
 
 const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
@@ -87,7 +88,7 @@ async function draftedWithLore(lore: string) {
 /** Each problem in the blurb as its words and kind. */
 async function claimProblems(dir: string) {
   const { problems } = await check(dir, await operator());
-  return problems
+  return withoutReminder(problems)
     .filter((p) => p.kind !== "moved")
     .map((p) => [p.text, p.kind]);
 }

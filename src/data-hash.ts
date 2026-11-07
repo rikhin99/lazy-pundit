@@ -20,14 +20,23 @@ export function dataHash(league: League, throughWeek: number): string {
     .digest("hex");
 }
 
-/** The data a ranking for `throughWeek` stands on, which the data hash covers. */
-export function coveredData(league: League, throughWeek: number) {
+/**
+ * The data a ranking for `throughWeek` stands on, which the data hash covers.
+ * `inProgressWeek` adds that week's matchups, for a draft that let it in.
+ */
+export function coveredData(
+  league: League,
+  throughWeek: number,
+  inProgressWeek?: number,
+) {
   return {
     playoffTeams: league.settings.playoffTeams,
     regularSeasonWeeks: league.settings.regularSeasonWeeks,
     standings: standingsThrough(league, throughWeek),
     weeks: league.weeks
-      .filter((w) => w.scored && w.week <= throughWeek)
+      .filter(
+        (w) => (w.scored && w.week <= throughWeek) || w.week === inProgressWeek,
+      )
       .map((w) => ({
         week: w.week,
         byes: w.byes,

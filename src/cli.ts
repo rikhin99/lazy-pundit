@@ -121,6 +121,9 @@ const KINDS: Record<Problem["kind"], string> = {
   "unreadable-tag": "unreadable tag",
   moved: "you moved this team",
   "small-sample": "small sample",
+  "failed-fetch": "fetch failed",
+  provisional: "provisional",
+  "correction-timing": "correction timing",
 };
 
 /** The problems list as the library ordered it: one line per item. */
@@ -190,10 +193,15 @@ function printWarnings(warnings: string[]): void {
 program
   .command("draft")
   .description("Fetch the league and start a draft for the last scored week.")
-  .action(async () => {
+  .option(
+    "--include-in-progress",
+    "Add the week in progress's stats as evidence, every claim citing them provisional.",
+  )
+  .action(async (opts: { includeInProgress?: boolean }) => {
     const deps = systemDeps();
     const result = await draft(await workspace(deps), deps, {
       onWarnings: printWarnings,
+      includeInProgress: opts.includeInProgress === true,
     });
     if (result.fallback) console.error(`${MARKS.warn} ${result.fallback}`);
     console.log(
@@ -238,7 +246,7 @@ program
       );
     }
     if (result.changes.length === 0) {
-      if (!result.methodChanged) {
+      if (!result.methodChanged && !result.fromLastComplete) {
         console.log(`No changes since ${result.dataAsOf}.`);
       }
     } else {
@@ -249,6 +257,11 @@ program
         console.log("Newly stale:");
         printProblems(result.newlyStale);
       }
+    }
+    if (result.scoredWeek !== undefined) {
+      console.log(
+        `week ${result.scoredWeek} is scored; start a week ${result.scoredWeek} draft`,
+      );
     }
     report(result.problems);
   });

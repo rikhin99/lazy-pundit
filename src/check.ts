@@ -60,6 +60,9 @@ export interface Problem {
   /**
    * `moved`: a moved team, away from its starting place. `small-sample`: the
    * small-sample flag, a league item. `no-stakes`: the no-stakes flag.
+   * `failed-fetch`: the failed-fetch item, a league item only the command
+   * that fetched lists. `provisional`: a provisional claim.
+   * `correction-timing`: the correction-timing reminder, a league item.
    */
   kind:
     | Exclude<ClaimStatus, "verified">
@@ -67,7 +70,10 @@ export interface Problem {
     | "no-stakes"
     | "unreadable-tag"
     | "moved"
-    | "small-sample";
+    | "small-sample"
+    | "failed-fetch"
+    | "provisional"
+    | "correction-timing";
   /** Why, in words the pundit reads. */
   reason: string;
   /** For a stale claim: what changed since it held. */
@@ -150,7 +156,12 @@ export async function checkDraft(
   checkOrder(name, ranking, league);
 
   const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
-  const { evidence } = draftData(league, ranking.meta.week, stakes);
+  const { evidence } = draftData(
+    league,
+    ranking.meta.week,
+    stakes,
+    ranking.meta.in_progress_week,
+  );
   const baseline = await movementBaseline(dir, week);
   const order = orderEvidence(ranking, baseline);
   const startingOrder = Object.fromEntries(
@@ -175,6 +186,7 @@ export async function checkDraft(
   problems.push(
     ...movedTeams(ranking, order, startingOrder, teamNames(league)),
     ...(isSmallSample(week) ? [smallSampleFlag(week)] : []),
+    ...(week > 0 ? [correctionTiming(league)] : []),
   );
   problems.sort(byHardThenLine);
 
@@ -216,12 +228,14 @@ export function claimsGoingStale(
   from: League,
   to: League,
 ): Problem[] {
-  const { week } = checked.ranking.meta;
+  const { week, in_progress_week } = checked.ranking.meta;
+  const evidenceOf = (league: League) =>
+    draftData(league, week, checked.stakes, in_progress_week).evidence;
   const { problems } = reviewProse({
     text: checked.text,
     ranking: checked.ranking,
     league: to,
-    evidence: draftData(to, week, checked.stakes).evidence,
+    evidence: evidenceOf(to),
     order: checked.order,
     validatorNames: validatorNames(
       checked.lore,
@@ -229,7 +243,7 @@ export function claimsGoingStale(
       checked.handles,
       checked.stakes,
     ),
-    before: { evidence: [draftData(from, week, checked.stakes).evidence] },
+    before: { evidence: [evidenceOf(from)] },
   });
   return problems.filter((p) => p.kind === "stale" && p.cause === "refresh");
 }
@@ -249,7 +263,8 @@ async function earlierEvidence(
   for (const id of (ranking.meta.earlier_snapshots ?? []).toReversed()) {
     try {
       const league = normalizeSleeper(await readSnapshot(snapshotsDir(ws), id));
-      packs.push(draftData(league, ranking.meta.week, stakes).evidence);
+      const { week, in_progress_week } = ranking.meta;
+      packs.push(draftData(league, week, stakes, in_progress_week).evidence);
     } catch {
       // Left out, as above.
     }
@@ -297,6 +312,11 @@ function reviewProse(input: {
 
   const problems: Problem[] = [];
   const autoTags: { start: number; end: number; id: string }[] = [];
+  // Provisional while the week the draft let in is still unscored in its data.
+  const recorded = ranking.meta.in_progress_week;
+  const inProgress = league.weeks.some((w) => w.week === recorded && !w.scored)
+    ? recorded
+    : undefined;
   const lineAt = (offset: number) =>
     written.slice(0, offset).split("\n").length;
   for (const s of sections) {
@@ -315,7 +335,20 @@ function reviewProse(input: {
       section: s.team ? (names.get(s.team) ?? s.team) : "Intro",
     };
     for (const c of result.claims) {
-      if (c.status === "verified") continue;
+      if (c.status === "verified") {
+        if (inProgress && c.id?.startsWith(`w${inProgress}.`)) {
+          problems.push({
+            ...at,
+            severity: "soft",
+            line: lineAt(s.start + c.start),
+            text: c.text,
+            kind: "provisional",
+            reason: `week ${inProgress} is still in progress, so this can change once it's scored`,
+            id: c.id,
+          });
+        }
+        continue;
+      }
       problems.push({
         ...at,
         severity: isHard(c.status) ? "hard" : "soft",
@@ -364,15 +397,30 @@ export const NO_STAKES_REASON =
 
 /** The small-sample flag. Worked out here, never written to the file, so nothing published can carry it. */
 function smallSampleFlag(week: number): Problem {
-  return {
-    severity: "soft",
-    team: null,
-    section: "League",
-    line: null,
-    text: "",
-    kind: "small-sample",
-    reason: `week ${week} is early in the season, so the starting order means little yet`,
-  };
+  return leagueItem(
+    "small-sample",
+    `week ${week} is early in the season, so the starting order means little yet`,
+  );
+}
+
+/**
+ * The last day each platform makes stat corrections to a scored week, as
+ * spec #37's user story 59 gives them.
+ */
+const CORRECTIONS_THROUGH: Record<League["platform"], string> = {
+  sleeper: "Thursday",
+  espn: "Saturday",
+};
+
+/**
+ * The correction-timing reminder. Nothing signals when corrections stop, so
+ * every draft of a scored week carries it.
+ */
+function correctionTiming(league: League): Problem {
+  return leagueItem(
+    "correction-timing",
+    `Scored. Corrections may land through ${CORRECTIONS_THROUGH[league.platform]}`,
+  );
 }
 
 /** The problems list's order: hard first, then by line, with league items ahead of any line. */
@@ -381,6 +429,30 @@ function byHardThenLine(a: Problem, b: Problem): number {
     Number(b.severity === "hard") - Number(a.severity === "hard") ||
     (a.line ?? 0) - (b.line ?? 0)
   );
+}
+
+/**
+ * A problems list with a league item only the command knows, such as the
+ * failed-fetch item, in its place in the list's order.
+ */
+export function withLeagueItem(
+  problems: Problem[],
+  item: Problem | undefined,
+): Problem[] {
+  return item ? [item, ...problems].sort(byHardThenLine) : problems;
+}
+
+/** A soft league item: about the whole league, at no team or line. */
+export function leagueItem(kind: Problem["kind"], reason: string): Problem {
+  return {
+    severity: "soft",
+    team: null,
+    section: "League",
+    line: null,
+    text: "",
+    kind,
+    reason,
+  };
 }
 
 /**

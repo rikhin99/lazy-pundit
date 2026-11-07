@@ -39,8 +39,9 @@ export function draftData(
   league: League,
   week: number,
   stakes: Stakes = UNRECORDED,
+  inProgressWeek?: number,
 ): DraftData {
-  const evidence = buildEvidencePack(league, week);
+  const evidence = buildEvidencePack(league, week, inProgressWeek);
   const fromStakes = stakesEvidence(stakes, league, week);
   Object.assign(evidence.league, fromStakes.league);
   for (const [team, ev] of Object.entries(fromStakes.teams)) {
@@ -53,7 +54,9 @@ export function draftData(
     const ev = evidence.teams[team.id] ?? {};
     const triggers = triggerParts(stakes, team.id, evidence.league, ev, names);
     teams[team.id] = {
-      statLine: [statLine(ev, names), ...triggers].filter(Boolean).join(" · "),
+      statLine: [statLine(ev, names, week), ...triggers]
+        .filter(Boolean)
+        .join(" · "),
       stats: {
         ...pick(ev, "record", "streak", "allplay"),
         ...pickNumbers(ev, "pf", "form3", "luck"),
@@ -89,6 +92,7 @@ const PLAYOFF_WORDS: Record<PlayoffStatus, string> = {
 function statLine(
   ev: Record<string, EvidenceValue>,
   names: Map<TeamId, string>,
+  week: number,
 ): string {
   const parts: string[] = [];
   if (typeof ev.pf_rank === "number" && ev.allplay !== undefined) {
@@ -99,7 +103,7 @@ function statLine(
     const verb = { W: "won", L: "lost", T: "tied" }[run[1] as "W" | "L" | "T"];
     parts.push(`[${verb} ${run[2]} straight]{ev=streak}`);
   }
-  const last = lastMatchup(ev, names);
+  const last = lastMatchup(ev, names, week);
   if (last) parts.push(last);
   if (ev.playoffs !== undefined) {
     const status = PLAYOFF_WORDS[ev.playoffs as PlayoffStatus];
@@ -109,18 +113,22 @@ function statLine(
 }
 
 /**
- * The team's latest matchup: `[beat]{ev=w8.result} [Pirates]{ev=w8.opponent}
- * by [5.5]{ev=w8.margin}`. A losers-bracket matchup, where the lower score
- * advances, or a two-week round not yet decided gives the scores instead.
+ * The team's latest matchup through the ranking week `upTo`, never an
+ * in-progress week a draft let in: `[beat]{ev=w8.result}
+ * [Pirates]{ev=w8.opponent} by [5.5]{ev=w8.margin}`. A losers-bracket
+ * matchup, where the lower score advances, or a two-week round not yet
+ * decided gives the scores instead.
  */
 function lastMatchup(
   ev: Record<string, EvidenceValue>,
   names: Map<TeamId, string>,
+  upTo: number,
 ): string | null {
   const week = Object.keys(ev)
     .map((k) => /^w(\d+)\.opponent$/.exec(k)?.[1])
     .filter((w) => w !== undefined)
     .map(Number)
+    .filter((w) => w <= upTo)
     .sort((a, b) => b - a)[0];
   if (week === undefined) return null;
   const w = `w${week}`;
