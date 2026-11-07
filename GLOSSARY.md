@@ -161,7 +161,7 @@ A fetch of every week: the first fetch, any fetch more than 2 weeks after the la
 Which snapshots are kept: every snapshot a draft or frozen copy names, as its snapshot or one of its earlier snapshots, and the latest of each season. Others older than 14 days are deleted, along with stored payloads no kept snapshot uses.
 
 **Last complete snapshot**:
-The newest snapshot of the season in the league workspace. When a fetch fails or comes back partial, the command writes nothing and continues from it, saying its data as of and the command to run once fetching works. With none, the command stops.
+The newest snapshot of the season in the league workspace. When a fetch fails or comes back partial, the command writes nothing and continues from it, saying its data as of and the command to run once fetching works. With none, the command stops, writing nothing, and its error ends with the fix for what failed.
 _Avoid_: Fallback snapshot (a fallback is the LLM's)
 
 ## Setup and cost
@@ -426,7 +426,7 @@ _Avoid_: Errors, issues, warnings (for the whole list)
 A problems-list item about the whole league rather than a team or a line of the draft, such as the small-sample flag.
 
 **Failed-fetch item**:
-A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix for what failed: `lazy-pundit refresh` once fetching works; checking `league_id` in `workspace.md` when the platform doesn't know the league; or checking for a newer Lazy Pundit when the platform answers in a shape this version can't read. Only the command that fetched lists it; `check` never does.
+A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix for what failed: `lazy-pundit refresh` once fetching works; checking `league_id` in `workspace.md` when the platform doesn't know the league; or checking for a newer Lazy Pundit when the platform answers in a shape this version can't read. Only the command that fetched lists it; `check` never does. With no last complete snapshot, the same fix ends the stopping error, except that running the command again once fetching works takes the place of `lazy-pundit refresh`, since there's no draft for it to move.
 
 **Correction-timing reminder**:
 A soft league item on a draft of a scored week, since nothing signals when stat corrections stop: "Scored. Corrections may land through Thursday" on Sleeper.

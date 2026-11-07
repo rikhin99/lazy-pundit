@@ -61,7 +61,7 @@ export interface RefreshResult {
  * auto-tag. With neither change it only updates `checked_at`. A failed fetch
  * continues from the last complete snapshot, leaving `checked_at`, with the
  * failed-fetch item; with no snapshot to continue from it throws, as a bad
- * settings file does, and changes nothing.
+ * settings file does, with the fix for what failed, and changes nothing.
  */
 export async function refresh(
   workspaceDir: string,
@@ -257,7 +257,8 @@ export interface FetchedOrContinued extends FetchedSleeper {
 /**
  * `fetchFresh`, except that a failed or partial fetch continues from the last
  * complete snapshot: the season's newest, whose `write` writes nothing and
- * gives it back. With no snapshot to continue from, the fetch's error stands.
+ * gives it back. With no snapshot to continue from, it stops with the fetch's
+ * error, its message ending with the fix for what failed.
  */
 export async function fetchOrContinue(
   ws: Workspace,
@@ -277,7 +278,12 @@ export async function fetchOrContinue(
           m.season === ws.season.year,
       )
       .at(-1);
-    if (!last) throw err;
+    if (!last) {
+      throw new FetchError(`${err.message}. ${FETCH_FIXES[err.fix].stopping}`, {
+        cause: err,
+        fix: err.fix,
+      });
+    }
     return {
       league: normalizeSleeper(await readSnapshot(dir, last.id)),
       write: async () => last,
@@ -286,19 +292,30 @@ export async function fetchOrContinue(
   }
 }
 
-/** What the failed-fetch item tells the pundit to do, for each kind of failure. */
-const FETCH_FIXES: Record<FetchFix, string> = {
-  refresh: "Once fetching works, run: lazy-pundit refresh",
-  league_id:
-    "The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.",
-  update:
-    "This version can't read what the platform answered: check for a newer Lazy Pundit.",
-};
+const LEAGUE_ID_FIX =
+  "The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.";
+const UPDATE_FIX =
+  "This version can't read what the platform answered: check for a newer Lazy Pundit.";
+
+/**
+ * What the pundit is told to do, for each kind of failure: `continuing` ends
+ * the failed-fetch item, `stopping` the error when there's no last complete
+ * snapshot, where no draft exists for `refresh` to move.
+ */
+const FETCH_FIXES: Record<FetchFix, { continuing: string; stopping: string }> =
+  {
+    refresh: {
+      continuing: "Once fetching works, run: lazy-pundit refresh",
+      stopping: "Once fetching works, run the command again.",
+    },
+    league_id: { continuing: LEAGUE_ID_FIX, stopping: LEAGUE_ID_FIX },
+    update: { continuing: UPDATE_FIX, stopping: UPDATE_FIX },
+  };
 
 /** The failed-fetch item: a soft league item with the fix for what failed. */
 function failedFetchItem(err: FetchError, dataAsOf: string): Problem {
   return leagueItem(
     "failed-fetch",
-    `couldn't fetch: ${err.message}. Continuing from the last complete snapshot, data as of ${dataAsOf}. ${FETCH_FIXES[err.fix]}`,
+    `couldn't fetch: ${err.message}. Continuing from the last complete snapshot, data as of ${dataAsOf}. ${FETCH_FIXES[err.fix].continuing}`,
   );
 }

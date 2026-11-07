@@ -3,7 +3,13 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { setFrontMatterKey } from "../src/front-matter.ts";
-import { draft, FetchError, publish, RankingFileError } from "../src/index.ts";
+import {
+  type Deps,
+  draft,
+  FetchError,
+  publish,
+  RankingFileError,
+} from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
   atWeek,
@@ -69,14 +75,56 @@ describe("draft: a failed fetch", () => {
     );
   });
 
-  test("with no snapshot to continue from, stops with the fetch's error", async () => {
-    const { dir, deps } = await onStandings(8);
-    const WEEK_8 = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}/matchups/8`;
+  describe("with no snapshot to continue from, stops with the fix for what failed", () => {
+    const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
 
-    await expect(draft(dir, failingOn(deps, WEEK_8))).rejects.toThrow(
-      FetchError,
-    );
-    expect(existsSync(rankingsDir(dir))).toBe(false);
+    async function stopped(patch: (deps: Deps) => Deps): Promise<FetchError> {
+      const { dir, deps } = await onStandings(8);
+      const err = await draft(dir, patch(deps)).catch((e: unknown) => e);
+      expect(existsSync(rankingsDir(dir))).toBe(false);
+      expect(existsSync(join(dir, ".snapshots"))).toBe(false);
+      if (!(err instanceof FetchError))
+        throw new Error(`not a FetchError: ${err}`);
+      return err;
+    }
+
+    test("a failed request says to run the command again, not refresh", async () => {
+      const WEEK_8 = `${LEAGUE}/matchups/8`;
+
+      const err = await stopped((deps) => failingOn(deps, WEEK_8));
+
+      expect(err.message).toBe(
+        `GET ${WEEK_8} failed. Once fetching works, run the command again.`,
+      );
+    });
+
+    test("a league the platform doesn't know gives the league ID to check", async () => {
+      const err = await stopped((deps) => ({
+        ...deps,
+        transport: patchingTransport(deps.transport, {
+          [LEAGUE]: { replaceWith: null },
+        }),
+      }));
+
+      expect(err.message).toBe(
+        `Sleeper league ${FEAR_THE_TURTLE_ID} is not a league payload. The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.`,
+      );
+    });
+
+    test("a league payload of another shape says to check for a newer version", async () => {
+      const err = await stopped((deps) => ({
+        ...deps,
+        transport: patchingTransport(deps.transport, {
+          [LEAGUE]: (league) => {
+            delete league.settings;
+          },
+        }),
+      }));
+
+      expect(err.message).toMatch(
+        /\. This version can't read what the platform answered: check for a newer Lazy Pundit\.$/,
+      );
+    });
   });
 });
 
