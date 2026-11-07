@@ -10,7 +10,8 @@
 #   cancel-folder   Ctrl-C at the folder prompt
 #   rename          rename the first handle to "gus", pick standings
 #   skip-rest       Skip the rest at the handles step
-#   key             enter a key (checked offline, so it can't be), cap 0.10
+#   key             enter a key, which the replay can't check, so it's saved with
+#                   a warning that it couldn't be checked; cap 0.10
 #   another         every default, then a second league, cancelled at its name
 #   stakes          money at stake: buy-in 50, the default payouts, a $10 weekly high score
 #   family          a family league type, so the family league and Family persona are preselected
@@ -20,6 +21,10 @@
 # It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
 # with the wizard's code. Look in that home for what the wizard wrote. A new
 # wizard step needs its prompt and answer added at the bottom of this file.
+
+# The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
+# setup does. drive-wizard-all.sh reads this line.
+set cancelled {bad-id cancel cancel-folder another}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
@@ -49,6 +54,8 @@ catch {unset env(ANTHROPIC_API_KEY)}
 
 # A real width: a terminal of width 0 makes clack wrap one character per line.
 set stty_init "cols 120 rows 40"
+# Read the wizard's output as UTF-8 whatever the locale, so a prompt's symbol matches.
+encoding system utf-8
 set timeout 15
 
 proc finish {} {
@@ -152,8 +159,11 @@ send "\r"
 need "Add an Anthropic key"
 if {$scenario eq "key"} {
   send "\r"
-  need "Anthropic key"
+  # The password prompt's own line: "Anthropic key" alone also matches the
+  # explanation and the select's redraw, which come before the prompt listens.
+  need "\u25c6  Anthropic key"
   send "sk-ant-test\r"
+  need "couldn't check it"
   need "Spend cap"
   send [string repeat "\x7f" 5]; after 200; send "0.10\r"
 } else {

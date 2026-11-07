@@ -1,6 +1,7 @@
 export {
   ANTHROPIC_API,
   anthropicLlm,
+  KEY_CHECK_WAIT_MS,
   type Llm,
   LlmError,
   type LlmErrorKind,

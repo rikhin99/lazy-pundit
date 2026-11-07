@@ -12,6 +12,8 @@ export interface TransportRequest {
   method?: "GET" | "POST";
   /** The request body, sent with a `POST`. Never recorded anywhere. */
   body?: string;
+  /** Aborts the request, for a caller that stops waiting for its answer. */
+  signal?: AbortSignal;
 }
 
 export interface TransportResponse {
@@ -40,6 +42,7 @@ export function httpTransport(): Transport {
         method: req.method ?? "GET",
         headers: req.headers ?? {},
         ...(req.body === undefined ? {} : { body: req.body }),
+        ...(req.signal === undefined ? {} : { signal: req.signal }),
       });
       return {
         status: res.status,

@@ -5,25 +5,43 @@ import type { Transport } from "./transport.ts";
 export const ANTHROPIC_API = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
 
+/** How long the key check waits for Anthropic's answer before giving up. */
+export const KEY_CHECK_WAIT_MS = 10_000;
+
 /**
  * Asks Anthropic whether a key works, by listing models: a free call that
  * spends nothing. `rejected` is a 401 or 403; `unreachable` means the request
- * failed or the API answered with an error of its own.
+ * failed, the API answered with an error of its own, or no answer came within
+ * `KEY_CHECK_WAIT_MS`, when the request is aborted.
  */
 export async function checkAnthropicKey(
   transport: Transport,
   key: string,
 ): Promise<"ok" | "rejected" | { unreachable: string }> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const noAnswer = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`no answer in ${KEY_CHECK_WAIT_MS / 1000} seconds`));
+    }, KEY_CHECK_WAIT_MS);
+  });
   try {
-    const res = await transport.request({
-      url: `${ANTHROPIC_API}/models`,
-      headers: { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION },
-    });
+    const res = await Promise.race([
+      transport.request({
+        url: `${ANTHROPIC_API}/models`,
+        headers: { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION },
+        signal: controller.signal,
+      }),
+      noAnswer,
+    ]);
     if (res.status === 200) return "ok";
     if (res.status === 401 || res.status === 403) return "rejected";
     return { unreachable: `Anthropic answered ${res.status}` };
   } catch (err) {
     return { unreachable: (err as Error).message };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

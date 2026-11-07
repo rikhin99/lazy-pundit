@@ -7,7 +7,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { loadCredentials } from "../src/config.ts";
 import {
   buyInProblem,
@@ -19,6 +19,7 @@ import {
   familyLeagueDefault,
   familyLeagueLowers,
   handleProblem,
+  KEY_CHECK_WAIT_MS,
   METHOD_CHOICES,
   nicknamesOf,
   nicknamesProblem,
@@ -585,6 +586,33 @@ test("a key is checked live: a rejected one is asked again, and one that can't b
   const unreachable = await checkKey(answering(500), "k");
   expect(unreachable.problem).toBeUndefined();
   expect(unreachable.warning).toMatch(/couldn't check/);
+});
+
+test("a key check that never gets an answer gives up after its bounded wait: the key is kept with a warning, and the request is aborted", async () => {
+  const base = await operator();
+  let signal: AbortSignal | undefined;
+  const silent: Deps = {
+    ...base,
+    transport: {
+      request: (req) => {
+        signal = req.signal;
+        return new Promise(() => {});
+      },
+    },
+  };
+  vi.useFakeTimers();
+  try {
+    const checked = checkKey(silent, "k");
+    await vi.advanceTimersByTimeAsync(KEY_CHECK_WAIT_MS - 1);
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    const { problem, warning } = await checked;
+    expect(problem).toBeUndefined();
+    expect(warning).toMatch(/couldn't check it \(no answer in 10 seconds\)/);
+    expect(signal?.aborted).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("a credentials file that can't take the key leaves no workspace behind and lists nothing", async () => {

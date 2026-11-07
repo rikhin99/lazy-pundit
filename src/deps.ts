@@ -47,8 +47,9 @@ export interface Environment {
  *   LAZY_PUNDIT_ESPN_S2    overrides the stored espn_s2 cookie
  *   LAZY_PUNDIT_CLIPBOARD  `off` leaves the clipboard alone, as on a machine
  *                          without one, so scripted runs don't overwrite it
- *   LAZY_PUNDIT_REPLAY     a snapshot's folder: league fetches replay it, not
- *                          the network, so scripted runs stay offline
+ *   LAZY_PUNDIT_REPLAY     a snapshot's folder: every request replays it, not
+ *                          the network, so scripted runs stay offline; one it
+ *                          didn't record, such as the key check, gets a 404
  */
 export function systemDeps(): Deps {
   const env = process.env;
