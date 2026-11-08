@@ -1,6 +1,6 @@
 # Changelog
 
-Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pundit#semver:^0`. Within 0.x, a release may change the files a workspace holds; its entry says how.
+Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pundit#semver:^0` (with npm 12 or later, add `--allow-git=all`). Within 0.x, a release may change the files a workspace holds; its entry says how.
 
 ## 0.1.0
 

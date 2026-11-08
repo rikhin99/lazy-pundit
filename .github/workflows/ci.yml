@@ -20,3 +20,4 @@ jobs:
       - run: npm test
       - run: sudo apt-get update && sudo apt-get install -y expect
       - run: npm run -s drive:wizard:all
+      - run: npm run -s install:smoke

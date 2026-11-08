@@ -11,7 +11,13 @@ Needs Node 24 or later.
 npm i -g github:rikhin99/lazy-pundit#semver:^0
 ```
 
-That installs the latest 0.x release. Run the same line again to update. Install from a release (`#semver:^0` or a tag such as `#v0.1.0`), not from `#main`: only release tags carry the built code that npm can install globally. See `CHANGELOG.md` for what each release has.
+That installs the latest 0.x release. Run the same line again to update. With npm 12 or later (`npm -v`; Node 24 and 26 ship npm 11), npm refuses installs from git unless you allow them, so add `--allow-git=all`:
+
+```sh
+npm i -g --allow-git=all github:rikhin99/lazy-pundit#semver:^0
+```
+
+Install from a release (`#semver:^0` or a tag such as `#v0.1.0`), not from `#main`: only release tags carry the built code that npm can install globally. See `CHANGELOG.md` for what each release has.
 
 ## A week's ranking
 
@@ -81,6 +87,8 @@ npm test
 1. On `main`, set `package.json`'s version and add a `## <version>` entry to `CHANGELOG.md`. Commit both.
 2. Run `npm run -s release -- <version>`. It checks the tree, builds, and tags `v<version>` on the release commit, leaving `main` and your working tree as they are.
 3. Push `main` and the tag together (`git push origin main v<version>`), then make the GitHub release with the printed `gh release create` command. Its notes are the CHANGELOG entry, written to `dist/RELEASE_NOTES.md`.
+
+`npm run -s install:smoke` (run in CI after the tests) does steps 2 and the install in a throwaway clone of HEAD: it tags a release commit there, installs it by `#semver:^0` into an empty prefix with a clean HOME, once with the npm in use and once with npm 12 and `--allow-git=all`, and fails unless `--help` lists every command and `doctor` exits 0. Only committed work is tested.
 
 The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock**, a **clipboard**, the **cache**, **config** and **workspaces** folders, and the environment's overrides (`systemDeps()` in production, the only place that reads `process.env`). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
 

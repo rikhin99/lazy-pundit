@@ -35,7 +35,8 @@
     "outline": "node scripts/outline.ts",
     "mutate": "node scripts/mutate.ts",
     "trace": "node scripts/trace-context.ts",
-    "release": "node scripts/release.ts"
+    "release": "node scripts/release.ts",
+    "install:smoke": "bash scripts/install-smoke.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
