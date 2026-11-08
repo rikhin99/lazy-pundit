@@ -462,7 +462,7 @@ _Avoid_: Test suite, usage stats
 The builder's Stage 1 trial with real pundits ranking their own leagues, to learn whether the tool earns a place in their week. It gathers no telemetry: what the builder learns, each pundit chooses to paste.
 
 **Demand-test summary**:
-What `stats` prints, read from the league workspace's drafts and frozen copies alone, for the pundit to paste to the builder during the demand test. For each published ranking week, it shows the minutes from the draft's start to its first publish, how many teams were moved and by how many places in all (measured against the starting order at publish), the LLM text kept, whether the LLM was used and the blurb problems at publish. Then it gives the medians. Nothing is sent anywhere: the pundit chooses what to paste.
+What `stats` prints, read from the pundit's frozen copies and LLM prose files alone, for the pundit to paste to the builder during the demand test. For each published ranking week, it shows the minutes from the draft's start to its first publish, how many teams were moved and by how many places in all (measured against the starting order at publish), the LLM text kept, whether the LLM was used and the blurb problems at publish. Then it gives the medians. Nothing is sent anywhere: the pundit chooses what to paste.
 _Avoid_: Usage stats, usage summary
 
 **LLM text kept**:
