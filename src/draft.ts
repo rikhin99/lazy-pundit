@@ -1,4 +1,4 @@
-import { access, mkdir } from "node:fs/promises";
+import { access, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   checkDraft,
@@ -31,6 +31,7 @@ import {
   type GatedProse,
   gatedProse,
 } from "./llm-gate.ts";
+import { renderLlmProseFile } from "./llm-prose-file.ts";
 import {
   loadLore,
   refuseLocal,
@@ -209,7 +210,7 @@ export async function draft(
       fallback: `No Anthropic key, so the LLM didn't run: set ANTHROPIC_API_KEY, or add anthropic_api_key to ${credentialsPath(deps)}${STAT_LINES}`,
     };
   }
-  const { prose, failed, fallback } = outcome;
+  const { prose, failed, fallback, llm } = outcome;
   const now = began.toISOString();
   const text = renderDraft(
     {
@@ -237,6 +238,20 @@ export async function draft(
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     throw await draftExists(workspaceDir, week, league);
+  }
+  // One left by a deleted draft of the week would otherwise stand in for this one's.
+  const llmPath = join(dir, `${weekStem(week)}.llm.md`);
+  if (llm && (llm.intro || Object.keys(llm.blurbs).length > 0)) {
+    await writeWorkspaceFile(
+      llmPath,
+      renderLlmProseFile(
+        { season: Number(league.season), week, created_at: now },
+        league,
+        llm,
+      ),
+    );
+  } else {
+    await rm(llmPath, { force: true });
   }
   const checked = await checkDraft(workspaceDir);
   const problems = withLeagueItem(
@@ -312,6 +327,8 @@ const STAT_LINES = "; the draft has stat lines.";
 /** A new draft's prose, its gate failures and any fallback reason. */
 interface ProseOutcome {
   prose: DraftProse;
+  /** The sections of `prose` the LLM wrote, for the LLM prose file. */
+  llm?: DraftProse;
   failed: FailedSection[];
   /** The fallback reason, when the LLM didn't run or stopped partway. */
   fallback?: string;
@@ -371,6 +388,7 @@ async function llmProse(
   }
   const { written, failed, stopped } = gated;
   return {
+    llm: { intro: written.intro ?? "", blurbs: written.teams },
     prose: {
       intro: written.intro ?? lines.intro,
       blurbs: { ...lines.blurbs, ...written.teams },

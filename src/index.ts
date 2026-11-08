@@ -21,6 +21,11 @@ export {
   saveCredentials,
 } from "./config.ts";
 export { type DataChange, diff } from "./data-diff.ts";
+export {
+  type DemandTestSummary,
+  type DemandTestWeek,
+  stats,
+} from "./demand-test.ts";
 export { type Deps, type Environment, systemDeps } from "./deps.ts";
 export {
   type DoctorCheck,
@@ -137,6 +142,11 @@ export {
   type PunditSettings,
 } from "./pundit-settings.ts";
 export { RankingFileError } from "./ranking-file.ts";
+export {
+  type RankingWeek,
+  type RankingWeekFile,
+  readRankingWeeks,
+} from "./ranking-weeks.ts";
 export { type RefreshResult, refresh } from "./refresh.ts";
 export {
   type HandEdit,

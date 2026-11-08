@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { draft } from "../src/index.ts";
+import { draft, publish } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
   FEAR_THE_TURTLE_ID,
@@ -137,6 +137,26 @@ test("check finds the workspace from a folder inside it", async () => {
 
   expect(code).toBe(0);
   expect(stdout).toContain(REMINDER_ONLY);
+});
+
+test("stats prints the demand-test summary to paste, with no replay to fetch from", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+  await publish(dir, deps);
+
+  const { code, stdout } = await cli(dir, ["stats"], "", undefined, {
+    LAZY_PUNDIT_REPLAY: join(tmpdir(), "lazy-pundit-no-replay"),
+  });
+
+  expect(code).toBe(0);
+  expect(stdout).toBe(
+    [
+      "Lazy Pundit demand-test summary: 1 published ranking week",
+      "2025 week 8: 0 min to publish · no teams moved · LLM unused · 0 hard and 0 soft blurb problems",
+      "Median: 0 min to publish · no teams moved · LLM used in 0 of 1 week · 0 hard and 0 soft blurb problems",
+      "",
+    ].join("\n"),
+  );
 });
 
 test("--league finds the workspace config.yaml lists, from any folder", async () => {

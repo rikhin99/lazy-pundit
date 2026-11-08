@@ -442,6 +442,26 @@ export function withLeagueItem(
   return item ? [item, ...problems].sort(byHardThenLine) : problems;
 }
 
+/**
+ * Whether a problem is a blurb problem: one the validator finds in a blurb or
+ * the intro. Named by kind, so a new league item isn't counted by accident.
+ */
+export function isBlurbProblem(p: Problem): boolean {
+  return BLURB_PROBLEM_KINDS.has(p.kind);
+}
+
+const BLURB_PROBLEM_KINDS = new Set<Problem["kind"]>([
+  "wrong",
+  "stale",
+  "unknown-id",
+  "loose",
+  "unchecked",
+  "provisional",
+  "swear",
+  "no-stakes",
+  "unreadable-tag",
+]);
+
 /** A soft league item: about the whole league, at no team or line. */
 export function leagueItem(kind: Problem["kind"], reason: string): Problem {
   return {

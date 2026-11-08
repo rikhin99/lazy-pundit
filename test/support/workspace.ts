@@ -254,6 +254,15 @@ export async function published(dir: string, deps: Deps) {
   return result;
 }
 
+/**
+ * A frozen copy's text without the two publish-record lines every publish
+ * adds after `edition` (`first_published_at`, `blurb_problems`), so a test of
+ * what else the frozen copy keeps compares with the draft's text.
+ */
+export function withoutPublishRecord(text: string): string {
+  return text.replace(/^(?:first_published_at|blurb_problems): .*\r?\n/gm, "");
+}
+
 /** The YAML front matter of a Markdown file. */
 export function frontMatter(text: string): Record<string, unknown> {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);

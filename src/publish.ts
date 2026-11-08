@@ -1,11 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { checkDraft, type Problem } from "./check.ts";
+import { checkDraft, isBlurbProblem, type Problem } from "./check.ts";
 import type { Deps } from "./deps.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
-import { frozenCopy, lastPublished, parseRanking } from "./ranking-file.ts";
+import {
+  frozenCopy,
+  lastPublished,
+  type PublishRecord,
+  parseRanking,
+} from "./ranking-file.ts";
 import { freshDataWarnings } from "./refresh.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
@@ -101,10 +106,16 @@ export async function publish(
 
   const name = `${stem}.published.md`;
   const publishedPath = join(dir, name);
-  const edition = (await editionOf(publishedPath, name)) + 1;
+  const record = await publishRecord(
+    publishedPath,
+    name,
+    checked.ranking.meta.created_at,
+    deps.clock.now(),
+    problems,
+  );
   await writeWorkspaceFile(
     publishedPath,
-    frozenCopy(name, checked.text, edition),
+    frozenCopy(name, checked.text, record),
   );
   // The frozen copy is the checked draft with its edition, so the draft's
   // parse and order evidence render it.
@@ -131,11 +142,30 @@ export async function publish(
 }
 
 /**
- * The edition of the frozen copy at `path`: 0 before the week's first
- * publish, and 1 for one written before frozen copies carried an edition.
+ * The publish record of a new edition of the frozen copy at `path`: edition 1
+ * on the week's first publish, else one more than the last (an old frozen
+ * copy with no edition counts as 1), keeping the last edition's first publish
+ * time when it froze the same draft (`createdAt`): a draft made again after
+ * the week was published starts its own.
  */
-async function editionOf(path: string, name: string): Promise<number> {
+async function publishRecord(
+  path: string,
+  name: string,
+  createdAt: string,
+  now: Date,
+  problems: Problem[],
+): Promise<PublishRecord> {
   const text = await readFile(path, "utf8").catch(() => undefined);
-  if (text === undefined) return 0;
-  return parseRanking(name, text).meta.edition ?? 1;
+  const last = text === undefined ? undefined : parseRanking(name, text).meta;
+  const blurb = problems.filter(isBlurbProblem);
+  const sameDraft = last?.created_at === createdAt;
+  return {
+    edition: last === undefined ? 1 : (last.edition ?? 1) + 1,
+    firstPublishedAt:
+      (sameDraft && last?.first_published_at) || now.toISOString(),
+    blurbProblems: {
+      hard: blurb.filter((p) => p.severity === "hard").length,
+      soft: blurb.filter((p) => p.severity === "soft").length,
+    },
+  };
 }

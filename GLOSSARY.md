@@ -295,6 +295,9 @@ _Avoid_: Prompt data, LLM input
 The record of one LLM call, kept as a file in the league workspace: the model, the token counts and cost, the system text, the prompt and the reply or the error, never the key. A draft writes one per call, and `transcripts delete` removes them all.
 _Avoid_: LLM log, prompt log
 
+**LLM prose file**:
+The record a draft keeps beside itself of each section the LLM wrote, word for word as written, best attempts included: the week intro and each team's blurb, never a stat line. A draft the LLM wrote nothing for has none, so a draft with no LLM prose file is one where the LLM wasn't used. The pundit never edits it.
+
 **Fallback**:
 What a draft writes when the LLM can't run or stops partway, with a reason saying why: stat lines if it failed before its first reply, otherwise the prose so far. No key, an invalid key, no credits, the spend cap, a model with no price and any provider error all fall back. It is never silent and never half-written.
 
@@ -422,6 +425,9 @@ A claim with no evidence to check it against, such as a tier claim in a ranking 
 Everything in a draft the pundit should see before publishing: each claim that isn't verified, each word-list hit and each flag, placed at its team and line unless it's a league item. Every surface shows the same list, hard problems first.
 _Avoid_: Errors, issues, warnings (for the whole list)
 
+**Blurb problem**:
+A problem the validator finds in a blurb or the week intro: a claim that isn't verified (provisional claims included), a word-list hit, a stakes mention under no stakes or an unreadable tag. League items and moved teams aren't blurb problems. A frozen copy records how many hard and soft ones it was published with.
+
 **League item**:
 A problems-list item about the whole league rather than a team or a line of the draft, such as the small-sample flag.
 
@@ -451,6 +457,16 @@ A team the pundit has placed somewhere other than its starting place. It's liste
 **Eval harness**:
 The builder's own measure of LLM prose quality, run on prepared leagues rather than on any pundit's real weeks. It looks for what the validator can't see by design, such as untagged superlatives or invented facts, and decides which model is the default. Pundits never run it.
 _Avoid_: Test suite, usage stats
+
+**Demand test**:
+The builder's Stage 1 trial with real pundits ranking their own leagues, to learn whether the tool earns a place in their week. It gathers no telemetry: what the builder learns, each pundit chooses to paste.
+
+**Demand-test summary**:
+What `stats` prints, read from the league workspace's drafts and frozen copies alone, for the pundit to paste to the builder during the demand test. For each published ranking week, it shows the minutes from the draft's start to its first publish, how many teams were moved and by how many places in all (measured against the starting order at publish), the LLM text kept, whether the LLM was used and the blurb problems at publish. Then it gives the medians. Nothing is sent anywhere: the pundit chooses what to paste.
+_Avoid_: Usage stats, usage summary
+
+**LLM text kept**:
+The share of the LLM's words, as its LLM prose file holds them, that the frozen copy still has in the same order and in the same section, with tags left out. A week where the LLM wasn't used has none to measure.
 
 ## Surfaces
 

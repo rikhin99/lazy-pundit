@@ -16,11 +16,13 @@ import {
   FEAR_THE_TURTLE_ID,
   failingOn,
   fearTheTurtle,
+  fixedClock,
   frontMatter,
   onStandings,
   patchingTransport,
   published,
   rankingsDir,
+  withoutPublishRecord,
   withoutReminder,
 } from "./support/workspace.ts";
 
@@ -260,10 +262,13 @@ describe("publish", () => {
       snapshot: drafted.snapshot,
       edition: 1,
     });
-    // The draft verbatim, plus its edition at the end of the front matter.
-    expect(frozen.replace("edition: 1\n---\n", "---\n")).toBe(
-      await readFile(drafted.path, "utf8"),
+    // The draft verbatim, plus its publish record at the end of the front matter.
+    expect(frozen).toContain(
+      "\nedition: 1\nfirst_published_at: 2025-10-28T15:00:00.000Z\nblurb_problems: {hard: 0, soft: 0}\n---\n",
     );
+    expect(
+      withoutPublishRecord(frozen).replace("edition: 1\n---\n", "---\n"),
+    ).toBe(await readFile(drafted.path, "utf8"));
   });
 
   test("a moved section takes its new place; a renamed heading is still the same team", async () => {
@@ -351,7 +356,9 @@ describe("publish: the frozen copy keeps the draft's text", () => {
 
     await published(dir, deps);
 
-    expect(await readFile(frozen, "utf8")).toBe(withFirstEdition(text));
+    expect(withoutPublishRecord(await readFile(frozen, "utf8"))).toBe(
+      withFirstEdition(text),
+    );
   });
 
   // Not reachable through publish, where the schema refuses these drafts first.
@@ -383,7 +390,7 @@ describe("publish: the frozen copy keeps the draft's text", () => {
     await published(dir, deps);
 
     const copy = await readFile(frozen, "utf8");
-    expect(copy).toBe(withFirstEdition(text));
+    expect(withoutPublishRecord(copy)).toBe(withFirstEdition(text));
     const { snapshot } = frontMatter(text);
     expect(frontMatter(copy)).toMatchObject({
       format: 1,
@@ -398,15 +405,18 @@ describe("publish: the frozen copy keeps the draft's text", () => {
     expect(out).not.toContain("(new)");
   });
 
-  test("republishing changes only the edition line", async () => {
+  test("republishing changes only the edition line, keeping the first publish time", async () => {
     const { dir, deps, frozen } = await editedDraft(withComment);
 
     await published(dir, deps);
     const first = await readFile(frozen, "utf8");
-    await published(dir, deps);
+    await published(dir, {
+      ...deps,
+      clock: fixedClock("2025-10-28T16:00:00.000Z"),
+    });
     const second = await readFile(frozen, "utf8");
 
-    expect(first).toContain("\nedition: 1\n---\n");
+    expect(withoutPublishRecord(first)).toContain("\nedition: 1\n---\n");
     expect(second).toBe(first.replace("edition: 1", "edition: 2"));
   });
 
@@ -420,7 +430,9 @@ describe("publish: the frozen copy keeps the draft's text", () => {
       await published(dir, deps);
 
       const copy = await readFile(frozen, "utf8");
-      expect(copy).toBe(text.replace(written, "edition: 1\n"));
+      expect(withoutPublishRecord(copy)).toBe(
+        text.replace(written, "edition: 1\n"),
+      );
       expect(frontMatter(copy).edition).toBe(1);
     },
   );
@@ -436,7 +448,7 @@ describe("publish: the frozen copy keeps the draft's text", () => {
     await published(dir, deps);
 
     const copy = await readFile(frozen, "utf8");
-    expect(copy).toBe(withFirstEdition(text));
+    expect(withoutPublishRecord(copy)).toBe(withFirstEdition(text));
     expect(frontMatter(copy)).toMatchObject({
       edition: 1,
       note: "edition: 3\n",
@@ -456,7 +468,7 @@ describe("publish: the frozen copy keeps the draft's text", () => {
     await published(dir, deps);
 
     const copy = await readFile(frozen, "utf8");
-    expect(copy).toContain(added);
+    expect(withoutPublishRecord(copy)).toContain(added);
     expect(copy).not.toMatch(/(?<!\r)\n/);
     expect(frontMatter(copy).edition).toBe(1);
   });

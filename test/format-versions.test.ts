@@ -9,6 +9,7 @@ import {
 } from "../src/config.ts";
 import { FORMAT } from "../src/front-matter.ts";
 import { leagueFileSchema } from "../src/league-file.ts";
+import { llmProseFileSchema } from "../src/llm-prose-file.ts";
 import { loreSchema } from "../src/lore.ts";
 import { personaSchema } from "../src/persona.ts";
 import { punditSettingsSchema } from "../src/pundit-settings.ts";
@@ -28,7 +29,7 @@ import { workspaceSchema } from "../src/workspace.ts";
  */
 const RECORDED = {
   FORMAT: {
-    1: "c1badd7f4f1cc174f89f8c1a55cd7f23f30bf492c717362468df5ab0ebac5950",
+    1: "a9e97d7fb25f23c341bce12c702a71ce186a898c9472e02a4c26ebcf9c8977ec",
   } as Record<number, string>,
   SNAPSHOT_FORMAT: {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",
@@ -54,6 +55,7 @@ test.each([
       loreSchema,
       punditSettingsSchema,
       leagueFileSchema,
+      llmProseFileSchema,
     ),
   ],
   ["SNAPSHOT_FORMAT", SNAPSHOT_FORMAT, shapeHash(manifestSchema)],

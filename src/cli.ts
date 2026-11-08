@@ -81,6 +81,7 @@ import {
   spendCapNote,
   spendCapProblem,
   spendCapWarning,
+  stats,
   systemDeps,
   type TeamNicknames,
   WINNER_TAKES_ALL,
@@ -223,6 +224,16 @@ program
       );
     }
     report(result.problems);
+  });
+
+program
+  .command("stats")
+  .description(
+    "Summarise your published weeks for the demand test, to paste to the builder; nothing is sent.",
+  )
+  .action(async () => {
+    const summary = await stats(await workspace(systemDeps()));
+    console.log(summary.text);
   });
 
 program

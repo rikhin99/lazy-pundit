@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   readFrontMatter,
   setFrontMatterKey,
+  setFrontMatterValue,
   WorkspaceFileError,
   writeFrontMatter,
 } from "./front-matter.ts";
@@ -75,9 +76,21 @@ export const metaSchema = z.object({
   created_at: z.string(),
   /** A frozen copy's edition: 1 on the first publish, one more on each republish. */
   edition: z.number().int().positive().optional(),
+  /** A frozen copy's first publish time, kept by each republish. */
+  first_published_at: z.string().optional(),
+  /** How many hard and soft blurb problems a frozen copy was published with. */
+  blurb_problems: z
+    .object({
+      hard: z.number().int().nonnegative(),
+      soft: z.number().int().nonnegative(),
+    })
+    .optional(),
 });
 
 export type RankingMeta = z.infer<typeof metaSchema>;
+
+/** How many hard and soft blurb problems a frozen copy was published with. */
+export type BlurbProblems = NonNullable<RankingMeta["blurb_problems"]>;
 
 /** A ranking file that can't be read or doesn't place every team once. */
 export class RankingFileError extends WorkspaceFileError {
@@ -111,17 +124,37 @@ export async function lastPublished(
   return { week: last.week, ranking: parseRanking(last.name, text) };
 }
 
+/** What a frozen copy records of its publish, beside the draft's front matter. */
+export interface PublishRecord {
+  edition: number;
+  firstPublishedAt: string;
+  blurbProblems: BlurbProblems;
+}
+
 /**
  * A frozen copy of a checked draft's `text`: the same text, word for word, with
- * only the `edition` line added or changed.
+ * only the publish record's lines (`edition`, `first_published_at`,
+ * `blurb_problems`) added or changed.
  */
 export function frozenCopy(
   file: string,
   text: string,
-  edition: number,
+  record: PublishRecord,
 ): string {
   readFrontMatter(file, text, "format"); // Refuses the wrong format version.
-  return setFrontMatterKey(file, text, "edition", edition);
+  const withEdition = setFrontMatterKey(file, text, "edition", record.edition);
+  const withFirst = setFrontMatterValue(
+    file,
+    withEdition,
+    "first_published_at",
+    record.firstPublishedAt,
+  );
+  return setFrontMatterValue(
+    file,
+    withFirst,
+    "blurb_problems",
+    record.blurbProblems,
+  );
 }
 
 /** What a new draft's sections hold: the week intro and each team's blurb. */
