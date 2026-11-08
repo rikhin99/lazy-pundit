@@ -110,6 +110,7 @@ export type Kind =
   | "move"
   | "group"
   | "playoffs"
+  | "knocked_out"
   | "number"
   | "text";
 

@@ -29,6 +29,10 @@ export const PLAIN_PROSE = [
   "Fourth time this year the kicker missed.",
   "A first-round pick on the bench.",
   "Ten minutes after kickoff the lineup was already cooked.",
+  // a player's injury, not the bracket (#72)
+  "Their WR1 got knocked out with a hamstring.",
+  "Their QB got knocked out in the final minutes.",
+  "A rookie knocked out in the first round of the draft.",
 ];
 
 /** Blurbs full of checkable claims, from the grounding-prototype scenarios. */

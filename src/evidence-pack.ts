@@ -85,11 +85,22 @@ export function buildEvidencePack(
   for (const [team, status] of playoffStatuses(league, week)) {
     (teams[team] as Record<string, EvidenceValue>).playoffs = status;
   }
+  const knockedOutBy = knockedOut(league, week);
+  for (const [team, round] of knockedOutBy) {
+    (teams[team] as Record<string, EvidenceValue>).knocked_out = round;
+  }
 
   const items = leagueItems(league, week, played);
   const { clinched, eliminated } = settledThisWeek(league, week);
   if (clinched.length > 0) items["wk.clinched"] = clinched.join(",");
   if (eliminated.length > 0) items["wk.eliminated"] = eliminated.join(",");
+  const knockedOutBefore = knockedOut(league, week - 1);
+  const knockedOutNow = standingsThrough(league, week)
+    .map((s) => s.team)
+    .filter((t) => knockedOutBy.has(t) && !knockedOutBefore.has(t));
+  if (knockedOutNow.length > 0) {
+    items["wk.knocked_out"] = knockedOutNow.join(",");
+  }
   // The platform settings, read from the fetch and never from a pundit's file.
   const { playoffTeams, playoffStartWeek, faabBudget } = league.settings;
   items["platform.playoff_spots"] = playoffTeams;
@@ -97,6 +108,37 @@ export function buildEvidencePack(
   if (faabBudget !== null) items["platform.faab_budget"] = faabBudget;
 
   return { week, teams, league: items };
+}
+
+/**
+ * Each team knocked out through `week`, with the winners-bracket round it lost
+ * in. A round played over two weeks has a result on both weeks once it's
+ * decided, so a team is knocked out only from the round's last week: none of
+ * its matchups in that round come after `week`.
+ */
+function knockedOut(league: League, week: number): Map<TeamId, number> {
+  const knockedOutBy = new Map<TeamId, number>();
+  const winnersSides = (w: Week) =>
+    w.matchups.flatMap((m) =>
+      m.kind === "winners" && m.round !== undefined
+        ? m.sides.map((side) => ({ side, round: m.round as number }))
+        : [],
+    );
+  for (const w of league.weeks) {
+    if (w.week > week || !w.scored) continue;
+    for (const { side, round } of winnersSides(w)) {
+      if (side.result !== "L") continue;
+      const roundGoesOn = league.weeks.some(
+        (later) =>
+          later.week > week &&
+          winnersSides(later).some(
+            (g) => g.round === round && g.side.team === side.team,
+          ),
+      );
+      if (!roundGoesOn) knockedOutBy.set(side.team, round);
+    }
+  }
+  return knockedOutBy;
 }
 
 /** Every team's played weeks through `week`, oldest first. */

@@ -39,7 +39,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `playoff-status.ts` | Each team's settled playoff status from conservative bounds, and who changed in a ranking week | `playoffStatuses`, `settledThisWeek`, `PlayoffStatus` |
 | `lineup.ts` | Best possible lineup points | `bestLineupPoints` |
 | `data-hash.ts` | The hash of the data a ranking stands on, and that data | `dataHash`, `coveredData` |
-| `evidence-pack.ts` (500) | Every stat under its evidence ID, per team and league, with the platform settings as `platform.*`, and an in-progress week's own matchup stats when a draft lets it in | `buildEvidencePack` |
+| `evidence-pack.ts` (560) | Every stat under its evidence ID, per team and league, with the platform settings as `platform.*`, who is knocked out (`knocked_out`, and `wk.knocked_out` for the ranking week; a bracket result, so not in `playoff-status.ts`), and an in-progress week's own matchup stats when a draft lets it in | `buildEvidencePack` |
 | `draft-data.ts` | Evidence pack plus the stat lines and intro a draft starts with, stakes included when passed | `draftData` |
 | `draft-context.ts` | Everything the LLM may be sent for a league-week | `draftContext`, `DraftContext` |
 | `persona.ts` | The presets and their preset samples, reading `persona.md` (Broadcast when it's missing) under the family league's cap with its warnings, and the persona a draft records | `PRESETS`, `loadPersona`, `Persona`, `personaRecord`, `personaSchema` |

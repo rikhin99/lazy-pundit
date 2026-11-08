@@ -1,14 +1,17 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import {
+  type ClaimStatus,
   check,
   draft,
   draftData,
+  isHard,
   type League,
   type LlmRequest,
   playoffStatuses,
   settledThisWeek,
   type TeamId,
+  validate,
 } from "../src/index.ts";
 import { scriptedLlm } from "./support/llm.ts";
 import {
@@ -333,5 +336,260 @@ describe("playoff status and the LLM", () => {
     );
     expect(prompt).toMatch(/### Bench Mob[^#]*\nplayoffs: clinched_bye\n/);
     expect(system).toContain("A team with no playoffs ID");
+  });
+
+  test("in week 15 the prompt sends knocked_out and wk.knocked_out, and explains them", async () => {
+    const data = draftData(await committed(15), 15);
+    const reply = [
+      `## {intro}\n[Baron Von Trade]{ev=wk.knocked_out} are out. ${data.intro}`,
+      ...Object.entries(data.teams).map(
+        ([id, t]) => `## {team=${id}}\nSteady as ever. ${t.statLine}`,
+      ),
+    ].join("\n\n");
+    const { dir, deps } = await fearTheTurtle(15);
+    const llm = scriptedLlm(reply);
+    deps.llm = llm;
+    deps.env.anthropicApiKey = "sk-ant-api03-test-key";
+
+    await draft(dir, deps);
+
+    // The knocked-out teams' stat lines pass the gate first time.
+    expect(llm.requests).toHaveLength(1);
+    const { prompt, system } = llm.requests[0] as LlmRequest;
+    expect(prompt).toContain(
+      "wk.knocked_out: Baron Von Trade, Red Zone Rascals",
+    );
+    expect(prompt).toMatch(
+      /### Baron Von Trade[^#]*\nplayoffs: clinched\n[^#]*knocked_out: 1\n/,
+    );
+    expect(system).toContain("knocked_out is the winners-bracket round");
+    expect(system).toContain("knocked out of the playoffs");
+  });
+});
+
+describe("knocked out of the playoffs", () => {
+  // Week 15 is the first winners-bracket round (fixture:show -- 15 --model):
+  // Frank's FAAB Fund (:4) beat Red Zone Rascals (:8), Kim Possible Kicks (:7)
+  // beat Baron Von Trade (:5); Bench Mob (:3) and Bye Bye Bea (:11) have byes.
+  test("a winners-bracket loser has knocked_out, the round it lost in, and keeps its playoffs", async () => {
+    const pack = draftData(await committed(15), 15).evidence;
+    expect(pack.teams["sleeper:5"]?.knocked_out).toBe(1);
+    expect(pack.teams["sleeper:8"]?.knocked_out).toBe(1);
+    expect(pack.teams["sleeper:5"]?.playoffs).toBe("clinched");
+    for (const id of ["sleeper:4", "sleeper:7", "sleeper:3", "sleeper:11"]) {
+      expect(pack.teams[id as TeamId], id).not.toHaveProperty("knocked_out");
+    }
+    expect(pack.league["wk.knocked_out"]).toBe("sleeper:5,sleeper:8");
+  });
+
+  /** Validates `text` in `team`'s section of `league`'s week, teams known by name. */
+  const validateAt = (
+    league: League,
+    week: number,
+    team: TeamId | null,
+    text: string,
+  ) =>
+    validate({
+      text,
+      team,
+      evidence: draftData(league, week).evidence,
+      order: {},
+      nicknames: Object.fromEntries(league.teams.map((t) => [t.id, [t.name]])),
+      sections: { lore: [], stakes: [], log: [] },
+      swearing: "on",
+    });
+
+  /** Each claim's text and status, as `validateAt` finds them. */
+  const claimsAt = (...args: Parameters<typeof validateAt>) =>
+    validateAt(...args).claims.map((c) => [c.text, c.status]);
+
+  test.each([
+    ["sleeper:5", "Baron Von Trade were eliminated in the first round."],
+    ["sleeper:8", "Red Zone Rascals were eliminated in the first round."],
+    ["sleeper:5", "Knocked out of the playoffs by Kim."],
+    ["sleeper:8", "They got knocked out in the first round."],
+  ])("untagged, in %s's blurb: %s is verified", async (team, text) => {
+    const claims = claimsAt(await committed(15), 15, team as TeamId, text);
+    expect(claims.map(([, s]) => s)).toEqual(["verified"]);
+  });
+
+  test.each([
+    ["sleeper:4", "Frank's FAAB Fund were eliminated in the first round."],
+    ["sleeper:7", "Kim Possible Kicks were eliminated in the first round."],
+    ["sleeper:3", "Bench Mob were eliminated."],
+    ["sleeper:4", "Knocked out of the playoffs."],
+    ["sleeper:11", "They got knocked out in the first round."],
+  ])("untagged, in %s's blurb: %s is wrong", async (team, text) => {
+    const claims = claimsAt(await committed(15), 15, team as TeamId, text);
+    expect(claims.map(([, s]) => s)).toEqual(["wrong"]);
+  });
+
+  test.each([
+    ["sleeper:5", "[Eliminated]{ev=playoffs}", "verified"],
+    ["sleeper:8", "[Eliminated]{ev=playoffs}", "verified"],
+    ["sleeper:5", "[Knocked out]{ev=knocked_out}", "verified"],
+    [
+      "sleeper:5",
+      "[eliminated in the first round]{ev=knocked_out}",
+      "verified",
+    ],
+    ["sleeper:5", "[Knocked out]{ev=wk.knocked_out}", "verified"],
+    ["sleeper:5", "[Clinched a playoff spot]{ev=playoffs}", "verified"],
+    ["sleeper:5", "[clinched]{ev=knocked_out}", "wrong"],
+    ["sleeper:4", "[Eliminated]{ev=playoffs}", "wrong"],
+    ["sleeper:7", "[Eliminated]{ev=playoffs}", "wrong"],
+    ["sleeper:3", "[Eliminated]{ev=playoffs}", "wrong"],
+    ["sleeper:4", "[Knocked out]{ev=wk.knocked_out}", "wrong"],
+  ])("tagged, in %s's blurb: %s is %s", async (team, text, status) => {
+    const claims = claimsAt(await committed(15), 15, team as TeamId, text);
+    expect(claims.map(([, s]) => s)).toEqual([status]);
+  });
+
+  test("an untagged claim is auto-tagged to the ID that applies", async () => {
+    const league = await committed(15);
+    const tagged = (team: TeamId, text: string) =>
+      validateAt(league, 15, team, text).autoTags.map((t) => t.id);
+    expect(tagged("sleeper:5", "Eliminated in round one.")).toEqual([
+      "knocked_out",
+    ]);
+    expect(tagged("sleeper:9", "Eliminated weeks ago.")).toEqual(["playoffs"]);
+  });
+
+  test.each([
+    ["Baron Von Trade were eliminated in the first round.", "verified"],
+    ["Red Zone Rascals got knocked out of the playoffs.", "verified"],
+    [
+      "[Baron Von Trade and Red Zone Rascals]{ev=wk.knocked_out} are out.",
+      "verified",
+    ],
+    ["Frank's FAAB Fund were eliminated.", "wrong"],
+    ["Bench Mob got knocked out of the bracket.", "wrong"],
+  ])("in the intro: %s is %s", async (text, status) => {
+    const claims = claimsAt(await committed(15), 15, null, text);
+    expect(claims.map(([, s]) => s)).toEqual([status]);
+  });
+
+  test("a knocked-out team's stat line says so in place of the clinched wording, and it verifies", async () => {
+    const league = await committed(15);
+    const data = draftData(league, 15);
+    const line = data.teams["sleeper:5"]?.statLine ?? "";
+    expect(line.endsWith(" · [Knocked out]{ev=knocked_out}")).toBe(true);
+    expect(line).not.toContain("Clinched");
+    expect(data.teams["sleeper:4"]?.statLine).toMatch(
+      / · \[Clinched a playoff spot\]\{ev=playoffs\}$/,
+    );
+    expect(claimsAt(league, 15, "sleeper:5", line).at(-1)).toEqual([
+      "Knocked out",
+      "verified",
+    ]);
+  });
+
+  test("a team that missed the playoffs, or lost in the losers bracket, is eliminated and never knocked out", async () => {
+    const league = await committed(15);
+    const pack = draftData(league, 15).evidence;
+    // Hail Mary Hustle (:9) had a bye; Gus Bus (:1) lost in the losers bracket.
+    for (const id of ["sleeper:9", "sleeper:1"] as TeamId[]) {
+      expect(pack.teams[id]?.playoffs, id).toBe("eliminated");
+      expect(pack.teams[id], id).not.toHaveProperty("knocked_out");
+      expect(draftData(league, 15).teams[id]?.statLine).toMatch(
+        / · \[Eliminated\]\{ev=playoffs\}$/,
+      );
+    }
+    expect(claimsAt(league, 15, "sleeper:1", "Eliminated.")).toEqual([
+      ["Eliminated", "verified"],
+    ]);
+  });
+
+  test("a two-week round undecided after its first week knocks nobody out", async () => {
+    const league = await patched(15, {
+      "": (l) => {
+        l.settings.playoff_round_type = 2;
+      },
+      winners_bracket: (games) => {
+        for (const g of games) {
+          if (g.r === 1) {
+            g.w = null;
+            g.l = null;
+          }
+        }
+      },
+    });
+    const pack = draftData(league, 15).evidence;
+    for (const team of league.teams) {
+      expect(pack.teams[team.id], team.id).not.toHaveProperty("knocked_out");
+    }
+    expect(pack.league).not.toHaveProperty("wk.knocked_out");
+    expect(
+      claimsAt(league, 15, "sleeper:5", "Eliminated in the first round."),
+    ).toEqual([["Eliminated", "wrong"]]);
+  });
+
+  test("a decided two-week round knocks its loser out only in its last week", async () => {
+    // Weeks 14 and 15 as one round: week 14 paired as week 15 is.
+    const week15 = (await committed(15)).weeks.find((w) => w.week === 15);
+    const matchupOf = new Map(
+      week15?.matchups.flatMap((m, i) =>
+        m.sides.map((s) => [Number(s.team.split(":")[1]), i + 1] as const),
+      ),
+    );
+    const league = await patched(15, {
+      "": (l) => {
+        l.settings.playoff_round_type = 2;
+        l.settings.playoff_week_start = 14;
+      },
+      "matchups/14": (rows) => {
+        for (const m of rows) m.matchup_id = matchupOf.get(m.roster_id) ?? null;
+      },
+    });
+
+    // Red Zone Rascals (:8) clinch after the shorter regular season, and the
+    // bracket has them losing round 1 (both weeks carry the result).
+    const first = draftData(league, 14).evidence;
+    expect(first.teams["sleeper:8"]?.playoffs).toBe("clinched");
+    expect(first.teams["sleeper:8"]).not.toHaveProperty("knocked_out");
+    expect(first.league).not.toHaveProperty("wk.knocked_out");
+    expect(
+      claimsAt(league, 14, "sleeper:8", "Eliminated in the first round."),
+    ).toEqual([["Eliminated", "wrong"]]);
+
+    const last = draftData(league, 15).evidence;
+    expect(last.teams["sleeper:8"]?.knocked_out).toBe(1);
+    expect(last.league["wk.knocked_out"]).toContain("sleeper:8");
+    expect(
+      claimsAt(league, 15, "sleeper:8", "Eliminated in the first round."),
+    ).toEqual([["Eliminated", "verified"]]);
+  });
+
+  test.each<[string, Json]>([
+    ["median", { league_average_match: 1 }],
+    ["divisions", { divisions: 2 }],
+  ])(
+    "in a league with %s a bracket loser is knocked out, with no playoffs",
+    async (_, settings) => {
+      const league = await patched(15, {
+        "": (l) => {
+          Object.assign(l.settings, settings);
+        },
+      });
+      const pack = draftData(league, 15).evidence;
+      expect(pack.teams["sleeper:5"]).not.toHaveProperty("playoffs");
+      expect(pack.teams["sleeper:5"]?.knocked_out).toBe(1);
+      expect(
+        claimsAt(league, 15, "sleeper:5", "Eliminated in the first round."),
+      ).toEqual([["Eliminated", "verified"]]);
+    },
+  );
+
+  test("knocked out with an injury is no claim", async () => {
+    const league = await committed(15);
+    for (const team of [...league.teams.map((t) => t.id), null]) {
+      const claims = claimsAt(
+        league,
+        15,
+        team,
+        "Their WR1 got knocked out with a hamstring.",
+      );
+      expect(claims.filter(([, s]) => isHard(s as ClaimStatus))).toEqual([]);
+    }
   });
 });

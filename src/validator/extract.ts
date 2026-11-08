@@ -201,6 +201,13 @@ const PLAYOFFS: [RegExp, PlayoffWant][] = [
     /\b(?:eliminated|mathematically out|out of (?:the )?playoff (?:race|hunt|picture))\b/gi,
     "eliminated",
   ],
+  // A bare "knocked out" can be a player's injury, so only the bracket's is
+  // checked. A round counts only at the clause's end or before its opponent:
+  // "in the final minutes" and "in the first round of the draft" aren't one.
+  [
+    /\bknocked out (?:of (?:the )?(?:playoffs|bracket)\b|in (?:the )?(?:(?:first|second|third|opening|1st|2nd|3rd) round|round (?:one|two|three|[123])|quarter-?finals?|quarters|semi-?finals?|semis|finals?)(?=\s*(?:$|[.,;:!?)—–-]|(?:by|to|against|at)\b)))/gi,
+    "eliminated",
+  ],
   [
     /\bplayoff (?:lock|bound|hopes?)\b|\bin the (?:playoff )?hunt\b|\bon the bubble\b|\bpunch(?:ed|es)? (?:their|a) (?:playoff )?ticket\b/gi,
     null,

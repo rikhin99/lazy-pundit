@@ -29,11 +29,12 @@ Reading the evidence
 - Every rank counts from the highest value: rank 1 has the most (for pa_rank, the most points scored against it). standing is the place in the league standings.
 - w<N>. IDs are that week's stats; w<N>.top, .zeros and .benchmiss name players, with their points under _points.
 - luck is actual wins minus the wins expected from all-play; form3 averages the last three weeks played.
-- A value that names a team is shown as the team's name. wk.clinched and wk.eliminated can name several: the teams whose playoff status changed this week.
+- A value that names a team is shown as the team's name. wk.clinched and wk.eliminated can name several: the teams whose playoff status changed this week. wk.knocked_out names the teams knocked out of the playoffs this week.
 - stakes.pot is the pot and stakes.payout_<n> what final place n wins, in dollars. wk.rule.<id> names this week's trigger winners for house rule <id>, several when tied; rule.<id>.count is how many times the team has triggered it this season, and rule.<id>.winnings what those come to so far: a stat, not money paid or owed.
 - rival is the team's rival in this week's rivalry week, next_rival its rival next week; wk.rivalry.<n> names the two teams of this week's rivalry n, and wk.rivalry.<n>.winner the one that won it.
 - platform.playoff_spots, platform.playoff_start and platform.faab_budget are the platform's own settings: how many teams make the playoffs, the week they start and the FAAB budget.
 - playoffs is clinched_bye, clinched or eliminated, and is there only when settled. A team with no playoffs ID has no status to state: playoff words about it are wrong claims. Say only clinched a spot, clinched a bye or eliminated; looser phrases such as "playoff lock" or "on the bubble" can never pass.
+- knocked_out is the winners-bracket round the team lost in, and is there only once it's out. Such a team was eliminated, or knocked out of the playoffs, even though its playoffs still says it clinched; cite knocked_out for that.
 
 Reply format
 Reply with nothing but the sections below, each a heading line then its text, in any order:

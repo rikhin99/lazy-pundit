@@ -94,7 +94,8 @@ const PLAYOFF_WORDS: Record<PlayoffStatus, string> = {
  * A team's stat line: points rank, a streak of two or more, its last result
  * and any settled playoff status, e.g. `[3rd]{ev=pf_rank} in points ·
  * [won 3 straight]{ev=streak} · [beat]{ev=w8.result} [Pirates]{ev=w8.opponent}
- * by [5.5]{ev=w8.margin} · [Clinched a bye]{ev=playoffs}`.
+ * by [5.5]{ev=w8.margin} · [Clinched a bye]{ev=playoffs}`. A team knocked
+ * out of the bracket ends `[Knocked out]{ev=knocked_out}` in its place.
  * The record is left out: the published line already leads with it.
  */
 function statLine(
@@ -113,7 +114,9 @@ function statLine(
   }
   const last = lastMatchup(ev, names, week);
   if (last) parts.push(last);
-  if (ev.playoffs !== undefined) {
+  if (ev.knocked_out !== undefined) {
+    parts.push("[Knocked out]{ev=knocked_out}");
+  } else if (ev.playoffs !== undefined) {
     const status = PLAYOFF_WORDS[ev.playoffs as PlayoffStatus];
     parts.push(`[${status}]{ev=playoffs}`);
   }

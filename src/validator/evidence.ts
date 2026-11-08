@@ -20,7 +20,7 @@ const TEAM_STATS =
 
 /** League items whose value is a comma-separated list of team IDs. */
 const TEAM_LIST_STATS =
-  /^wk\.(clinched|eliminated|rivalry\.\d+|rule\.[a-z0-9-]+)$/;
+  /^wk\.(clinched|eliminated|knocked_out|rivalry\.\d+|rule\.[a-z0-9-]+)$/;
 
 /** What the league stat line's `wk.clinched` tag says before the teams. */
 export const CLINCHED_LABEL = "Clinched this week:";
@@ -39,6 +39,7 @@ export function kindOf(id: string, value: EvidenceValue): Kind {
   if (stat === "move") return "move";
   if (stat === "group") return "group";
   if (stat === "playoffs") return "playoffs";
+  if (stat === "knocked_out") return "knocked_out";
   return typeof value === "number" ? "number" : "text";
 }
 
@@ -116,11 +117,19 @@ export function agrees(ctx: Ctx, r: Resolved, words: string): boolean {
       return named.every((team) => listed.includes(team));
     }
     case "playoffs": {
+      // A team knocked out of the bracket was eliminated, though it clinched.
       const want = playoffWant(t);
       return (
-        want === value || (want === "clinched" && value === "clinched_bye")
+        want === value ||
+        (want === "clinched" && value === "clinched_bye") ||
+        (want === "eliminated" &&
+          r.team !== null &&
+          ctx.evidence.teams[r.team]?.knocked_out !== undefined)
       );
     }
+    case "knocked_out":
+      // Cited, a bare "knocked out" is the bracket's.
+      return playoffWant(t) === "eliminated" || /\bknocked out\b/.test(t);
     case "result": {
       const won = WIN_WORDS.test(t);
       const lost = LOSS_WORDS.test(t);

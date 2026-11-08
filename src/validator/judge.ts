@@ -157,11 +157,17 @@ export function judge(
       const v = r?.value;
       const ok =
         v === shape.want || (shape.want === "clinched" && v === "clinched_bye");
-      if (ok) {
+      // A team knocked out of the bracket was eliminated, though it clinched.
+      const stat = ok
+        ? "playoffs"
+        : shape.want === "eliminated" && resolve(ctx, "knocked_out", t)
+          ? "knocked_out"
+          : null;
+      if (stat) {
         return {
           status: "verified",
-          reason: verifiedReason(ctx, [{ team: t, stat: "playoffs" }]),
-          hits: [{ team: t, stat: "playoffs" }],
+          reason: verifiedReason(ctx, [{ team: t, stat }]),
+          hits: [{ team: t, stat }],
         };
       }
     }
