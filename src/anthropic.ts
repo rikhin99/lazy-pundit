@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Transport } from "./transport.ts";
+import { requestWithin, type Transport } from "./transport.ts";
 
 /** Anthropic's API. */
 export const ANTHROPIC_API = "https://api.anthropic.com/v1";
@@ -18,30 +18,20 @@ export async function checkAnthropicKey(
   transport: Transport,
   key: string,
 ): Promise<"ok" | "rejected" | { unreachable: string }> {
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const noAnswer = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      reject(new Error(`no answer in ${KEY_CHECK_WAIT_MS / 1000} seconds`));
-    }, KEY_CHECK_WAIT_MS);
-  });
   try {
-    const res = await Promise.race([
-      transport.request({
+    const res = await requestWithin(
+      transport,
+      {
         url: `${ANTHROPIC_API}/models`,
         headers: { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION },
-        signal: controller.signal,
-      }),
-      noAnswer,
-    ]);
+      },
+      KEY_CHECK_WAIT_MS,
+    );
     if (res.status === 200) return "ok";
     if (res.status === 401 || res.status === 403) return "rejected";
     return { unreachable: `Anthropic answered ${res.status}` };
   } catch (err) {
     return { unreachable: (err as Error).message };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

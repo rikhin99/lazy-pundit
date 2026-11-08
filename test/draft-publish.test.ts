@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { setFrontMatterKey } from "../src/front-matter.ts";
 import {
   type Deps,
   draft,
   FetchError,
+  PLATFORM_WAIT_MS,
   publish,
   RankingFileError,
 } from "../src/index.ts";
@@ -22,6 +23,7 @@ import {
   patchingTransport,
   published,
   rankingsDir,
+  silentOn,
   withoutPublishRecord,
   withoutReminder,
 } from "./support/workspace.ts";
@@ -50,6 +52,33 @@ describe("draft: a failed fetch", () => {
         severity: "soft",
         section: "League",
         reason: `couldn't fetch: GET ${WEEK_10} failed. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
+      }),
+    );
+  });
+
+  test("a request that runs out of time continues from the last complete snapshot, with the failed-fetch item", async () => {
+    const { dir, deps } = await onStandings(8);
+    const first = await draft(dir, deps);
+    await rm(first.path);
+    const later = atWeek(deps, 10);
+    const { transport, asked } = silentOn(later.transport, WEEK_10);
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let result: Awaited<ReturnType<typeof draft>>;
+    try {
+      const drafted = draft(dir, { ...later, transport });
+      await asked();
+      await vi.advanceTimersByTimeAsync(PLATFORM_WAIT_MS);
+      result = await drafted;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(result.snapshot).toBe(first.snapshot);
+    expect(result.problems).toContainEqual(
+      expect.objectContaining({
+        kind: "failed-fetch",
+        reason: `couldn't fetch: GET ${WEEK_10} got no answer in 30 seconds. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
       }),
     );
   });

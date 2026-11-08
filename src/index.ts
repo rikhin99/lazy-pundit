@@ -182,6 +182,7 @@ export {
 export { deleteTranscripts } from "./transcripts.ts";
 export {
   httpTransport,
+  PLATFORM_WAIT_MS,
   type Transport,
   type TransportRequest,
   type TransportResponse,

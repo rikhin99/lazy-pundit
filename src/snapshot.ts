@@ -12,9 +12,13 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
 import type { Clock } from "./clock.ts";
 import {
+  NoAnswer,
+  PLATFORM_WAIT_MS,
   requestUrl,
+  requestWithin,
   type Transport,
   type TransportRequest,
+  type TransportResponse,
 } from "./transport.ts";
 import { writeGitignore } from "./workspace-files.ts";
 
@@ -65,6 +69,23 @@ export class FetchError extends Error {
   }
 }
 
+/**
+ * Sends one platform request, waiting `PLATFORM_WAIT_MS` for its answer. Any
+ * thrown error, running out of time included, becomes a `FetchError`.
+ */
+export async function platformRequest(
+  transport: Transport,
+  req: TransportRequest,
+): Promise<TransportResponse> {
+  try {
+    return await requestWithin(transport, req, PLATFORM_WAIT_MS);
+  } catch (cause) {
+    const failed =
+      cause instanceof NoAnswer ? `got ${cause.message}` : "failed";
+    throw new FetchError(`GET ${requestUrl(req)} ${failed}`, { cause });
+  }
+}
+
 /** One payload fetched and held in memory until the whole snapshot is complete. */
 interface Fetched {
   request: ManifestRequest;
@@ -104,12 +125,7 @@ export class SnapshotRecorder {
     params: Record<string, string> = {},
   ): Promise<Uint8Array> {
     const req: TransportRequest = { url, params, headers: this.#headers };
-    let res: Awaited<ReturnType<Transport["request"]>>;
-    try {
-      res = await this.#transport.request(req);
-    } catch (cause) {
-      throw new FetchError(`GET ${requestUrl(req)} failed`, { cause });
-    }
+    const res = await platformRequest(this.#transport, req);
     if (res.status < 200 || res.status >= 300) {
       throw new FetchError(`GET ${requestUrl(req)} returned ${res.status}`);
     }

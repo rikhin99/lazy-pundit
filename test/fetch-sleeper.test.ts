@@ -3,11 +3,13 @@ import { mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   type Clock,
+  FetchError,
   fetchSleeperSnapshot,
   fileTransport,
+  PLATFORM_WAIT_MS,
   type Transport,
   type TransportRequest,
 } from "../src/index.ts";
@@ -18,6 +20,7 @@ import {
   type Json,
   type Patch,
   patchingTransport,
+  silentOn,
   statCorrection,
   WEEKS,
 } from "./support/workspace.ts";
@@ -143,6 +146,34 @@ describe("fetchSleeperSnapshot", () => {
         leagueId: FEAR_THE_TURTLE_ID,
       }),
     ).rejects.toThrow(/matchups\/2.*500/);
+    expect(await readdir(dir)).toEqual([]);
+  });
+
+  test("a request that never gets an answer fails the fetch after 30 seconds, with the request aborted", async () => {
+    const dir = await tempDir();
+    const { transport, asked } = silentOn(replay(), `${LEAGUE}/matchups/2`);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const fetched = fetchSleeperSnapshot({
+        transport,
+        clock: fixedClock,
+        snapshotsDir: dir,
+        cacheDir: await tempDir(),
+        leagueId: FEAR_THE_TURTLE_ID,
+      });
+      fetched.catch(() => {});
+      const signal = await asked();
+      await vi.advanceTimersByTimeAsync(PLATFORM_WAIT_MS - 1);
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(fetched).rejects.toThrow(FetchError);
+      await expect(fetched).rejects.toThrow(
+        `GET ${LEAGUE}/matchups/2 got no answer in 30 seconds`,
+      );
+      expect(signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
     expect(await readdir(dir)).toEqual([]);
   });
 

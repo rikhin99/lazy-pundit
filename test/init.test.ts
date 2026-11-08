@@ -1,6 +1,6 @@
 import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { dropWorkspaces } from "../src/config.ts";
 import {
   checkLeague,
@@ -9,6 +9,7 @@ import {
   draft,
   FetchError,
   findWorkspace,
+  PLATFORM_WAIT_MS,
   platformStop,
   punditNameProblem,
   SetupRefusal,
@@ -24,6 +25,7 @@ import {
   operator,
   patchingTransport,
   rankingsDir,
+  silentOn,
 } from "./support/workspace.ts";
 
 /** No workspace folder and no config: a refusal leaves nothing behind. */
@@ -162,6 +164,28 @@ test("a Sleeper outage isn't reported as a wrong league ID", async () => {
     },
   };
   await expect(checkLeague(deps, "123")).rejects.toThrow(FetchError);
+});
+
+test("a league check that never gets an answer fails as a fetch after 30 seconds, with the request aborted", async () => {
+  const base = await operator();
+  const { transport, asked } = silentOn(base.transport);
+  const deps = { ...base, transport };
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    const checked = checkLeague(deps, "123");
+    checked.catch(() => {});
+    const signal = await asked();
+    await vi.advanceTimersByTimeAsync(PLATFORM_WAIT_MS - 1);
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(checked).rejects.toThrow(FetchError);
+    await expect(checked).rejects.toThrow(
+      `GET ${SLEEPER_API}/league/123 got no answer in 30 seconds`,
+    );
+    expect(signal?.aborted).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 /** Sleeper answering for one account with these leagues in 2025, then `inner`. */

@@ -114,6 +114,44 @@ export function withoutReminder(problems: Problem[]): Problem[] {
   return problems.filter((p) => p.kind !== "correction-timing");
 }
 
+/**
+ * The same transport, except that it never answers the request for `url` (or
+ * any request, with none). `asked()` resolves with that request's `signal`
+ * once it is made and every other request has been answered, so a fake-timer
+ * test can then advance the clock without timing out a request still reading
+ * the replay from disk.
+ */
+export function silentOn(
+  transport: Transport,
+  url?: string,
+): { transport: Transport; asked: () => Promise<AbortSignal | undefined> } {
+  let signal: AbortSignal | undefined;
+  let silent = false;
+  let answering = 0;
+  const realTick = () => new Promise((resolve) => setImmediate(resolve));
+  return {
+    async asked() {
+      while (!silent || answering > 0) await realTick();
+      return signal;
+    },
+    transport: {
+      async request(req) {
+        if (url !== undefined && req.url !== url) {
+          answering++;
+          try {
+            return await transport.request(req);
+          } finally {
+            answering--;
+          }
+        }
+        signal = req.signal;
+        silent = true;
+        return new Promise(() => {});
+      },
+    },
+  };
+}
+
 /** The same deps, whose fetch fails on the request for `url` alone. */
 export function failingOn(deps: Deps, url: string): Deps {
   return {

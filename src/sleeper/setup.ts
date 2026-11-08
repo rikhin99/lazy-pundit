@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FetchError } from "../snapshot.ts";
+import { FetchError, platformRequest } from "../snapshot.ts";
 import type { Transport } from "../transport.ts";
 import { SLEEPER_API } from "./api.ts";
 
@@ -12,12 +12,7 @@ async function lookUp(
   transport: Transport,
   url: string,
 ): Promise<unknown | undefined> {
-  let res: Awaited<ReturnType<Transport["request"]>>;
-  try {
-    res = await transport.request({ url });
-  } catch (cause) {
-    throw new FetchError(`GET ${url} failed`, { cause });
-  }
+  const res = await platformRequest(transport, { url });
   if (res.status === 400 || res.status === 404) return undefined;
   if (res.status < 200 || res.status >= 300) {
     throw new FetchError(`GET ${url} returned ${res.status}`);
