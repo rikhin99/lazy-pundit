@@ -1,37 +1,40 @@
 # lazy-pundit
-Turns your fantasy league data into power rankings and weekly recaps written in a pundit's voice, so the commissioner doesn't have to. Starting with Sleeper and Yahoo. Early planning stage.
+Weekly power rankings for your fantasy football league, drafted for you with the stats behind them and written in the persona you choose. You put the teams in your order and edit the words. Every claim in the intro and blurbs is checked against the league's data before you publish. It runs on your machine, from the command line.
 
-League data comes from the [Sleeper API](https://docs.sleeper.com/) and (experimentally) ESPN Fantasy. Lazy Pundit isn't affiliated with either.
+It works with [Sleeper](https://docs.sleeper.com/) leagues. ESPN comes in a later release. Lazy Pundit isn't affiliated with Sleeper or ESPN.
 
-## Usage (early)
+## Install
 
-A league workspace is a folder with a `workspace.md` naming the pundit and the Sleeper season:
-
-```markdown
----
-format: 1
-pundit: rikhin
-seasons:
-  2025:
-    platform: sleeper
-    league_id: "1234567890"
----
-```
-
-From inside that folder (or any folder in it):
+Needs Node 24 or later.
 
 ```sh
-lazy-pundit draft     # fetch, then write pundits/<pundit>/<season>/week-NN.md in standings order
-                      # reorder the ## sections and edit the blurbs
-lazy-pundit check     # list the draft's problems and tag clear claims
-lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it
-lazy-pundit doctor    # check Node, your config and credentials, and each listed workspace
-lazy-pundit transcripts delete   # remove the workspace's LLM transcripts
+npm i -g github:rikhin99/lazy-pundit#semver:^0
 ```
 
-With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why.
+That installs the latest 0.x release. Run the same line again to update. Install from a release (`#semver:^0` or a tag such as `#v0.1.0`), not from `#main`: only release tags carry the built code that npm can install globally. See `CHANGELOG.md` for what each release has.
 
-From anywhere, `--league <slug>` acts on a workspace your `config.yaml` lists.
+## A week's ranking
+
+**Set up once.** `lazy-pundit init` asks for your name, finds your Sleeper league, and walks through the setup steps: manager handles, lore and nicknames, stakes, the persona, the power-score method, your Anthropic key and the spend cap. You can skip any step and come back to it. It makes the league's workspace in a new folder.
+
+**Each week**, from inside the workspace (or from anywhere, with `--league <slug>`):
+
+```sh
+lazy-pundit draft     # fetch the league; write pundits/<pundit>/<season>/week-NN.md in the starting order
+                      # now edit: reorder the ## team sections, rewrite the intro and blurbs
+lazy-pundit check     # list the draft's problems and tag the claims it can check
+lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it to the clipboard
+```
+
+With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `publish` asks before publishing a draft with hard problems, or with a relaxed family-league persona; `-y` skips the question.
+
+**Also:**
+
+- `lazy-pundit refresh` refetches the league after stat corrections or late games and moves the draft onto the new data, leaving your order and words. `--full` refetches every week.
+- `lazy-pundit stats` prints a summary of your published weeks (time to publish, teams moved, how much LLM text you kept) to paste to the builder. Nothing is sent anywhere.
+- `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`.
+- `lazy-pundit doctor` checks Node, your config and credentials, and each workspace.
+- `lazy-pundit transcripts delete` removes the workspace's LLM transcripts.
 
 ### Config and credentials
 
@@ -49,7 +52,7 @@ workspaces:
   fear-the-turtle: /Users/you/lazy-pundit/fear-the-turtle
 ```
 
-`spend.yaml` counts LLM spend by local calendar month, across every league. `credentials.yaml` holds the Anthropic key and the `espn_s2` cookie at mode 0600; the tool warns if others can read it.
+`spend.yaml` counts LLM spend by local calendar month, across every league. `credentials.yaml` holds the Anthropic key (and, for ESPN once it's supported, the `espn_s2` cookie) at mode 0600; the tool warns if others can read it.
 
 Environment variables:
 
@@ -70,6 +73,14 @@ npm run typecheck
 npm run lint
 npm test
 ```
+
+### Releasing
+
+`npm i -g` can't install a git ref whose `package.json` has a `prepare` or `build` script (npm 11.6.1 and 11.21.2 alike). It installs the clone globally, as a link to a temp folder that npm then deletes. So `main` isn't installable, and each release tag points at a release commit made on top of `main`, with the built `dist/` added and no `scripts` block:
+
+1. On `main`, set `package.json`'s version and add a `## <version>` entry to `CHANGELOG.md`. Commit both.
+2. Run `npm run -s release -- <version>`. It checks the tree, builds, and tags `v<version>` on the release commit, leaving `main` and your working tree as they are.
+3. Push `main` and the tag together (`git push origin main v<version>`), then make the GitHub release with the printed `gh release create` command. Its notes are the CHANGELOG entry, written to `dist/RELEASE_NOTES.md`.
 
 The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock**, a **clipboard**, the **cache**, **config** and **workspaces** folders, and the environment's overrides (`systemDeps()` in production, the only place that reads `process.env`). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
 

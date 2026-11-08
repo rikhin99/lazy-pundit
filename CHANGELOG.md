@@ -1,0 +1,30 @@
+# Changelog
+
+Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pundit#semver:^0`. Within 0.x, a release may change the files a workspace holds; its entry says how.
+
+## 0.1.0
+
+The first release, for Sleeper leagues.
+
+### What's in it
+
+- `init` sets up a league workspace step by step: the pundit's name, the Sleeper league picked from a Sleeper account's leagues, manager handles, lore and nicknames, stakes and house rules, the family league and persona, the power-score method, the Anthropic key and the spend cap. Any step can be skipped and answered later.
+- `setup` shows the setup checklist, and `setup <step>` re-runs one step (`handles`, `lore`, `stakes`, `method`, `key`, `cap`, `persona`), showing a diff before overwriting a hand edit.
+- `draft` fetches the league and starts a draft for the last scored week: the teams in the starting order from the chosen power-score method (standings, points per game, all-play, form, the ffwrapped formula, the FFMWR rank average or the ramped blend), each with its stats. With an Anthropic key, the LLM writes the week intro and the blurbs in the persona's voice, under the spend cap, and its transcripts are kept in the workspace. With no key, past the cap or on an error, the draft has stat lines instead. `--include-in-progress` adds the in-progress week's stats as evidence for provisional claims.
+- `check` lists the draft's problems and auto-tags clear claims. Claims in the intro and blurbs, such as records, scores, matchups and playoff status (clinched, eliminated, knocked out), are checked against the evidence pack.
+- `refresh` refetches the league and recomputes the starting order and stats, leaving the pundit's order and words as they are. `--full` refetches every week.
+- `publish` checks the draft, asks before publishing over a hard problem, writes the frozen copy and the plain text, and copies the plain text to the clipboard.
+- `stats` prints the demand-test summary from the pundit's published weeks, to paste to the builder. Nothing is sent anywhere.
+- `doctor` checks Node, the config and credentials, and each workspace.
+- `transcripts delete` removes the workspace's LLM transcripts.
+
+### Not in it yet
+
+- ESPN leagues (and Yahoo).
+- `revise`, the LLM revision of one blurb or the intro.
+- `preview`, the local editing view beside the draft.
+- Style pages and awards.
+- `season add` and `handles`, for carrying a workspace into a new season.
+- Week-0 (preseason) drafts.
+- Drastic corrections as evidence in the next draft.
+- Playoff status for leagues with median scoring or divisions.

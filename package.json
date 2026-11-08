@@ -1,6 +1,6 @@
 {
   "name": "lazy-pundit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Local, CLI-first power rankings with checked stats for fantasy football leagues.",
   "license": "MIT",
   "type": "module",
@@ -34,7 +34,8 @@
     "drive:wizard:all": "bash scripts/drive-wizard-all.sh",
     "outline": "node scripts/outline.ts",
     "mutate": "node scripts/mutate.ts",
-    "trace": "node scripts/trace-context.ts"
+    "trace": "node scripts/trace-context.ts",
+    "release": "node scripts/release.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
