@@ -80,16 +80,6 @@ npm run lint
 npm test
 ```
 
-### Releasing
-
-`npm i -g` can't install a git ref whose `package.json` has a `prepare` or `build` script (npm 11.6.1 and 11.21.2 alike). It installs the clone globally, as a link to a temp folder that npm then deletes. So `main` isn't installable, and each release tag points at a release commit made on top of `main`, with the built `dist/` added and no `scripts` block:
-
-1. On `main`, set `package.json`'s version and add a `## <version>` entry to `CHANGELOG.md`. Commit both.
-2. Run `npm run -s release -- <version>`. It checks the tree, builds, and tags `v<version>` on the release commit, leaving `main` and your working tree as they are.
-3. Push `main` and the tag together (`git push origin main v<version>`), then make the GitHub release with the printed `gh release create` command. Its notes are the CHANGELOG entry, written to `dist/RELEASE_NOTES.md`.
-
-`npm run -s install:smoke` (run in CI after the tests) does steps 2 and the install in a throwaway clone of HEAD: it tags a release commit there, installs it by `#semver:^0` into an empty prefix with a clean HOME, once with the npm in use and once with npm 12 and `--allow-git=all`, and fails unless `--help` lists every command and `doctor` exits 0. Only committed work is tested.
-
 The library never reaches the network or the system clock directly: every entry point takes injected `Deps`: a **transport**, a **clock**, a **clipboard**, the **cache**, **config** and **workspaces** folders, and the environment's overrides (`systemDeps()` in production, the only place that reads `process.env`). Tests drive `draft()` and `publish()` against a temp workspace, replaying snapshot folders through `fileTransport()` with a fixed clock and a recording clipboard (see `test/support/workspace.ts`).
 
 ### Fixtures
@@ -104,3 +94,23 @@ npm run scrub:sleeper
 The branch, not the unpacked folder, is what exists: list it with `git ls-tree -r --name-only fixtures/raw`, and rerun `npm run fixtures:raw` after the branch changes, since an older unpack goes stale silently.
 
 Tests that need the raw files run only when `fixtures/raw/` is present. The fixture name check reads an optional, never-committed `fixtures/denylist.txt` (one real name per line, `#` comments allowed).
+
+### Releasing
+
+`npm i -g` can't install a git ref whose `package.json` has a `prepare` or `build` script (npm 11.6.1 and 11.21.2 alike). It installs the clone globally, as a link to a temp folder that npm then deletes. So `main` isn't installable, and each release tag points at a release commit made on top of `main`, with the built `dist/` added and no `scripts` block. To cut a release:
+
+1. On `main`, set `package.json`'s version (`npm pkg set version=<version>`, then `npm install --package-lock-only --ignore-scripts`) and add a `## <version>` entry to `CHANGELOG.md`: what's in it and what isn't yet. Commit.
+2. Push `main` and wait for CI to pass (`gh run watch`). Its `install:smoke` step has then installed this exact commit the way a pundit would.
+3. Run `npm run -s release -- <version>`. It refuses a tree with changes, a branch other than `main`, a `package.json` with another version, a tag that exists and a CHANGELOG without the entry. Then it builds and tags `v<version>` on the release commit, leaving `main` and your working tree as they are.
+4. Push the tag (`git push origin v<version>`), then make the GitHub release with the printed `gh release create` command. Its notes are the CHANGELOG entry, written to `dist/RELEASE_NOTES.md`.
+5. Check the real install, from GitHub, in a clean HOME:
+
+   ```sh
+   export HOME=$(mktemp -d) && npm i -g --prefix "$HOME/p" github:rikhin99/lazy-pundit#semver:^0 && "$HOME/p/bin/lazy-pundit" doctor
+   ```
+
+   Run it in a new terminal, since it changes `HOME`. It should install `<version>` and `doctor` should run.
+
+If a pushed release is broken, leave its tag where it is: pundits may have installed it, and npm caches git refs. Fix it on `main` and release the next patch version, which the install line's `#semver:^0` picks up when a pundit runs it again.
+
+`npm run -s install:smoke` (run in CI after the tests) does steps 3 and 5 in a throwaway clone of HEAD, from the clone instead of GitHub: it tags a release commit there, installs it by `#semver:^0` into an empty prefix with a clean HOME, once with the npm in use and once with npm 12 and `--allow-git=all`, and fails unless `--help` lists every command and `doctor` exits 0. Only committed work is tested.

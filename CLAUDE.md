@@ -19,3 +19,7 @@ Before reading source files, read `docs/agents/module-map.md`: which module owns
 ### Implementing a ticket
 
 Follow `docs/agents/ticket-workflow.md`: glossary before the first test, then build, sweep and measure.
+
+### Releasing
+
+The README's "Releasing" section has the steps. A ticket that lands something in `CHANGELOG.md`'s "Not in it yet" list moves it to the next release's entry. Agents can't push, so the maintainer pushes `main` and the tag and makes the GitHub release.
