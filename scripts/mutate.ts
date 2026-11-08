@@ -1,5 +1,6 @@
 /**
- * Mutation check: changes one place in a committed source file, runs one test
+ * Mutation check: changes one place in a source file (uncommitted changes
+ * included), runs one test
  * file, prints which tests went red (or "survived"), and puts the file back,
  * Ctrl-C included. `<old>` must occur exactly once in the file. Exits 0 when
  * the mutation goes red, 1 when it survives, 2 on a usage problem.
@@ -35,19 +36,16 @@ if (
   stop("usage: npm run -s mutate -- <src-file> <old> <new> <test-file>");
 }
 
-const status = spawnSync("git", ["status", "--porcelain", "--", file], {
-  encoding: "utf8",
-});
-if (status.status !== 0) stop(`git status failed for ${file}`);
-if (status.stdout.trim() !== "") {
-  stop(`${file} has uncommitted changes; commit or stash them first`);
-}
-
 const original = readFileSync(file, "utf8");
 const count = original.split(oldText).length - 1;
 if (count !== 1) stop(`<old> occurs ${count} times in ${file}, not once`);
 
 const out = mkdtempSync(join(tmpdir(), "lazy-pundit-mutate-"));
+// The file may have uncommitted changes, so git can't restore it. If this
+// process is killed before the finally, this copy is the way back.
+const backup = join(out, "original");
+writeFileSync(backup, original);
+console.error(`a copy of ${file} is at ${backup} until the run ends`);
 // The test run gets Ctrl-C too; this keeps us alive to reach the finally.
 // The handler itself only runs after spawnSync returns, so the run's own
 // exit says whether it was interrupted.
