@@ -36,7 +36,7 @@ With an Anthropic key, `draft` has the LLM write the intro and blurbs, and write
 
 **Also:**
 
-- `lazy-pundit refresh` refetches the league after stat corrections or late games and moves the draft onto the new data, leaving your order and words. `--full` refetches every week.
+- `lazy-pundit refresh` refetches the league after stat corrections or late scoring and moves the draft onto the new data, leaving your order and words. `--full` refetches every week.
 - `lazy-pundit stats` prints a summary of your published weeks (time to publish, teams moved, how much LLM text you kept) to paste to the builder. Nothing is sent anywhere.
 - `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`.
 - `lazy-pundit doctor` checks Node, your config and credentials, and each workspace.

@@ -214,6 +214,32 @@ test("code and comments use glossary terms, not their Avoid terms", async () => 
   expect(offences).toEqual([]);
 });
 
+/** What pundits read about the tool, outside `src/`. */
+const PUNDIT_DOCS = ["README.md", "CHANGELOG.md"];
+
+/** Glossary names that hold an _Avoid_ word: the "points per game" method. */
+const GLOSSARY_PHRASES = [/points per game/g];
+
+test("the README and CHANGELOG use glossary terms, not their Avoid terms", async () => {
+  const glossary = await glossaryAvoidTerms();
+  const offences: string[] = [];
+  for (const doc of PUNDIT_DOCS) {
+    const prose = GLOSSARY_PHRASES.reduce(
+      (text, phrase) => text.replace(phrase, " "),
+      (await readFile(join(ROOT, doc), "utf8"))
+        .replace(/^```[\s\S]*?^```/gm, " ")
+        .replace(/`[^`\n]*`/g, " ")
+        .toLowerCase()
+        .replace(/-/g, " "),
+    );
+    for (const t of ENFORCED) {
+      const hit = prose.match(wordPattern(t));
+      if (hit) offences.push(`${doc}: "${hit[0]}", say ${glossary.get(t)}`);
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
 test("every glossary Avoid term is enforced or left to the reviewer", async () => {
   const glossary = [...(await glossaryAvoidTerms()).keys()];
   const sorted = [...ENFORCED, ...REVIEWED];

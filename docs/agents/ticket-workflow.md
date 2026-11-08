@@ -28,6 +28,10 @@ While building, run `npm run -s format` (it fixes formatting itself and fails on
 
 A change to a wizard prompt (`cli.ts`) or a setup step (`init.ts`): run `npm run -s drive:wizard:all` (about a minute) before committing, since CI runs it only after the push and the pre-commit hook doesn't.
 
+A change to `package.json`'s `bin`, `files`, `dependencies` or `scripts`, to `src/cli.ts`'s entry, or to `scripts/release.ts`: run `npm run -s install:smoke` (about 20s) before committing, for the same reason.
+
+A ticket that says to diagnose before choosing a fix: the diagnosis is done when a scratch run of the fix's shape goes green, before any repo code. In #85, `scripts/prepare.ts` was written on the first cause found (`-g` reaching the child install), and a no-op `prepare` then showed that every `prepare` script breaks a global git install. That run, first, would have ruled the fix out.
+
 A change to a helper in `test/support/`: run the full suite once, right after the change, since other test files call the helper too. In #79, `patchingTransport` took a patch's return value as a new payload, and two `init` tests whose patches return one by accident broke only at the commit, after both reviews.
 
 A change that adds something to every draft's output, such as a league item or a warning: right after its first test is green, run the full suite once to see which tests break. Before fixing them, add one shared helper or constant in `test/support/workspace.ts` and update the tests with it in one pass. In #47 part (b), the correction-timing reminder broke 41 tests, which were fixed file by file before `withoutReminder` existed.

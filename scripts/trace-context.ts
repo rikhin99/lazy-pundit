@@ -73,7 +73,16 @@ const STAGES: [string, (c: Turn["calls"][number]) => boolean][] = [
     (c) => /Write|Edit/.test(c.tool) && /(^|\/)test\//.test(c.target),
   ],
   ["review starts", (c) => c.tool === "Agent" && /review/i.test(c.target)],
-  ["commit", (c) => c.tool === "Bash" && /git (\S+ )*commit/.test(c.target)],
+  // A commit in the repo, not one in a scratch clone (`git -C src … commit`,
+  // or a script written under the scratchpad): #85's trace put its commit at
+  // a scratch script's 75.6k, about 50k before the real one.
+  [
+    "commit",
+    (c) =>
+      c.tool === "Bash" &&
+      /(^|&& |; )git commit\b/.test(c.target) &&
+      !/scratchpad|git -C/.test(c.target),
+  ],
   ["sweep starts", (c) => c.tool === "Agent" && /sweep/i.test(c.target)],
 ];
 
