@@ -13,7 +13,7 @@ import type { Deps } from "./deps.ts";
 import { list } from "./evidence-pack.ts";
 import { type FrontMatterValue, setFrontMatterValue } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
-import { validatorNames } from "./lore.ts";
+import { freshClashWarning, validatorNames } from "./lore.ts";
 import { startingOrder } from "./power-score.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { applyRetention } from "./retention.ts";
@@ -124,7 +124,9 @@ export async function refresh(
       snapshot: meta.snapshot,
       newlyStale: [],
       problems: withFailedFetch(problems),
-      warnings,
+      // The draft stays on its snapshot, so a clash only fresh names have
+      // would otherwise go unsaid until the next draft stops on it.
+      warnings: [...warnings, ...freshClashes(checked, fresh.league)],
       ...outcome,
     };
   }
@@ -213,10 +215,22 @@ export async function freshDataWarnings(
     const ws = await readWorkspace(workspaceDir);
     const { league } = await fetchFresh(ws, deps);
     const warning = dataChangedWarning(checked, league);
-    return warning ? [warning] : [];
+    return [...(warning ? [warning] : []), ...freshClashes(checked, league)];
   } catch (err) {
     return [`couldn't check for data changes: ${(err as Error).message}`];
   }
+}
+
+/**
+ * A warning for each lore nickname that reads as another team's name in fresh
+ * data, which `draft` and a `refresh` onto changed data would stop on.
+ */
+function freshClashes(checked: CheckedDraft, fresh: League): string[] {
+  const warnings: string[] = [];
+  validatorNames(checked.lore, fresh, checked.handles, checked.stakes, (c) =>
+    warnings.push(freshClashWarning(c)),
+  );
+  return warnings;
 }
 
 /**

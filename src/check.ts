@@ -10,8 +10,10 @@ import type { League, TeamId } from "./league.ts";
 import { loadLeagueFile } from "./league-file.ts";
 import type { FailedSection, SectionKey } from "./llm-gate.ts";
 import {
+  clashText,
   type Lore,
   loadLore,
+  type NicknameClash,
   type ValidatorNames,
   validatorNames,
 } from "./lore.ts";
@@ -137,6 +139,11 @@ export interface CheckedDraft extends CheckResult {
   order: Record<TeamId, OrderEvidence>;
   /** What movement was measured against, or none before the first publish. */
   baseline?: MovementBaseline;
+  /**
+   * A warning, also in `warnings`, for each lore nickname that reads as
+   * another team's name in the draft's snapshot and so was left out.
+   */
+  clashWarnings: string[];
 }
 
 /**
@@ -180,13 +187,23 @@ export async function checkDraft(
     ]),
   ) as Record<TeamId, OrderEvidence>;
   const lore = await loadLore(ws);
+  // The snapshot's names can't be edited, so a nickname that clashes with one
+  // is left out and warned of rather than stopping the check.
+  const clashes: NicknameClash[] = [];
+  const names = validatorNames(lore, league, ws.handles, stakes, (c) =>
+    clashes.push(c),
+  );
+  const clashWarnings = clashes.map(
+    (c) =>
+      `${clashText(c)} in ${name}'s snapshot, so this check counts it for ${c.team} only. Remove it from ${c.section} to clear this; \`draft\`, and \`refresh\` onto changed data, stop on it while the platform has that name`,
+  );
   const { problems, autoTags } = reviewProse({
     text: written,
     ranking,
     league,
     evidence,
     order,
-    validatorNames: validatorNames(lore, league, ws.handles, stakes),
+    validatorNames: names,
     before: {
       order: startingOrder,
       evidence: await earlierEvidence(ws, ranking, stakes),
@@ -212,6 +229,7 @@ export async function checkDraft(
     autoTagged: tagging ? autoTags.length : 0,
     warnings: [
       ...lore.warnings,
+      ...clashWarnings,
       ...leagueFileWarnings,
       ...stakesWarnings(stakes, league),
     ],
@@ -225,12 +243,14 @@ export async function checkDraft(
     handles: ws.handles,
     order,
     ...(baseline ? { baseline } : {}),
+    clashWarnings,
   };
 }
 
 /**
  * The claims in a checked draft that hold on the data of `from` and fail on the
- * data of `to`: the ones a move between the two makes stale.
+ * data of `to`: the ones a move between the two makes stale. A nickname that
+ * clashes with a name in `to` is left out, as `checkDraft` leaves one out.
  */
 export function claimsGoingStale(
   checked: CheckedDraft,
@@ -251,6 +271,7 @@ export function claimsGoingStale(
       to,
       checked.handles,
       checked.stakes,
+      () => undefined,
     ),
     before: { evidence: [evidenceOf(from)] },
   });

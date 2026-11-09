@@ -139,7 +139,7 @@ export async function draft(
       () => false,
     )
   ) {
-    throw await draftExists(workspaceDir, week, fetched.league);
+    throw await draftExists(workspaceDir, week, fetched.league, warn);
   }
 
   const { id } = await fetched.write();
@@ -239,7 +239,7 @@ export async function draft(
     await writeWorkspaceFile(path, text, { exclusive: true });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-    throw await draftExists(workspaceDir, week, league);
+    throw await draftExists(workspaceDir, week, league, warn);
   }
   // One left by a deleted draft of the week would otherwise stand in for this one's.
   const llmPath = join(dir, `${weekStem(week)}.llm.md`);
@@ -292,10 +292,13 @@ async function draftExists(
   workspaceDir: string,
   week: number,
   fresh: League,
+  warn: (more: string[]) => void,
 ): Promise<DraftExistsError> {
   const message = `${weekStem(week)}.md already exists, so it was left as it is`;
   try {
     const checked = await checkDraft(workspaceDir, { autoTag: false });
+    // The draft in the way may stand on names that clash with lore's.
+    warn(checked.clashWarnings);
     const warning = dataChangedWarning(checked, fresh);
     return new DraftExistsError(warning ? `${message}. ${warning}` : message);
   } catch {

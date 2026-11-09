@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   check,
+  type Deps,
+  DraftExistsError,
   draft,
   draftData,
   publish,
@@ -18,8 +20,10 @@ import {
   committed,
   FEAR_THE_TURTLE_ID,
   fearTheTurtle,
+  frontMatter,
   type Json,
   operator,
+  type Patch,
   patchingTransport,
   statCorrection,
   withoutReminder,
@@ -93,6 +97,24 @@ async function claimProblems(dir: string) {
     .map((p) => [p.text, p.kind]);
 }
 
+const BENCH_MOB = "Bench Mob (sleeper:3)";
+
+/** The warning for a nickname clashing with a name in week 8's draft's snapshot. */
+function snapshotClash(nickname: string, section: string, team: string) {
+  return `lore.md: the nickname "${nickname}" points at both ${section} and ${team} in week-08.md's snapshot, so this check counts it for ${team} only. Remove it from ${section} to clear this; \`draft\`, and \`refresh\` onto changed data, stop on it while the platform has that name`;
+}
+
+/** The warning for a nickname clashing with a name in fresh data. */
+function freshClash(nickname: string, section: string, team: string) {
+  return `lore.md: the nickname "${nickname}" points at both ${section} and ${team} in the fresh data. Keep it on one: \`draft\`, and \`refresh\` onto changed data, stop on it`;
+}
+
+/** The warnings of `check` that are nickname clashes. */
+async function snapshotClashes(dir: string): Promise<string[]> {
+  const { warnings } = await check(dir, await operator());
+  return warnings.filter((w) => w.includes("points at both"));
+}
+
 describe("nicknames reach the validator", () => {
   test("a team's nickname makes that team's stats count", async () => {
     const { dir, gusSays } = await draftedWithLore(
@@ -144,13 +166,15 @@ describe("a nickname that reads as two holders' is a load error", () => {
     const inside = await draftedWithLore(
       "## {team=sleeper:9}\nnicknames: Mob\n",
     );
-    await expect(claimProblems(inside.dir)).rejects.toThrow(
-      /"Mob".*team:sleeper:9.*Bench Mob/,
-    );
+    expect(await snapshotClashes(inside.dir)).toEqual([
+      snapshotClash("Mob", "team:sleeper:9", BENCH_MOB),
+    ]);
     const around = await draftedWithLore(
       "## {team=sleeper:9}\nnicknames: Bench Mob Rules\n",
     );
-    await expect(claimProblems(around.dir)).rejects.toThrow(/Bench Mob Rules/);
+    expect(await snapshotClashes(around.dir)).toEqual([
+      snapshotClash("Bench Mob Rules", "team:sleeper:9", BENCH_MOB),
+    ]);
     const nested = await draftedWithLore(
       "## {team=sleeper:9}\nnicknames: Karna\n\n## {team=sleeper:1}\nnicknames: Big Karna\n",
     );
@@ -199,19 +223,36 @@ describe("a nickname that reads as two holders' is a load error", () => {
     );
   });
 
-  test("another team's name or manager's display name", async () => {
+  test("another team's name or manager's display name, which check only warns of", async () => {
     const taken = await draftedWithLore(
       "## {team=sleeper:1}\nnicknames: Bench Mob\n",
     );
-    await expect(claimProblems(taken.dir)).rejects.toThrow(
-      /"Bench Mob".*team:sleeper:1.*Bench Mob/,
-    );
+    expect(await snapshotClashes(taken.dir)).toEqual([
+      snapshotClash("Bench Mob", "team:sleeper:1", BENCH_MOB),
+    ]);
     const manager = await draftedWithLore(
       "## {team=sleeper:1}\nnicknames: benchwarmer_bo\n",
     );
-    await expect(claimProblems(manager.dir)).rejects.toThrow(
-      /"benchwarmer_bo".*team:sleeper:1.*Bench Mob/,
+    expect(await snapshotClashes(manager.dir)).toEqual([
+      snapshotClash("benchwarmer_bo", "team:sleeper:1", BENCH_MOB),
+    ]);
+  });
+
+  test("check leaves a nickname that clashes with a team's name out, so the name counts only for that team", async () => {
+    const { dir, gusSays } = await draftedWithLore(
+      "## {team=sleeper:1}\nnicknames: Bench Mob\n",
     );
+    await gusSays("Bench Mob is 7-1.");
+    expect(await claimProblems(dir)).toEqual([]);
+  });
+
+  test("draft stops on a clash with a team's name before it writes a snapshot", async () => {
+    const ws = await fearTheTurtle(8);
+    await writeLore(ws.dir, "## {team=sleeper:1}\nnicknames: Bench Mob\n");
+    await expect(draft(ws.dir, ws.deps)).rejects.toThrow(
+      /"Bench Mob".*team:sleeper:1.*Bench Mob/,
+    );
+    expect(existsSync(join(ws.dir, ".snapshots"))).toBe(false);
   });
 
   test("a departed manager still holds their nickname", async () => {
@@ -237,6 +278,108 @@ describe("a nickname that reads as two holders' is a load error", () => {
     await writeLore(ws.dir, twoTeams);
     await expect(draft(ws.dir, ws.deps)).rejects.toThrow(/"karna"/);
     expect(existsSync(join(ws.dir, ".snapshots"))).toBe(false);
+  });
+});
+
+describe("a clash with names only one version of the league holds", () => {
+  const BO_AS_KARNA = {
+    [`${LEAGUE}/users`]: (users: Json) => {
+      const bo = users.find((u: Json) => u.display_name === "benchwarmer_bo");
+      bo.display_name = "Karna";
+    },
+  };
+  const KARNA_LORE = "## {team=sleeper:1}\nnicknames: Karna\n";
+  /** 1.8 more for Gus Bus in week 8 makes the draft's "55" margins false. */
+  const GUS_CORRECTED = { [`${LEAGUE}/matchups/8`]: statCorrection(1, 1.8) };
+  const withPatches = (deps: Deps, patches: Record<string, Patch>) => ({
+    ...deps,
+    transport: patchingTransport(deps.transport, patches),
+  });
+
+  /** Week 8 drafted while bo was called Karna, then lore giving Karna to another team. */
+  async function draftedAsKarna() {
+    const ws = await fearTheTurtle(8);
+    const { path } = await draft(ws.dir, withPatches(ws.deps, BO_AS_KARNA));
+    await writeLore(ws.dir, KARNA_LORE);
+    return { ...ws, path };
+  }
+  const clash = snapshotClash("Karna", "team:sleeper:1", BENCH_MOB);
+
+  test("check warns of a name only the draft's snapshot holds, and carries on", async () => {
+    const { dir } = await draftedAsKarna();
+    expect(await snapshotClashes(dir)).toEqual([clash]);
+  });
+
+  test("refresh with no data change carries on with the warning", async () => {
+    const { dir, deps } = await draftedAsKarna();
+    const { changes, warnings } = await refresh(dir, deps);
+    expect(changes).toEqual([]);
+    expect(warnings).toContain(clash);
+  });
+
+  test("refresh onto data without that name moves the draft, and the warning goes", async () => {
+    const { dir, deps, path } = await draftedAsKarna();
+    const before = frontMatter(await readFile(path, "utf8")).snapshot;
+    const { changes, warnings } = await refresh(
+      dir,
+      withPatches(deps, GUS_CORRECTED),
+    );
+    expect(changes).not.toEqual([]);
+    expect(frontMatter(await readFile(path, "utf8")).snapshot).not.toBe(before);
+    expect(warnings.filter((w) => w.includes("points at both"))).toEqual([]);
+  });
+
+  test("a second draft says what clashes before it's refused as already there", async () => {
+    const { dir, deps } = await draftedAsKarna();
+    const told: string[] = [];
+    await expect(
+      draft(dir, deps, { onWarnings: (w) => told.push(...w) }),
+    ).rejects.toThrow(DraftExistsError);
+    expect(told).toContain(clash);
+  });
+
+  test("publish gives the stale count with a clash in the fresh names", async () => {
+    const ws = await fearTheTurtle(8);
+    await draft(ws.dir, ws.deps);
+    await writeLore(ws.dir, KARNA_LORE);
+    const corrected = await publish(
+      ws.dir,
+      withPatches(ws.deps, GUS_CORRECTED),
+    );
+    const stale = corrected.warnings.find((w) => w.startsWith("data changed"));
+    expect(stale).toMatch(/: \d+ claims would go stale/);
+
+    const renamed = await publish(
+      ws.dir,
+      withPatches(ws.deps, { ...GUS_CORRECTED, ...BO_AS_KARNA }),
+    );
+    expect(renamed.warnings).toEqual([
+      ...corrected.warnings,
+      freshClash("Karna", "team:sleeper:1", BENCH_MOB),
+    ]);
+  });
+
+  test("refresh with no data change warns of a clash in the fresh names", async () => {
+    const ws = await fearTheTurtle(8);
+    await draft(ws.dir, ws.deps);
+    await writeLore(ws.dir, KARNA_LORE);
+    const { changes, warnings } = await refresh(
+      ws.dir,
+      withPatches(ws.deps, BO_AS_KARNA),
+    );
+    expect(changes).toEqual([]);
+    expect(warnings).toContain(
+      freshClash("Karna", "team:sleeper:1", BENCH_MOB),
+    );
+  });
+
+  test("publish says it for both the snapshot and fresh data when both have the clash", async () => {
+    const { dir, deps } = await draftedAsKarna();
+    const { warnings } = await publish(dir, withPatches(deps, BO_AS_KARNA));
+    expect(warnings.filter((w) => w.includes("points at both"))).toEqual([
+      clash,
+      freshClash("Karna", "team:sleeper:1", BENCH_MOB),
+    ]);
   });
 });
 

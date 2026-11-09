@@ -362,13 +362,16 @@ function teamsOf(
  * Every team's names for the validator: its name, its managers' display names
  * and lore's nicknames, plus the lore sections a tag may cite. A nickname that
  * would read as two holders' is a load error naming both, unless they come to
- * one team, as a manager and their own team do.
+ * one team, as a manager and their own team do. Given `onLeagueClash`, one
+ * that reads as another team's name is told to it and left out instead, since
+ * that league can't be edited and the name counts only for its own team.
  */
 export function validatorNames(
   lore: Lore,
   league: LeagueNames,
   handles: Workspace["handles"],
   stakes: Stakes = UNRECORDED,
+  onLeagueClash?: (clash: NicknameClash) => void,
 ): ValidatorNames {
   const nicknames = Object.fromEntries(
     league.teams.map((t) => [
@@ -390,12 +393,19 @@ export function validatorNames(
           !comeToOneTeam(w.teams, teams) &&
           readAsOne(w.name, n),
       );
-      if (held) throwClash(n, held.holder, s.name);
+      if (held) throwClash({ nickname: n, section: held.holder, team: s.name });
       const other = taken.find(
         ({ name, team }) => !teams.includes(team.id) && readAsOne(name, n),
       );
       if (other) {
-        throwClash(n, s.name, `${other.team.name} (${other.team.id})`);
+        const clash = {
+          nickname: n,
+          section: s.name,
+          team: `${other.team.name} (${other.team.id})`,
+        };
+        if (!onLeagueClash) throwClash(clash);
+        onLeagueClash(clash);
+        continue;
       }
       written.push({ name: n, holder: s.name, teams });
       for (const team of teams) nicknames[team]?.push(n);
@@ -425,8 +435,25 @@ function readAsOne(a: string, b: string): boolean {
   return wholeWords(x).test(y) || wholeWords(y).test(x);
 }
 
-function throwClash(nickname: string, a: string, b: string): never {
-  throw new WorkspaceFileError(
-    `lore.md: the nickname "${nickname}" points at both ${a} and ${b}; keep it on one`,
-  );
+/** A lore nickname that reads as another team's name in one version of the league. */
+export interface NicknameClash {
+  nickname: string;
+  /** The lore section giving the nickname. */
+  section: string;
+  /** The team whose name it reads as, with its ID. */
+  team: string;
+}
+
+/** The start of every clash's message: the nickname and both holders. */
+export function clashText(c: NicknameClash): string {
+  return `lore.md: the nickname "${c.nickname}" points at both ${c.section} and ${c.team}`;
+}
+
+/** What a command with fresh data says of a clash that `draft` would stop on. */
+export function freshClashWarning(c: NicknameClash): string {
+  return `${clashText(c)} in the fresh data. Keep it on one: \`draft\`, and \`refresh\` onto changed data, stop on it`;
+}
+
+function throwClash(c: NicknameClash): never {
+  throw new WorkspaceFileError(`${clashText(c)}; keep it on one`);
 }
