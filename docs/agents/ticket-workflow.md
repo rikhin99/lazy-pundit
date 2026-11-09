@@ -18,7 +18,7 @@ Done when the list is in a message, each noun with its `GLOSSARY.md` line or a n
 
 A pasted `/implement` arrives as text, and the skill can't be loaded with the Skill tool, so read `~/.claude/plugins/cache/mattpocock/mattpocock-skills/*/skills/engineering/implement/SKILL.md` directly. In #56 part (b), searching for it with `find` cost 7.4k.
 
-Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing. Write each run as a script file in the scratchpad that starts with `set -euo pipefail` and sets `HOME` and the working directory to a temp folder. Drive `init` with `npm run -s drive:wizard -- <scenario>`, adding a scenario if yours is missing."
+Add to the spec subagent's brief: "Run the built library in scratch scripts: the ticket's commands in sequence, and each failure after a command has begun writing. Write each run as a script file in the scratchpad that starts with `set -euo pipefail` and sets `HOME` and the working directory to a temp folder. Drive `init` with `npm run -s drive:wizard -- <scenario>`, adding a scenario if yours is missing. For `refresh`, make the data change with a patched replay, so the run reaches the data-changed path." In #73 the spec review's `refresh` runs replayed week 9 over a week-8 draft and got "No changes", so the path that edits the front matter went unrun.
 
 The same script rule holds for your own scratch runs. In #60 part (a), a one-liner's failed `cd` left its `mkdir` and `touch` running in the repo. A scratch run calls the library with `node`, which strips the types, or uses `npm run fixture:show`. In #56 part (a), a vitest run outside the repo root hung past its timeout.
 
