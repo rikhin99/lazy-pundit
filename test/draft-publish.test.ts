@@ -4,14 +4,17 @@ import { join } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import { setFrontMatterKey } from "../src/front-matter.ts";
 import {
+  check,
   type Deps,
   draft,
   FetchError,
   PLATFORM_WAIT_MS,
   publish,
   RankingFileError,
+  refresh,
 } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
+import { scriptedLlm } from "./support/llm.ts";
 import {
   atWeek,
   FEAR_THE_TURTLE_ID,
@@ -547,6 +550,145 @@ describe("publish: intro and groups", () => {
 
     await expect(publish(dir, deps)).rejects.toThrow(
       /line \d+: section "Gus Bus" has no \{team=…\} or \{intro\} tag/,
+    );
+  });
+});
+
+describe("publish: over a frozen copy of that week that can't be read", () => {
+  /** Publishes week 8, rewrites its frozen copy with `edit` and returns it. */
+  async function brokenFrozenCopy(edit: (text: string) => string) {
+    const { dir, deps } = await fearTheTurtle(8);
+    await draft(dir, deps);
+    await published(dir, deps);
+    const frozen = join(rankingsDir(dir), "week-08.published.md");
+    await writeFile(frozen, edit(await readFile(frozen, "utf8")));
+    return { dir, deps, frozen };
+  }
+
+  const atEdition3 = (text: string) => text.replace("edition: 1", "edition: 3");
+  const replacedWarning = expect.stringMatching(
+    /^week-08\.published\.md can't be read, so publishing replaces it with edition \d, and any edits made in it are lost$/,
+  );
+
+  test.each([
+    ["an older format", (t: string) => t.replace("format: 1", "format: 0")],
+    ["invalid YAML", (t: string) => t.replace("---\n", "---\nbad: [\n")],
+    [
+      "a body with text outside any section",
+      (t: string) => t.replace(/\n---\n/, "\n---\nstray text\n"),
+    ],
+    [
+      "a comment after the edition",
+      (t: string) =>
+        t
+          .replace("edition: 3", "edition: 3 # by hand")
+          .replace("format: 1", "format: 0"),
+    ],
+  ])(
+    "with %s and edition 3, writes edition 4 and warns, naming the file",
+    async (_, edit) => {
+      const { dir, deps, frozen } = await brokenFrozenCopy((t) =>
+        edit(atEdition3(t)),
+      );
+
+      const result = await published(dir, deps);
+
+      expect(frontMatter(await readFile(frozen, "utf8")).edition).toBe(4);
+      expect(result.warnings).toEqual([replacedWarning]);
+    },
+  );
+
+  test.each([
+    ["no front matter", (t: string) => t.replace(/^---\n[\s\S]*?\n---\n/, "")],
+    [
+      "no edition line",
+      (t: string) =>
+        t.replace("edition: 1\n", "").replace("format: 1", "format: 0"),
+    ],
+    [
+      "an edition that isn't a positive whole number",
+      (t: string) =>
+        t
+          .replace("edition: 1", "edition: 0x3")
+          .replace("format: 1", "format: 0"),
+    ],
+    [
+      "an edition only in the body, a comment or a block scalar",
+      (t: string) =>
+        t
+          .replace("edition: 1\n", "# edition: 9\nnote: |\n  edition: 9\n")
+          .replace("format: 1", "format: 0")
+          .concat("\nedition: 9\n"),
+    ],
+  ])("with %s, writes edition 2 and warns", async (_, edit) => {
+    const { dir, deps, frozen } = await brokenFrozenCopy(edit);
+
+    const result = await published(dir, deps);
+
+    expect(frontMatter(await readFile(frozen, "utf8")).edition).toBe(2);
+    expect(result.warnings).toEqual([replacedWarning]);
+  });
+
+  test("a readable frozen copy is replaced without the warning", async () => {
+    const { dir, deps, frozen } = await brokenFrozenCopy(atEdition3);
+
+    const result = await published(dir, deps);
+
+    expect(frontMatter(await readFile(frozen, "utf8")).edition).toBe(4);
+    expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("a frozen copy of an earlier week that can't be read", () => {
+  /** Publishes week 8 and breaks its frozen copy, keeping the good text. */
+  async function brokenWeek8() {
+    const { dir, deps } = await fearTheTurtle(8);
+    await draft(dir, deps);
+    await published(dir, deps);
+    const frozen = join(rankingsDir(dir), "week-08.published.md");
+    const good = await readFile(frozen, "utf8");
+    await writeFile(frozen, good.replace("format: 1", "format: 0"));
+    return { dir, deps: atWeek(deps, 9), frozen, good };
+  }
+
+  const refusal =
+    /week-08\.published\.md[\s\S]*Fix week-08\.published\.md, or delete it/;
+
+  test("refuses draft before writing it, a snapshot or calling the LLM, and drafts once fixed", async () => {
+    const { dir, deps, frozen, good } = await brokenWeek8();
+    const snapshots = await readdir(join(dir, ".snapshots"));
+    const llm = scriptedLlm();
+    const withKey = {
+      ...deps,
+      llm,
+      env: { ...deps.env, anthropicApiKey: "sk-ant-api03-test-key" },
+    };
+
+    await expect(draft(dir, withKey)).rejects.toThrow(refusal);
+    await expect(draft(dir, deps)).rejects.toThrow(refusal);
+
+    expect(existsSync(join(rankingsDir(dir), "week-09.md"))).toBe(false);
+    expect(await readdir(join(dir, ".snapshots"))).toEqual(snapshots);
+    expect(llm.requests).toEqual([]);
+    await writeFile(frozen, good);
+    expect((await draft(dir, deps)).path).toBe(
+      join(rankingsDir(dir), "week-09.md"),
+    );
+  });
+
+  test("refuses check, refresh, publish and draft again over a later draft", async () => {
+    const { dir, deps, frozen, good } = await brokenWeek8();
+    await writeFile(frozen, good);
+    await draft(dir, deps);
+    await writeFile(frozen, good.replace("format: 1", "format: 0"));
+
+    await expect(check(dir, deps)).rejects.toThrow(refusal);
+    await expect(refresh(dir, deps)).rejects.toThrow(refusal);
+    await expect(publish(dir, deps)).rejects.toThrow(refusal);
+    // Not hidden behind "week-09.md already exists".
+    await expect(draft(dir, deps)).rejects.toThrow(refusal);
+    expect(existsSync(join(rankingsDir(dir), "week-09.published.md"))).toBe(
+      false,
     );
   });
 });

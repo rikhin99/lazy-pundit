@@ -9,6 +9,7 @@ import {
   atWeek,
   committed,
   fearTheTurtle,
+  rankingsDir,
   withoutReminder,
 } from "./support/workspace.ts";
 
@@ -337,6 +338,36 @@ describe("publishing with a relaxed family-league persona", () => {
       published: true,
     });
     expect(changed.asked).toHaveLength(1);
+  });
+
+  test("asks on a republish over a frozen copy that can't be read", async () => {
+    const ws = await relaxedWeek8();
+    const { dir } = ws;
+    await publish(dir, ws.deps, relaxedConfirm(true));
+    // Week 8's frozen copy has the same persona, but week 9's own copy can't
+    // be read once broken, so republishing week 9 still asks.
+    const deps = atWeek(ws.deps, 9);
+    await draft(dir, deps);
+    await publish(dir, deps, relaxedConfirm(true));
+    const frozen = join(rankingsDir(dir), "week-09.published.md");
+    const broken = (await readFile(frozen, "utf8")).replace(
+      "format: 1",
+      "format: 0",
+    );
+    await writeFile(frozen, broken);
+
+    const no = relaxedConfirm(false);
+    expect(await publish(dir, deps, no)).toMatchObject({
+      published: false,
+      stoppedBy: "relaxed",
+    });
+    expect(no.asked).toHaveLength(1);
+    expect(await readFile(frozen, "utf8")).toBe(broken);
+
+    const yes = relaxedConfirm(true);
+    expect(await publish(dir, deps, yes)).toMatchObject({ published: true });
+    expect(yes.asked).toHaveLength(1);
+    expect(await readFile(frozen, "utf8")).toContain("\nedition: 2\n");
   });
 
   test("--yes publishes without asking", async () => {

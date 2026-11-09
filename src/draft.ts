@@ -129,6 +129,9 @@ export async function draft(
   const week = fetched.league.lastScoredWeek;
   const dir = rankingsDir(ws);
   const path = join(dir, `${weekStem(week)}.md`);
+  // Before the snapshot, the LLM call and a draft in the way, which would
+  // hide it: an earlier frozen copy that can't be read stops the draft here.
+  const earlier = await lastPublished(dir, week);
   // Before the snapshot and the LLM call: a draft in the way needs neither.
   if (
     await access(path).then(
@@ -154,7 +157,6 @@ export async function draft(
     ]);
   }
   const data = draftData(league, week, stakes, included);
-  const earlier = await lastPublished(dir, week);
   warn([
     ...stakesWarnings(stakes, league),
     ...changedOutcomeWarnings(

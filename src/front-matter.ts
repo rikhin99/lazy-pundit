@@ -108,6 +108,27 @@ export function refuseUneditableFrontMatter(file: string, text: string): void {
   }
 }
 
+/**
+ * A top-level key's value as written on its own `key: value` line, comment
+ * left out, read from the front matter's text without parsing it: so it reads
+ * front matter that isn't valid YAML or has another version. A line in a
+ * comment, an indented one or one in the body isn't the key's.
+ */
+export function rawFrontMatterValue(
+  text: string,
+  key: string,
+): string | undefined {
+  const yaml = FRONT_MATTER.exec(text)?.[1] ?? "";
+  for (const line of yaml.split(/\r?\n/)) {
+    if (!line.startsWith(`${key}:`)) continue;
+    return line
+      .slice(key.length + 1)
+      .replace(/(^|\s)#.*$/, "")
+      .trim();
+  }
+  return undefined;
+}
+
 /** A top-level key's entry in `yaml`, when `yaml` is a map holding it. */
 function topLevelPair(yaml: string, key: string) {
   const { contents } = parseDocument(yaml);

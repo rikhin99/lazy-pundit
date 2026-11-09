@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { checkDraft, isBlurbProblem, type Problem } from "./check.ts";
 import type { Deps } from "./deps.ts";
+import { rawFrontMatterValue, WorkspaceFileError } from "./front-matter.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
 import {
@@ -10,6 +11,7 @@ import {
   lastPublished,
   type PublishRecord,
   parseRanking,
+  type RankingMeta,
 } from "./ranking-file.ts";
 import { freshDataWarnings } from "./refresh.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
@@ -76,9 +78,13 @@ export async function publish(
 ): Promise<PublishResult> {
   const checked = await checkDraft(workspaceDir);
   const { week, problems, dir, stem } = checked;
+  const name = `${stem}.published.md`;
+  const publishedPath = join(dir, name);
+  const ownCopy = await lastEdition(publishedPath, name);
   const warnings = [
     ...checked.warnings,
     ...(await freshDataWarnings(workspaceDir, checked, deps)),
+    ...(ownCopy?.warnings ?? []),
   ];
   opts.onWarnings?.(warnings);
 
@@ -88,11 +94,13 @@ export async function publish(
   }
   const { persona } = checked.ranking.meta;
   if (persona.family_league_relaxed && !opts.yes) {
-    // This week's own frozen copy counts, so a republish isn't asked again.
-    const last = await lastPublished(dir, week + 1);
+    // This week's own frozen copy counts, so a republish isn't asked again,
+    // unless it can't be read: then the persona counts as changed.
+    const last = ownCopy
+      ? ownCopy.meta
+      : (await lastPublished(dir, week))?.ranking.meta;
     const unchanged =
-      last !== undefined &&
-      isDeepStrictEqual(last.ranking.meta.persona, persona);
+      last !== undefined && isDeepStrictEqual(last.persona, persona);
     if (!unchanged && !(await opts.confirmRelaxed?.(persona))) {
       return {
         published: false,
@@ -104,11 +112,8 @@ export async function publish(
     }
   }
 
-  const name = `${stem}.published.md`;
-  const publishedPath = join(dir, name);
-  const record = await publishRecord(
-    publishedPath,
-    name,
+  const record = publishRecord(
+    ownCopy,
     checked.ranking.meta.created_at,
     deps.clock.now(),
     problems,
@@ -142,27 +147,60 @@ export async function publish(
 }
 
 /**
- * The publish record of a new edition of the frozen copy at `path`: edition 1
- * on the week's first publish, else one more than the last (an old frozen
- * copy with no edition counts as 1), keeping the last edition's first publish
- * time when it froze the same draft (`createdAt`): a draft made again after
- * the week was published starts its own.
+ * The week's last edition: its frozen copy at `path` (none before the week's
+ * first publish) and its edition number (an old frozen copy with no edition
+ * counts as 1). A frozen copy that can't be read gives no `meta`: its edition
+ * comes from a top-level `edition:` line, if it has one, and a warning that
+ * publishing replaces it.
  */
-async function publishRecord(
+async function lastEdition(
   path: string,
   name: string,
+): Promise<LastEdition | undefined> {
+  const text = await readFile(path, "utf8").catch(() => undefined);
+  if (text === undefined) return undefined;
+  try {
+    const meta = parseRanking(name, text).meta;
+    return { edition: meta.edition ?? 1, meta, warnings: [] };
+  } catch (error) {
+    if (!(error instanceof WorkspaceFileError)) throw error;
+    const written = rawFrontMatterValue(text, "edition") ?? "";
+    const edition = /^[1-9]\d*$/.test(written) ? Number(written) : 1;
+    return {
+      edition,
+      warnings: [
+        `${name} can't be read, so publishing replaces it with edition ${edition + 1}, and any edits made in it are lost`,
+      ],
+    };
+  }
+}
+
+interface LastEdition {
+  edition: number;
+  /** The frozen copy's front matter, unless it can't be read. */
+  meta?: RankingMeta;
+  /** That publishing replaces a frozen copy that can't be read. */
+  warnings: string[];
+}
+
+/**
+ * The publish record of a new edition after `last`: edition 1 on the week's
+ * first publish, else one more than the last, keeping the last edition's first
+ * publish time when it froze the same draft (`createdAt`): a draft made again
+ * after the week was published starts its own.
+ */
+function publishRecord(
+  last: LastEdition | undefined,
   createdAt: string,
   now: Date,
   problems: Problem[],
-): Promise<PublishRecord> {
-  const text = await readFile(path, "utf8").catch(() => undefined);
-  const last = text === undefined ? undefined : parseRanking(name, text).meta;
+): PublishRecord {
   const blurb = problems.filter(isBlurbProblem);
-  const sameDraft = last?.created_at === createdAt;
+  const sameDraft = last?.meta?.created_at === createdAt;
   return {
-    edition: last === undefined ? 1 : (last.edition ?? 1) + 1,
+    edition: last === undefined ? 1 : last.edition + 1,
     firstPublishedAt:
-      (sameDraft && last?.first_published_at) || now.toISOString(),
+      (sameDraft && last?.meta?.first_published_at) || now.toISOString(),
     blurbProblems: {
       hard: blurb.filter((p) => p.severity === "hard").length,
       soft: blurb.filter((p) => p.severity === "soft").length,

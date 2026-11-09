@@ -105,7 +105,9 @@ export class RankingFileError extends WorkspaceFileError {
 
 /**
  * The season's last published ranking (`week-NN.published.md`) of a week
- * before `before`, or none before the first publish.
+ * before `before`, or none before the first publish. One that can't be read is
+ * refused, never passed over for an earlier one, with the fix: mend it, or
+ * delete it and the next earlier frozen copy is read.
  */
 export async function lastPublished(
   dir: string,
@@ -121,7 +123,15 @@ export async function lastPublished(
     .sort((a, b) => b.week - a.week)[0];
   if (!last) return undefined;
   const text = await readFile(join(dir, last.name), "utf8");
-  return { week: last.week, ranking: parseRanking(last.name, text) };
+  try {
+    return { week: last.week, ranking: parseRanking(last.name, text) };
+  } catch (cause) {
+    if (!(cause instanceof WorkspaceFileError)) throw cause;
+    throw new WorkspaceFileError(
+      `${cause.message}\nFix ${last.name}, or delete it, and the frozen copy before it becomes the movement baseline.`,
+      { cause },
+    );
+  }
 }
 
 /** What a frozen copy records of its publish, beside the draft's front matter. */
