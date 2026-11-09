@@ -24,7 +24,11 @@ import {
 import { isSmallSample } from "./power-score.ts";
 import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
-import { readSnapshot, type Snapshot } from "./snapshot.ts";
+import {
+  readSnapshot,
+  type Snapshot,
+  SnapshotDamagedError,
+} from "./snapshot.ts";
 import { type Stakes, stakesWarnings } from "./stakes.ts";
 import {
   applyAutoTags,
@@ -592,8 +596,9 @@ async function readDraft(path: string, name: string): Promise<string> {
 
 /**
  * The snapshot a draft stands on. Its manifest or a blob it lists being gone
- * (only a hand deletion does that; retention keeps it) is a `WorkspaceFileError`
- * with the fix; anything else, such as a malformed manifest, is thrown as it is.
+ * (only a hand deletion does that; retention keeps it) or damaged (its file
+ * there but unreadable) is a `WorkspaceFileError` with the fix; anything else
+ * is thrown as it is.
  */
 async function readDraftSnapshot(
   dir: string,
@@ -603,9 +608,15 @@ async function readDraftSnapshot(
   try {
     return await readSnapshot(dir, id);
   } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause;
+    const where =
+      (cause as NodeJS.ErrnoException).code === "ENOENT"
+        ? "missing from"
+        : cause instanceof SnapshotDamagedError
+          ? "damaged in"
+          : undefined;
+    if (!where) throw cause;
     throw new WorkspaceFileError(
-      `${name} stands on snapshot ${id}, which is missing from the workspace's snapshots folder, so the draft can't be checked. Move ${name} out of its season folder and run \`lazy-pundit draft\` to start the week again`,
+      `${name} stands on snapshot ${id}, which is ${where} the workspace's snapshots folder, so the draft can't be checked. Move ${name} out of its season folder and run \`lazy-pundit draft\` to start the week again`,
       { cause },
     );
   }

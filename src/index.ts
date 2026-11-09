@@ -173,6 +173,7 @@ export {
   readManifest,
   readSnapshot,
   type Snapshot,
+  SnapshotDamagedError,
 } from "./snapshot.ts";
 export {
   standingsThrough,

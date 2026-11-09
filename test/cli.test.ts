@@ -251,6 +251,21 @@ test("check on a draft whose snapshot is missing prints the fix on one line and 
   );
 });
 
+test("check on a draft whose snapshot is damaged prints the fix on one line and fails", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  const { path } = await draft(dir, deps);
+  const id = frontMatter(await readFile(path, "utf8")).snapshot;
+  await writeFile(join(dir, ".snapshots", String(id), "manifest.json"), "{");
+
+  const { code, stdout, stderr } = await cli(dir, ["check"]);
+
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toBe(
+    `week-08.md stands on snapshot ${id}, which is damaged in the workspace's snapshots folder, so the draft can't be checked. Move week-08.md out of its season folder and run \`lazy-pundit draft\` to start the week again\n`,
+  );
+});
+
 test("check on a draft with indented front matter prints the fix on one line and fails", async () => {
   const { dir, deps } = await fearTheTurtle(8);
   const { path } = await draft(dir, deps);

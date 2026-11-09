@@ -1,13 +1,16 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "vitest";
 import {
   check,
   draft,
   type Problem,
   publish,
+  readManifest,
   refresh,
+  SnapshotDamagedError,
   WorkspaceFileError,
 } from "../src/index.ts";
 import {
@@ -430,18 +433,81 @@ describe("a draft whose snapshot is missing", () => {
       /^week-08\.md already exists, so it was left as it is$/,
     );
   });
+});
 
-  test("a snapshot that's present but malformed isn't called missing", async () => {
-    const { dir, deps, read } = await drafted();
+describe("a draft whose snapshot is damaged", () => {
+  const shapes = {
+    "a manifest that isn't JSON": async (id: string, snapshots: string) => {
+      await writeFile(join(snapshots, id, "manifest.json"), "{");
+    },
+    "a manifest of the wrong shape": async (id: string, snapshots: string) => {
+      await writeFile(join(snapshots, id, "manifest.json"), '{"requests":3}');
+    },
+    "a blob that isn't gzip": async (id: string, snapshots: string) => {
+      await writeFile(await firstBlob(id, snapshots), "not gzip");
+    },
+    "a blob whose content doesn't match its hash": async (
+      id: string,
+      snapshots: string,
+    ) => {
+      await writeFile(await firstBlob(id, snapshots), gzipSync("{}"));
+    },
+  };
+
+  /** The path of the first blob the snapshot's manifest lists. */
+  async function firstBlob(id: string, snapshots: string): Promise<string> {
+    const sha = (await readManifest(snapshots, id)).requests[0]?.sha256;
+    return join(snapshots, "blobs", `${sha}.json.gz`);
+  }
+
+  /** Drafts week 8, then damages its snapshot in the given shape. */
+  async function damaged(shape: keyof typeof shapes) {
+    const ws = await drafted();
+    const id = String(frontMatter(await ws.read()).snapshot);
+    await shapes[shape](id, join(ws.dir, ".snapshots"));
+    return {
+      ...ws,
+      message: `week-08.md stands on snapshot ${id}, which is damaged in the workspace's snapshots folder, so the draft can't be checked. Move week-08.md out of its season folder and run \`lazy-pundit draft\` to start the week again`,
+    };
+  }
+
+  test("the library's reader throws SnapshotDamagedError for it", async () => {
+    const { dir, read } = await drafted();
     const id = String(frontMatter(await read()).snapshot);
-    await writeFile(join(dir, ".snapshots", id, "manifest.json"), "{");
+    await shapes["a manifest that isn't JSON"](id, join(dir, ".snapshots"));
 
-    const err = await check(dir, deps).catch((e: unknown) => e);
+    const err = await readManifest(join(dir, ".snapshots"), id).catch(
+      (e: unknown) => e,
+    );
 
-    expect(err).toBeInstanceOf(Error);
-    expect(err).not.toBeInstanceOf(WorkspaceFileError);
-    expect((err as Error).message).not.toContain("is missing");
+    expect(err).toBeInstanceOf(SnapshotDamagedError);
   });
+
+  test.each(Object.keys(shapes) as (keyof typeof shapes)[])(
+    "with %s, check names the draft, the snapshot and the fix",
+    async (shape) => {
+      const { dir, deps, message } = await damaged(shape);
+
+      const failed = check(dir, deps);
+
+      await expect(failed).rejects.toThrow(WorkspaceFileError);
+      await expect(failed).rejects.toThrow(message);
+    },
+  );
+
+  test.each(Object.keys(shapes) as (keyof typeof shapes)[])(
+    "with %s, refresh and publish give the same message and leave the draft byte for byte",
+    async (shape) => {
+      const { dir, deps, message, read } = await damaged(shape);
+      const before = await read();
+
+      await expect(refresh(dir, deps)).rejects.toThrow(message);
+      await expect(publish(dir, deps)).rejects.toThrow(message);
+
+      expect(await read()).toBe(before);
+      expect(await readdir(rankingsDir(dir))).toEqual(["week-08.md"]);
+    },
+  );
 });
 
 describe("a draft whose front matter publish and refresh can't edit", () => {

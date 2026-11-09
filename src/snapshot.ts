@@ -238,13 +238,28 @@ export class SnapshotRecorder {
   }
 }
 
+/**
+ * A snapshot's manifest or blob that is present but can't be read: not JSON,
+ * the wrong shape, not gzip, or not matching its hash. A file that's gone is
+ * still the read's own ENOENT.
+ */
+export class SnapshotDamagedError extends Error {
+  override name = "SnapshotDamagedError";
+}
+
 /** Reads a snapshot's manifest. */
 export async function readManifest(
   snapshotsDir: string,
   id: string,
 ): Promise<Manifest> {
   const text = await readFile(join(snapshotsDir, id, "manifest.json"), "utf8");
-  return manifestSchema.parse(JSON.parse(text));
+  try {
+    return manifestSchema.parse(JSON.parse(text));
+  } catch (cause) {
+    throw new SnapshotDamagedError(`Snapshot ${id}'s manifest is damaged`, {
+      cause,
+    });
+  }
 }
 
 /**
@@ -365,11 +380,17 @@ export async function readBlob(
   snapshotsDir: string,
   sha: string,
 ): Promise<Uint8Array> {
-  const body = gunzipSync(
-    await readFile(join(snapshotsDir, "blobs", `${sha}.json.gz`)),
-  );
+  const gz = await readFile(join(snapshotsDir, "blobs", `${sha}.json.gz`));
+  let body: Buffer;
+  try {
+    body = gunzipSync(gz);
+  } catch (cause) {
+    throw new SnapshotDamagedError(`Snapshot blob ${sha} is damaged`, {
+      cause,
+    });
+  }
   if (sha256(body) !== sha) {
-    throw new Error(`Snapshot blob ${sha} is corrupt`);
+    throw new SnapshotDamagedError(`Snapshot blob ${sha} is damaged`);
   }
   return new Uint8Array(body);
 }
