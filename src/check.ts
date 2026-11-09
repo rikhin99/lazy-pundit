@@ -21,7 +21,7 @@ import {
 import { isSmallSample } from "./power-score.ts";
 import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
-import { readSnapshot } from "./snapshot.ts";
+import { readSnapshot, type Snapshot } from "./snapshot.ts";
 import { type Stakes, stakesWarnings } from "./stakes.ts";
 import {
   applyAutoTags,
@@ -151,7 +151,7 @@ export async function checkDraft(
   const written = await readDraft(path, name);
   const ranking = parseRanking(name, written);
   const league = normalizeSleeper(
-    await readSnapshot(snapshotsDir(ws), ranking.meta.snapshot),
+    await readDraftSnapshot(snapshotsDir(ws), ranking.meta.snapshot, name),
   );
   checkOrder(name, ranking, league);
 
@@ -582,5 +582,26 @@ async function readDraft(path: string, name: string): Promise<string> {
     return await readFile(path, "utf8");
   } catch (cause) {
     throw new WorkspaceFileError(`No draft ${name}`, { cause });
+  }
+}
+
+/**
+ * The snapshot a draft stands on. Its manifest or a blob it lists being gone
+ * (only a hand deletion does that; retention keeps it) is a `WorkspaceFileError`
+ * with the fix; anything else, such as a malformed manifest, is thrown as it is.
+ */
+async function readDraftSnapshot(
+  dir: string,
+  id: string,
+  name: string,
+): Promise<Snapshot> {
+  try {
+    return await readSnapshot(dir, id);
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause;
+    throw new WorkspaceFileError(
+      `${name} stands on snapshot ${id}, which is missing from the workspace's snapshots folder, so the draft can't be checked. Move ${name} out of its season folder and run \`lazy-pundit draft\` to start the week again`,
+      { cause },
+    );
   }
 }

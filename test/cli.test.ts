@@ -1,6 +1,13 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -227,6 +234,21 @@ test("answering p at the prompt publishes anyway", async () => {
   expect(stdout).toContain("Published week 8:");
   expect(stdout).toContain("No clipboard found; paste from the .txt file.");
   expect(await readFile(txt, "utf8")).toContain("They won by 50 this week.");
+});
+
+test("check on a draft whose snapshot is missing prints the fix on one line and fails", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  const { path } = await draft(dir, deps);
+  const id = frontMatter(await readFile(path, "utf8")).snapshot;
+  await rm(join(dir, ".snapshots"), { recursive: true });
+
+  const { code, stdout, stderr } = await cli(dir, ["check"]);
+
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toBe(
+    `week-08.md stands on snapshot ${id}, which is missing from the workspace's snapshots folder, so the draft can't be checked. Move week-08.md out of its season folder and run \`lazy-pundit draft\` to start the week again\n`,
+  );
 });
 
 test("refresh with no change says so, and updates checked_at", async () => {

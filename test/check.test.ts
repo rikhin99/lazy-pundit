@@ -1,10 +1,18 @@
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { check, draft, type Problem, publish } from "../src/index.ts";
+import {
+  check,
+  draft,
+  type Problem,
+  publish,
+  refresh,
+  WorkspaceFileError,
+} from "../src/index.ts";
 import {
   fearTheTurtle,
+  frontMatter,
   onStandings,
   rankingsDir,
 } from "./support/workspace.ts";
@@ -365,5 +373,72 @@ describe("an untagged claim naming a week", () => {
         reason: "w15.points is 111.12",
       }),
     ]);
+  });
+});
+
+describe("a draft whose snapshot is missing", () => {
+  /** Drafts week 8, then deletes what `gone` names from its snapshot. */
+  async function missing(gone: "snapshots folder" | "manifest" | "blob") {
+    const ws = await drafted();
+    const id = String(frontMatter(await ws.read()).snapshot);
+    const snapshots = join(ws.dir, ".snapshots");
+    if (gone === "snapshots folder") {
+      await rm(snapshots, { recursive: true });
+    } else if (gone === "manifest") {
+      await rm(join(snapshots, id), { recursive: true });
+    } else {
+      const manifest = JSON.parse(
+        await readFile(join(snapshots, id, "manifest.json"), "utf8"),
+      ) as { requests: { sha256: string }[] };
+      const sha = manifest.requests[0]?.sha256;
+      await rm(join(snapshots, "blobs", `${sha}.json.gz`));
+    }
+    return { ...ws, message: missingMessage(id) };
+  }
+
+  const missingMessage = (id: string) =>
+    `week-08.md stands on snapshot ${id}, which is missing from the workspace's snapshots folder, so the draft can't be checked. Move week-08.md out of its season folder and run \`lazy-pundit draft\` to start the week again`;
+
+  test.each(["snapshots folder", "manifest", "blob"] as const)(
+    "with its %s gone, check names the draft, the snapshot and the fix",
+    async (gone) => {
+      const { dir, deps, message } = await missing(gone);
+
+      const failed = check(dir, deps);
+
+      await expect(failed).rejects.toThrow(WorkspaceFileError);
+      await expect(failed).rejects.toThrow(message);
+    },
+  );
+
+  test("refresh and publish give the same message and leave the draft byte for byte", async () => {
+    const { dir, deps, message, read } = await missing("snapshots folder");
+    const before = await read();
+
+    await expect(refresh(dir, deps)).rejects.toThrow(message);
+    await expect(publish(dir, deps)).rejects.toThrow(message);
+
+    expect(await read()).toBe(before);
+    expect(await readdir(rankingsDir(dir))).toEqual(["week-08.md"]);
+  });
+
+  test("draft over it still says the draft exists", async () => {
+    const { dir, deps } = await missing("snapshots folder");
+
+    await expect(draft(dir, deps)).rejects.toThrow(
+      /^week-08\.md already exists, so it was left as it is$/,
+    );
+  });
+
+  test("a snapshot that's present but malformed isn't called missing", async () => {
+    const { dir, deps, read } = await drafted();
+    const id = String(frontMatter(await read()).snapshot);
+    await writeFile(join(dir, ".snapshots", id, "manifest.json"), "{");
+
+    const err = await check(dir, deps).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(WorkspaceFileError);
+    expect((err as Error).message).not.toContain("is missing");
   });
 });

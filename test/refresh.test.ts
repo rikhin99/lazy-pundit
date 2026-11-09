@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { setFrontMatterValue } from "../src/front-matter.ts";
@@ -276,6 +276,18 @@ describe("refresh", () => {
     const gus = problems.find((p) => p.team === "sleeper:1" && p.text === "55");
     expect(gus).toMatchObject({ kind: "stale", cause: "refresh" });
     expect(problems.some((p) => p.kind === "wrong")).toBe(false);
+  });
+
+  test("with an earlier snapshot gone, a later check still runs on the draft's own", async () => {
+    const { dir, deps, read } = await drafted();
+    const was = String(frontMatter(await read()).snapshot);
+    await refresh(dir, later(deps, GUS_CORRECTED));
+    await rm(join(dir, ".snapshots", was), { recursive: true });
+
+    const { problems } = await check(dir, deps);
+
+    const gus = problems.find((p) => p.team === "sleeper:1" && p.text === "55");
+    expect(gus).toMatchObject({ kind: "wrong" });
   });
 
   test("a claim that was never true stays wrong after a refresh", async () => {
