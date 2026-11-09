@@ -16,6 +16,18 @@ interface Turn {
   calls: { tool: string; target: string }[];
 }
 
+/**
+ * Whether a shell command commits in the repo, not in a scratch clone (`git -C
+ * src … commit`, or a script written under the scratchpad): #85's trace put
+ * its commit at a scratch script's 75.6k, about 50k before the real one. A
+ * message file in the scratchpad (`-F`, `--file`) is still the repo's commit,
+ * as issue-tracker.md has multi-line text written there; #74's went unseen.
+ */
+export function isRepoCommit(command: string): boolean {
+  const rest = command.replace(/\s(-F|--file)(=|\s+)\S+/g, "");
+  return /(^|&& |; )git commit\b/.test(rest) && !/scratchpad|git -C/.test(rest);
+}
+
 const k = (n: number) => `${(n / 1000).toFixed(1)}k`.padStart(7);
 
 async function latestLog(): Promise<string> {
@@ -73,41 +85,39 @@ const STAGES: [string, (c: Turn["calls"][number]) => boolean][] = [
     (c) => /Write|Edit/.test(c.tool) && /(^|\/)test\//.test(c.target),
   ],
   ["review starts", (c) => c.tool === "Agent" && /review/i.test(c.target)],
-  // A commit in the repo, not one in a scratch clone (`git -C src … commit`,
-  // or a script written under the scratchpad): #85's trace put its commit at
-  // a scratch script's 75.6k, about 50k before the real one.
-  [
-    "commit",
-    (c) =>
-      c.tool === "Bash" &&
-      /(^|&& |; )git commit\b/.test(c.target) &&
-      !/scratchpad|git -C/.test(c.target),
-  ],
+  ["commit", (c) => c.tool === "Bash" && isRepoCommit(c.target)],
   ["sweep starts", (c) => c.tool === "Agent" && /sweep/i.test(c.target)],
 ];
 
-const turns = turnsOf(
-  await readFile(process.argv[2] ?? (await latestLog()), "utf8"),
-);
-console.log(`${k(turns[0]?.size ?? 0)}  start`);
-for (const [name, matches] of STAGES) {
-  const turn = turns.find((t) => t.calls.some(matches));
-  console.log(`${turn ? k(turn.size) : "      -"}  ${name}`);
-}
-console.log(`${k(turns.at(-1)?.size ?? 0)}  last turn before any compaction\n`);
+if (import.meta.main) await main();
 
-console.log("Largest jumps, with the calls whose results caused them:");
-const jumps = turns
-  .slice(1)
-  .map((t, i) => ({
-    by: t.size - (turns[i] as Turn).size,
-    at: t.size,
-    calls: (turns[i] as Turn).calls,
-  }))
-  .sort((a, b) => b.by - a.by)
-  .slice(0, 8);
-for (const { by, at, calls } of jumps) {
-  console.log(`+${k(by).trim()} to ${k(at).trim()}`);
-  // Cut only for display: the stage checks above match on the whole target.
-  for (const c of calls) console.log(`    ${c.tool}: ${c.target.slice(0, 70)}`);
+async function main(): Promise<void> {
+  const turns = turnsOf(
+    await readFile(process.argv[2] ?? (await latestLog()), "utf8"),
+  );
+  console.log(`${k(turns[0]?.size ?? 0)}  start`);
+  for (const [name, matches] of STAGES) {
+    const turn = turns.find((t) => t.calls.some(matches));
+    console.log(`${turn ? k(turn.size) : "      -"}  ${name}`);
+  }
+  console.log(
+    `${k(turns.at(-1)?.size ?? 0)}  last turn before any compaction\n`,
+  );
+
+  console.log("Largest jumps, with the calls whose results caused them:");
+  const jumps = turns
+    .slice(1)
+    .map((t, i) => ({
+      by: t.size - (turns[i] as Turn).size,
+      at: t.size,
+      calls: (turns[i] as Turn).calls,
+    }))
+    .sort((a, b) => b.by - a.by)
+    .slice(0, 8);
+  for (const { by, at, calls } of jumps) {
+    console.log(`+${k(by).trim()} to ${k(at).trim()}`);
+    // Cut only for display: the stage checks above match on the whole target.
+    for (const c of calls)
+      console.log(`    ${c.tool}: ${c.target.slice(0, 70)}`);
+  }
 }
