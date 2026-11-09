@@ -2,7 +2,10 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Deps } from "./deps.ts";
 import { draftData } from "./draft-data.ts";
-import { WorkspaceFileError } from "./front-matter.ts";
+import {
+  refuseUneditableFrontMatter,
+  WorkspaceFileError,
+} from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
 import { loadLeagueFile } from "./league-file.ts";
 import type { FailedSection, SectionKey } from "./llm-gate.ts";
@@ -150,6 +153,8 @@ export async function checkDraft(
 
   const written = await readDraft(path, name);
   const ranking = parseRanking(name, written);
+  // publish and refresh edit the front matter, so refuse what they can't edit.
+  refuseUneditableFrontMatter(name, written);
   const league = normalizeSleeper(
     await readDraftSnapshot(snapshotsDir(ws), ranking.meta.snapshot, name),
   );

@@ -15,6 +15,7 @@ import {
   frontMatter,
   onStandings,
   rankingsDir,
+  withoutReminder,
 } from "./support/workspace.ts";
 
 const GUS = "## Gus Bus {team=sleeper:1}\n";
@@ -440,5 +441,98 @@ describe("a draft whose snapshot is missing", () => {
     expect(err).toBeInstanceOf(Error);
     expect(err).not.toBeInstanceOf(WorkspaceFileError);
     expect((err as Error).message).not.toContain("is missing");
+  });
+});
+
+describe("a draft whose front matter publish and refresh can't edit", () => {
+  const MESSAGE =
+    "week-08.md: put each front-matter key at the start of its line, with no indent and no braces around the keys";
+
+  /** The front matter's lines indented two spaces, as the pundit's editing might leave them. */
+  const indented = (text: string) =>
+    text.replace(
+      /^---\n([\s\S]*?)\n---\n/,
+      (_, yaml: string) => `---\n${yaml.replace(/^/gm, "  ")}\n---\n`,
+    );
+
+  /** The front matter as one `{...}` flow map. */
+  const flowMap = (text: string) =>
+    text.replace(
+      /^---\n[\s\S]*?\n---\n/,
+      `---\n${JSON.stringify(frontMatter(text))}\n---\n`,
+    );
+
+  /** A `{...}` flow map with each key on its own line, at its start. */
+  const flowMapOverLines = (text: string) =>
+    text.replace(
+      /^---\n[\s\S]*?\n---\n/,
+      `---\n{\n${Object.entries(frontMatter(text))
+        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+        .join(",\n")}\n}\n---\n`,
+    );
+
+  /** Drafts week 8 and reshapes its front matter, counting requests from then on. */
+  async function reshaped(shape: (text: string) => string) {
+    const ws = await drafted();
+    await ws.edit(shape);
+    let requests = 0;
+    const inner = ws.deps.transport;
+    const deps = {
+      ...ws.deps,
+      transport: {
+        request: (req: Parameters<typeof inner.request>[0]) => {
+          requests++;
+          return inner.request(req);
+        },
+      },
+    };
+    const snapshots = () => readdir(join(ws.dir, ".snapshots"));
+    return { ...ws, deps, requests: () => requests, snapshots };
+  }
+
+  const SHAPES = [
+    ["indented", indented],
+    ["a flow map", flowMap],
+    ["a flow map over several lines", flowMapOverLines],
+  ] as const;
+
+  test.each(SHAPES)(
+    "front matter %s: check names the draft and the fix",
+    async (_, shape) => {
+      const { dir, deps } = await reshaped(shape);
+
+      const failed = check(dir, deps);
+
+      await expect(failed).rejects.toThrow(WorkspaceFileError);
+      await expect(failed).rejects.toThrow(MESSAGE);
+    },
+  );
+
+  test.each(SHAPES)(
+    "front matter %s: publish and refresh give the same message, before fetching and writing nothing",
+    async (_, shape) => {
+      const { dir, deps, read, requests, snapshots } = await reshaped(shape);
+      const before = await read();
+      const snapshotsBefore = await snapshots();
+
+      await expect(publish(dir, deps)).rejects.toThrow(MESSAGE);
+      await expect(refresh(dir, deps)).rejects.toThrow(MESSAGE);
+
+      expect(requests()).toBe(0);
+      expect(await snapshots()).toEqual(snapshotsBefore);
+      expect(await read()).toBe(before);
+      expect(await readdir(rankingsDir(dir))).toEqual(["week-08.md"]);
+    },
+  );
+
+  test("a key's comment, blank line or a nested map's indented lines are fine", async () => {
+    const { dir, deps, edit } = await drafted();
+    await edit((t) =>
+      t.replace("\n---\n", "\n\n# mine\nnotes:\n  a: 1 # aside\n---\n"),
+    );
+
+    const { problems } = await check(dir, deps);
+
+    expect(withoutReminder(problems)).toEqual([]);
   });
 });

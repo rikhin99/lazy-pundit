@@ -83,6 +83,31 @@ function frontMatterYaml(file: string, text: string): string {
   return yaml;
 }
 
+/**
+ * Refuses front matter that `setFrontMatterKey` and `setFrontMatterValue`
+ * can't edit: anything but a block map with every key at the start of its
+ * line. Only the pundit's own editing writes another shape, such as indented keys or a
+ * `{...}` flow map.
+ */
+export function refuseUneditableFrontMatter(file: string, text: string): void {
+  const yaml = frontMatterYaml(file, text);
+  const { contents } = parseDocument(yaml);
+  const editable =
+    isMap(contents) &&
+    !contents.flow &&
+    contents.items.every(
+      (item) =>
+        isNode(item.key) &&
+        item.key.range !== undefined &&
+        (item.key.range[0] === 0 || yaml[item.key.range[0] - 1] === "\n"),
+    );
+  if (!editable) {
+    throw new WorkspaceFileError(
+      `${file}: put each front-matter key at the start of its line, with no indent and no braces around the keys`,
+    );
+  }
+}
+
 /** A top-level key's entry in `yaml`, when `yaml` is a map holding it. */
 function topLevelPair(yaml: string, key: string) {
   const { contents } = parseDocument(yaml);
