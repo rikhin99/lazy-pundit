@@ -1,7 +1,8 @@
 /**
  * Mutation check: changes one place in a source file (uncommitted changes
  * included), runs one test
- * file, prints which tests went red (or "survived"), and puts the file back,
+ * file, prints which tests went red with each one's first failure line (or
+ * "survived"), and puts the file back,
  * Ctrl-C included. `<old>` must occur exactly once in the file. Exits 0 when
  * the mutation goes red, 1 when it survives, 2 on a usage problem.
  *
@@ -17,7 +18,11 @@ interface Report {
     name: string;
     status: string;
     message?: string;
-    assertionResults: { fullName: string; status: string }[];
+    assertionResults: {
+      fullName: string;
+      status: string;
+      failureMessages?: string[];
+    }[];
   }[];
 }
 
@@ -98,7 +103,12 @@ if (unloaded.length > 0) {
   }
 } else if (failed.length > 0) {
   console.log(`red: ${failed.length} of ${results.length} failed`);
-  for (const a of failed) console.log(`  × ${a.fullName}`);
+  // The first line of each failure, so a red from the mutation itself (a
+  // ReferenceError, a syntax error) reads apart from a red on the behaviour.
+  for (const a of failed) {
+    console.log(`  × ${a.fullName}`);
+    console.log(`    ${(a.failureMessages?.[0] ?? "").split("\n")[0]}`);
+  }
 } else {
   console.log(`survived: all ${results.length} passed`);
   process.exit(1);
