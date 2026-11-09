@@ -3,7 +3,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { check, draft, type Problem, publish } from "../src/index.ts";
-import { onStandings, rankingsDir } from "./support/workspace.ts";
+import {
+  fearTheTurtle,
+  onStandings,
+  rankingsDir,
+} from "./support/workspace.ts";
 
 const GUS = "## Gus Bus {team=sleeper:1}\n";
 
@@ -275,5 +279,91 @@ describe("publish confirm", () => {
         CORRECTION_TIMING,
       ],
     });
+  });
+});
+
+describe("an untagged claim naming a week", () => {
+  /** Drafts week 15, where Bench Mob had a bye and played last in week 14, and adds `words` to a team's blurb. */
+  async function week15(heading: string, words: string) {
+    const ws = await fearTheTurtle(15);
+    const { path } = await draft(ws.dir, ws.deps);
+    const text = await readFile(path, "utf8");
+    if (!text.includes(heading)) throw new Error(`no ${heading}`);
+    await writeFile(path, text.replace(heading, `${heading}${words}\n`));
+    return (await check(ws.dir, ws.deps)).problems;
+  }
+
+  test("is unchecked, naming the week, when the evidence pack doesn't hold it", async () => {
+    const problems = await week15(
+      GUS,
+      "They scored 140.04 points in week 14. They beat Tank Brigade in week 14. It ended 140.04-136.94 in week 14. They were top 3 for week 14.",
+    );
+
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "top 3",
+        kind: "unchecked",
+        reason: "no week 14 rank in the evidence pack",
+      }),
+    );
+
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "140.04",
+        kind: "unchecked",
+        reason: "no week 14 points in the evidence pack",
+      }),
+    );
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "beat Tank Brigade",
+        kind: "unchecked",
+        reason: "no week 14 result in the evidence pack",
+      }),
+    );
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "140.04-136.94",
+        kind: "unchecked",
+        reason: "no week 14 score in the evidence pack",
+      }),
+    );
+  });
+
+  test("reads an earlier week's stats when the evidence pack holds them", async () => {
+    const problems = await week15(
+      "## Bench Mob {team=sleeper:3}\n",
+      "They scored 111.43 points in week 14. They beat Bye Bye Bea in week 14. In week 14 it ended 111.43-85.3. Week 14's margin was 30.",
+    );
+
+    const bench = problems.filter((p) => p.section === "Bench Mob");
+    expect(bench).toEqual([
+      expect.objectContaining({
+        severity: "hard",
+        text: "30",
+        kind: "wrong",
+        reason: "w14.margin is 26.13",
+      }),
+    ]);
+  });
+
+  test("a claim naming no week still reads the ranking week", async () => {
+    const problems = await week15(
+      GUS,
+      "They scored 111.12 points. They scored 140.04 points. Week 14 was rough, but this week they scored 111.12. After a week 14 win, they put up 111.12. It's their best since week 7, at 111.12 points scored.",
+    );
+
+    const gus = problems.filter((p) => p.section === "Gus Bus");
+    expect(gus).toEqual([
+      expect.objectContaining({
+        text: "140.04",
+        kind: "wrong",
+        reason: "w15.points is 111.12",
+      }),
+    ]);
   });
 });

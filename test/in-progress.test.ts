@@ -133,6 +133,90 @@ describe("--include-in-progress", () => {
     );
   });
 
+  test("an untagged claim naming the week reads its stats, so it's provisional when it agrees and wrong when it doesn't", async () => {
+    const { dir, deps } = await midWeek8();
+    const { path } = await draft(dir, deps, { includeInProgress: true });
+    await addToGus(
+      path,
+      "They scored 133.22 points in week 8. In week 8 they scored 120 points.",
+    );
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "133.22",
+        kind: "provisional",
+        id: "w8.points",
+      }),
+    );
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "hard",
+        text: "120",
+        kind: "wrong",
+        reason: "w8.points is 133.22",
+      }),
+    );
+  });
+
+  test("each claim reads the week its own clause names", async () => {
+    const { dir, deps } = await midWeek8();
+    const { path } = await draft(dir, deps, { includeInProgress: true });
+    await addToGus(
+      path,
+      "In week 7 they scored 87.86 and in week 8 they scored 133.22. They scored 120 in week 7, but 133.22 in week 8.",
+    );
+
+    const { problems } = await check(dir, deps);
+
+    const gus = problems.filter((p) => p.section === "Gus Bus");
+    expect(gus).toEqual([
+      expect.objectContaining({
+        text: "120",
+        kind: "wrong",
+        reason: "w7.points is 87.86",
+      }),
+      expect.objectContaining({ text: "133.22", kind: "provisional" }),
+      expect.objectContaining({ text: "133.22", kind: "provisional" }),
+    ]);
+  });
+
+  test("an untagged score naming the week is provisional on the first check", async () => {
+    const { dir, deps } = await midWeek8();
+    const { path } = await draft(dir, deps, { includeInProgress: true });
+    await addToGus(path, "It ended 133.22-78.22 in week 8.");
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "133.22-78.22",
+        kind: "provisional",
+        id: "w8.points",
+      }),
+    );
+  });
+
+  test("an untagged result naming the week is unchecked, since the week has no result yet", async () => {
+    const { dir, deps } = await midWeek8();
+    const { path } = await draft(dir, deps, { includeInProgress: true });
+    await addToGus(path, "They beat Pylon Patrol in week 8.");
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        severity: "soft",
+        text: "beat Pylon Patrol",
+        kind: "unchecked",
+        reason: "no week 8 result in the evidence pack",
+      }),
+    );
+  });
+
   test("refresh compares the in-progress week, so a claim it changes goes stale", async () => {
     const { dir, deps } = await midWeek8();
     const { path } = await draft(dir, deps, { includeInProgress: true });

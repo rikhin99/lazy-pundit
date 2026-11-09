@@ -1,5 +1,5 @@
 import type { TeamId } from "../league.ts";
-import { agrees, kindOf, resolve } from "./evidence.ts";
+import { agrees, kindOf, resolve, statOf } from "./evidence.ts";
 import {
   edgeGroup,
   type Found,
@@ -51,7 +51,7 @@ export function judge(
   text: string,
   f: Found,
 ): Verdict {
-  const week = ctx.evidence.week;
+  const week = f.week;
   const shape = f.shape;
   const none = (status: ClaimStatus, reason: string): Verdict => ({
     status,
@@ -89,7 +89,7 @@ export function judge(
   }
 
   if (shape.type === "score")
-    return judgeScore(ctx, teams, shape, f.end - f.start);
+    return judgeScore(ctx, teams, shape, f.end - f.start, week);
 
   if (shape.type === "place") {
     const hits: Hit[] = [];
@@ -102,7 +102,7 @@ export function judge(
     }
     if (hits.length)
       return { status: "verified", reason: verifiedReason(ctx, hits), hits };
-    if (!first) return none("unchecked", `no ${shape.key} to check against`);
+    if (!first) return none("unchecked", noStats(ctx, week, [shape.key]));
     return none("wrong", show(ctx, first));
   }
 
@@ -213,7 +213,7 @@ export function judge(
     if (hits.length)
       return { status: "verified", reason: verifiedReason(ctx, hits), hits };
     if (shape.score) {
-      const v = judgeScore(ctx, teams, shape.score, f.end - f.start);
+      const v = judgeScore(ctx, teams, shape.score, f.end - f.start, week);
       if (v.status === "verified") return v;
     }
     const t = teams[0];
@@ -222,11 +222,7 @@ export function judge(
           .map((k) => resolve(ctx, k, t))
           .filter((r): r is Resolved => !!r)
       : [];
-    if (!facts.length)
-      return none(
-        "unchecked",
-        `no ${shape.keys.join(" or ")} to check against`,
-      );
+    if (!facts.length) return none("unchecked", noStats(ctx, week, shape.keys));
     return none("wrong", facts.map((r) => show(ctx, r)).join(", "));
   }
 
@@ -272,8 +268,9 @@ export function judgeScore(
   teams: TeamId[],
   shape: ScoreWords,
   length: number,
+  /** The week the claim reads (`Found.week`). */
+  week: number,
 ): Verdict {
-  const week = ctx.evidence.week;
   const P = `w${week}.points`;
   const O = `w${week}.opp_points`;
   const first = { start: 0, end: shape.split };
@@ -309,7 +306,10 @@ export function judgeScore(
   if (pts === undefined || opp === undefined) {
     return {
       status: "unchecked",
-      reason: `no week ${week} score to check against`,
+      reason:
+        week === ctx.evidence.week
+          ? `no week ${week} score to check against`
+          : `no week ${week} score in the evidence pack`,
       hits: [],
     };
   }
@@ -318,6 +318,18 @@ export function judgeScore(
     reason: `week ${week} score was ${pts}-${opp}`,
     hits: [],
   };
+}
+
+/**
+ * Why a claim is unchecked when the evidence pack has none of `keys`. A week
+ * the claim names, other than the ranking week, is said as a week the pack
+ * doesn't hold: "no week 5 points in the evidence pack".
+ */
+function noStats(ctx: Ctx, week: number, keys: string[]): string {
+  return week !== ctx.evidence.week &&
+    keys.every((k) => k.startsWith(`w${week}.`))
+    ? `no week ${week} ${keys.map(statOf).join(" or ")} in the evidence pack`
+    : `no ${keys.join(" or ")} to check against`;
 }
 
 export function idFor(ctx: Ctx, hit: Hit): string {

@@ -25,6 +25,8 @@ export const PLAIN_PROSE = [
   "Seven wins, one loss.",
   "Three weeks ago this looked like a contender.",
   "Back in week 6 of the 2025 season.",
+  "In week 3 they finally found a running game, and in week 4 a kicker.",
+  "Since week 2 they've been the league's best story.",
   "Two of their starters scored zero.",
   "Fourth time this year the kicker missed.",
   "A first-round pick on the bench.",

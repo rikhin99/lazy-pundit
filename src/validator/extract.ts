@@ -88,6 +88,54 @@ export interface Found {
   start: number;
   end: number;
   shape: Shape;
+  /** The week the claim reads: the one its clause names, else the ranking week. */
+  week: number;
+}
+
+/**
+ * A week a clause names as the one its claims are about: "in week 8",
+ * "during week 8", "for week 8", "week 8's", or "this week" for the ranking
+ * week. "Since week 3" or "a week 14 bye" name no week a claim reads.
+ */
+const NAMED_WEEK =
+  /\b(?:(?:in|during|for)\s+(?:week|wk)\s*(\d{1,2})\b|(?:week|wk)\s*(\d{1,2})['’]s\b|this week\b)/gi;
+
+/** Where one clause ends and the next begins. */
+const CLAUSE_BREAK =
+  /[,;:()—–]|\s-\s|\b(?:and|but|while|though|although|whereas)\b/gi;
+
+/**
+ * The week a claim at `start`..`end` reads: of the weeks named in the
+ * claim's own clause, the nearest one, else the ranking week.
+ */
+function namedWeek(
+  s: string,
+  start: number,
+  end: number,
+  rankingWeek: number,
+): number {
+  let from = 0;
+  let to = s.length;
+  for (const m of s.matchAll(CLAUSE_BREAK)) {
+    if (m.index + m[0].length <= start) from = m.index + m[0].length;
+    else if (m.index >= end) {
+      to = m.index;
+      break;
+    }
+  }
+  const clause = s.slice(from, to);
+  let best = rankingWeek;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const m of clause.matchAll(NAMED_WEEK)) {
+    const mStart = from + m.index;
+    const mEnd = mStart + m[0].length;
+    const d = mEnd <= start ? start - mEnd : mStart >= end ? mStart - end : 0;
+    if (d < bestDist) {
+      bestDist = d;
+      best = (m[1] ?? m[2]) ? Number(m[1] ?? m[2]) : rankingWeek;
+    }
+  }
+  return best;
 }
 
 export const RESULT_VERBS =
@@ -220,11 +268,16 @@ export function playoffWant(words: string): PlayoffWant | undefined {
 }
 
 export function extract(ctx: Ctx, s: string): Found[] {
-  const week = ctx.evidence.week;
   const out: Found[] = [];
   const low = s.toLowerCase();
-  const add = (start: number, end: number, shape: Shape) =>
-    out.push({ start, end, shape });
+  const weekAt = (start: number, end: number) =>
+    namedWeek(s, start, end, ctx.evidence.week);
+  const add = (
+    start: number,
+    end: number,
+    shape: Shape,
+    week = weekAt(start, end),
+  ) => out.push({ start, end, shape, week });
 
   // results: a verb, then a team's name
   for (const m of s.matchAll(RESULT_VERBS)) {
@@ -355,6 +408,7 @@ export function extract(ctx: Ctx, s: string): Found[] {
     ),
   )) {
     const after = low.slice(m.index + m[0].length, m.index + m[0].length + 30);
+    const week = weekAt(m.index, m.index + m[0].length);
     const key = m[2] ? (ordinalKey(after, week) ?? "place") : "place";
     if (m[1]) {
       const n = Number(m[1]);
@@ -384,7 +438,10 @@ export function extract(ctx: Ctx, s: string): Found[] {
     const before = low.slice(Math.max(0, m.index - 30), m.index);
     if (/^[- ](game|straight|consecutive|tier)/.test(after)) continue;
     const num = parseNum(word) as Num;
-    const key = ordinalKey(before + after, week);
+    const key = ordinalKey(
+      before + after,
+      weekAt(m.index, m.index + word.length),
+    );
     const standingWords = /\bin\s*$/.test(before) || /^ place\b/.test(after);
     if (key) {
       add(m.index, m.index + word.length, {
@@ -423,6 +480,7 @@ export function extract(ctx: Ctx, s: string): Found[] {
     if (m[1] && /^(19|20)\d\d$/.test(token)) continue;
     const num = parseNum(token) as Num;
     const tailStart = m.index + m[0].length;
+    const week = weekAt(m.index, tailStart);
     let key = /\bby\s*$/.test(before)
       ? `w${week}.margin`
       : nearestCue(before, low.slice(tailStart, tailStart + 25), week);
@@ -432,12 +490,12 @@ export function extract(ctx: Ctx, s: string): Found[] {
     const hedgeLen = hedge
       ? (before.match(HEDGE) as RegExpMatchArray)[0].length
       : 0;
-    add(m.index - hedgeLen, m.index + m[0].length, {
-      type: "stat",
-      keys: key ? [key] : [],
-      num,
-      hedge,
-    });
+    add(
+      m.index - hedgeLen,
+      m.index + m[0].length,
+      { type: "stat", keys: key ? [key] : [], num, hedge },
+      week,
+    );
   }
 
   // a team's own name is never a claim, and the earlier, longer claim wins an overlap

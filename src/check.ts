@@ -336,7 +336,14 @@ function reviewProse(input: {
     };
     for (const c of result.claims) {
       if (c.status === "verified") {
-        if (inProgress && c.id?.startsWith(`w${inProgress}.`)) {
+        // An untagged score cites its two halves through its auto-tags.
+        const cited = c.id
+          ? [c.id]
+          : result.autoTags
+              .filter((t) => c.start <= t.start && t.end <= c.end)
+              .map((t) => t.id);
+        const id = cited.find((i) => i.startsWith(`w${inProgress}.`));
+        if (inProgress && id) {
           problems.push({
             ...at,
             severity: "soft",
@@ -344,7 +351,7 @@ function reviewProse(input: {
             text: c.text,
             kind: "provisional",
             reason: `week ${inProgress} is still in progress, so this can change once it's scored`,
-            id: c.id,
+            id,
           });
         }
         continue;
