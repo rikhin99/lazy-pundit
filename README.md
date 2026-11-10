@@ -3,15 +3,27 @@ Weekly power rankings for your fantasy football league, drafted for you with the
 
 It works with [Sleeper](https://docs.sleeper.com/) leagues. ESPN comes in a later release. Lazy Pundit isn't affiliated with Sleeper or ESPN.
 
-## Install
+## Before you install
 
-Needs Node 24 or later.
+You need two free programs, git and Node 24 or later. Open a terminal (on a Mac: Terminal, in Applications → Utilities) and check for each:
+
+```sh
+git --version
+node -v
+```
+
+- **git**: npm fetches Lazy Pundit from GitHub with it. On a Mac, if `git --version` offers to install the command line developer tools, click Install, wait for it to finish, and run `git --version` again. On Linux, install `git` with your package manager.
+- **Node**: `node -v` should print `v24` or higher. If it prints an older version or isn't found, install the LTS version from [nodejs.org](https://nodejs.org/), then open a new terminal and run `node -v` again. Node comes with npm, which installs Lazy Pundit.
+
+Lazy Pundit hasn't been tried on Windows. If you try it, run everything inside WSL (Windows Subsystem for Linux) as on Linux, and install Node inside WSL with a version manager such as [nvm](https://github.com/nvm-sh/nvm), since the installer from nodejs.org installs Windows' own Node.
+
+## Install
 
 ```sh
 npm i -g github:rikhin99/lazy-pundit#semver:^0
 ```
 
-That installs the latest 0.x release. Run the same line again to update. With npm 12 or later (`npm -v`; Node 24 and 26 ship npm 11), npm refuses installs from git unless you allow them, so add `--allow-git=all`:
+That installs the latest 0.x release, with no GitHub account needed. Check it with `lazy-pundit --help`. With npm 12 or later (`npm -v`; Node 24 and 26 ship npm 11), npm refuses installs from git unless you allow them, so add `--allow-git=all`:
 
 ```sh
 npm i -g --allow-git=all github:rikhin99/lazy-pundit#semver:^0
@@ -19,21 +31,71 @@ npm i -g --allow-git=all github:rikhin99/lazy-pundit#semver:^0
 
 Install from a release (`#semver:^0` or a tag such as `#v0.1.0`), not from `#main`: only release tags carry the built code that npm can install globally. See `CHANGELOG.md` for what each release has.
 
+**Updating.** Run the same install line again. Lazy Pundit doesn't tell you when a new release is out: the builder (who makes Lazy Pundit and runs this test with you) will, or you can watch the repo's releases on GitHub (Watch → Custom → Releases). Updating leaves your workspace where it is. Within 0.x a release may change the files a workspace holds, and its entry in `CHANGELOG.md` says how.
+
+**Back up your workspace before updating.** Copy its folder, or keep it in git (`git init` inside it; its `.gitignore` already leaves out the cached league data and the LLM transcripts). Reinstalling never touches it, but a bad release could damage files `init` can't rebuild: your house rules and Log in `league.md`, your lore, your published weeks and a draft in progress. With a backup, the worst case is restoring a folder.
+
+## Set up your league
+
+Run `lazy-pundit init`. It asks:
+
+1. **Your name**, as it goes on your rankings.
+2. **Which platform the league is on.** Pick Sleeper; ESPN and Yahoo stop there for now.
+3. **Your Sleeper league.** When it asks for your Sleeper account, type your account name on Sleeper (not the email or phone number you sign in with), and pick the league from that account's leagues this season. If you're not sure of the name, leave it empty and type the league ID instead: the number in the league's URL on sleeper.com. Every Sleeper league can be read this way, with no login. An account name Sleeper doesn't know gives "Sleeper has no account named …", and init asks again. An account with no leagues this season says so, and init asks for a league ID.
+4. **The workspace folder.** Leave it empty for a new folder in `~/lazy-pundit/`, named after the league (`~/lazy-pundit/fear-the-turtle`, say).
+5. **The setup steps**: manager handles, lore and nicknames, stakes and house rules (with whether it's a family league, read by people of any age, which keeps every persona clean), the power-score method, your Anthropic key and spend cap, and the persona. Each one but the spend cap can be skipped (the cap is passed over when you skip the key), with "Skip the rest" for all that are left, and answered later with `lazy-pundit setup <step>`.
+
+**The Anthropic key is optional.** With one, the LLM (Claude) writes a first draft of the intro and blurbs in your persona. With none, `draft` writes a stat line for each team instead, and you write the words yourself. To get a key, make an account at [console.anthropic.com](https://console.anthropic.com/), add a little credit to the account, and create an API key. You can add the key later with `lazy-pundit setup key`.
+
+**What a week spends.** A draft makes one to three LLM calls. On the default model (Claude Sonnet 5.5) a call can spend at most about $0.17 with a short lore file, so a draft at most about $0.50, and it's usually much less, since that ceiling assumes the longest possible reply. A long lore file sends more with each call, and `draft` says when it makes a draft cost more. Each call's real spend is in its transcript, and the month's total in `spend.yaml` in the config folder (see Config and credentials). The spend cap (5 USD a month by default, set with `lazy-pundit setup cap`) is checked before every call: a call that could take the month past it is never made, and the draft falls back to stat lines (or keeps the LLM's prose so far).
+
 ## A week's ranking
 
-**Set up once.** `lazy-pundit init` asks for your name, finds your Sleeper league, and walks through the setup steps: manager handles, lore and nicknames, stakes, the persona, the power-score method, your Anthropic key and the spend cap. You can skip any step and come back to it. It makes the league's workspace in a new folder.
-
-**Each week**, from inside the workspace (or from anywhere, with `--league <slug>`):
+From inside the workspace folder (`cd ~/lazy-pundit/<league>`), or from anywhere with `--league <slug>`:
 
 ```sh
-lazy-pundit draft     # fetch the league; write pundits/<pundit>/<season>/week-NN.md in the starting order
+lazy-pundit draft     # fetch the league; write pundits/<you>/<season>/week-NN.md in the starting order
 lazy-pundit table     # the Stats table: each team in the draft's order, its starting place and stats
-                      # now edit: reorder the ## team sections, rewrite the intro and blurbs
+                      # now edit week-NN.md: reorder the ## team sections, rewrite the intro and blurbs
 lazy-pundit check     # list the draft's problems and tag the claims it can check
 lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it to the clipboard
 ```
 
-With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `table` reads the draft's own data, with no fetch: run it again after moving sections to see each team's place (#) against its starting place (Start), or with `--sort ppg` (or `start`, `record`, `rank`, `all-play`, `form`, `luck`) for the best first. `publish` asks before publishing a draft with hard problems, or with a relaxed family-league persona; `-y` skips the question.
+Then paste into your league chat. If there's no clipboard, `publish` says so: open `week-NN.txt` and copy it from there.
+
+With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `draft` drafts the last scored week. Run while a week's matchups are still being played, it says a week is in progress and drafts the week before; `draft --include-in-progress` adds the in-progress week's stats as evidence, so claims about it are listed as provisional until the week is scored.
+
+### Editing a draft
+
+Open `week-NN.md` in any text editor. Leave the front matter (the lines between the two `---`) as it is. Below it is the intro, then a `## <team>` section for each team:
+
+```markdown
+## Gus Bus {team=sleeper:1}
+[6th]{ev=pf_rank} in points · [beat]{ev=w8.result} [Pylon Patrol]{ev=w8.opponent} by [55]{ev=w8.margin}
+```
+
+- **To reorder**, move whole sections, heading and blurb together. The order of the sections is your ranking. Keep each heading line as it is: `{team=…}` says which team it is.
+- **To rewrite a blurb**, replace the text under the heading. A tag such as `[55]{ev=w8.margin}` marks a claim and names the stat it's checked against. Publishing strips the tags, so the league sees only `55`. You don't need to write tags: `check` adds them to the claims it can match to one stat, and leaves the words as they are.
+- **`lazy-pundit table`** shows the stats behind the starting order (record, standings rank, points per game, all-play record, form, luck and streak), with each team's place now (#) against its starting place (Start). Run it again after moving sections. `--sort ppg` (or `start`, `record`, `rank`, `all-play`, `form`, `luck`) puts the best first. Below about 69 columns a row wraps, so widen the window.
+
+Say you move Gus Bus to the top and write "Gus Bus beat Pylon Patrol by 55 and are 6-2." `check` tags the claims and finds one wrong:
+
+```text
+Tagged 2 claims in pundits/rikhin/2025/week-08.md.
+Problems: 1 hard, 8 soft
+  ✗ line 28 Gus Bus: "6-2" wrong: record is 4-4, allplay is 45-43
+  · League: correction timing: Scored. Corrections may land through Thursday
+  · line 27 Gus Bus: "Gus Bus" you moved this team: starting place 7, now 1
+  ...
+```
+
+A hard problem (✗) would put something false in front of the league: fix it, and run `check` again. Soft ones (·) are worth a look, such as the teams you moved. `publish` runs the same check and asks before publishing over a hard problem, or with a relaxed family-league persona; `-y` skips the question.
+
+### Which files are yours
+
+- `pundits/<you>/<season>/week-NN.md`: the week's draft. Edit it.
+- `lore.md`, `seasons/<season>/league.md` (stakes, house rules and the Log), `pundits/<you>/persona.md` and `pundits/<you>/settings.md` (the power-score method): what `init` asked. Change them with `lazy-pundit setup <step>`, which shows a diff before overwriting a hand edit, or edit them by hand.
+- Leave the rest alone: `workspace.md`, `.snapshots/` (the league data as fetched), `transcripts/`, and each `week-NN.published.md`, the frozen copy of a published week.
 
 **Also:**
 
@@ -42,6 +104,12 @@ With an Anthropic key, `draft` has the LLM write the intro and blurbs, and write
 - `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`.
 - `lazy-pundit doctor` checks Node, your config and credentials, and each workspace.
 - `lazy-pundit transcripts delete` removes the workspace's LLM transcripts.
+
+## Help and feedback
+
+Something broken or confusing: tell the builder, or open an issue at [github.com/rikhin99/lazy-pundit/issues](https://github.com/rikhin99/lazy-pundit/issues). Include the command you ran, what it printed and the output of `lazy-pundit doctor`. Issues are public, and an edited-out name stays in an issue's edit history, so leave out league-mates' names, team names and league IDs, or send those to the builder directly.
+
+After each published week, run `lazy-pundit stats` and paste its summary to the builder. It's how the builder learns whether the tool saves you time, and it holds only numbers about your weeks.
 
 ### Config and credentials
 
