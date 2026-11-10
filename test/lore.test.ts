@@ -118,45 +118,45 @@ async function snapshotClashes(dir: string): Promise<string[]> {
 describe("nicknames reach the validator", () => {
   test("a team's nickname makes that team's stats count", async () => {
     const { dir, gusSays } = await draftedWithLore(
-      "## {team=sleeper:3}\nnicknames: Karna, The Mob\n",
+      "## {team=sleeper:3}\nnicknames: Rocco, The Mob\n",
     );
     // Bench Mob is 7-1 at week 8; the section's own team, Gus Bus, is 4-4.
-    await gusSays("Karna is 7-1 and The Mob knows it.");
+    await gusSays("Rocco is 7-1 and The Mob knows it.");
     expect(await claimProblems(dir)).toEqual([]);
 
-    await gusSays("Karna is 6-2.");
+    await gusSays("Rocco is 6-2.");
     expect(await claimProblems(dir)).toEqual([["6-2", "wrong"]]);
   });
 
   test("a manager's nickname counts for their current team through the handle's link", async () => {
     const { dir, gusSays } = await draftedWithLore(
-      "## {manager=bo}\nnicknames: Karna\n",
+      "## {manager=bo}\nnicknames: Rocco\n",
     );
     await linkHandle(dir, "bo", await accountOf("sleeper:3"));
-    await gusSays("Karna is 7-1.");
+    await gusSays("Rocco is 7-1.");
     expect(await claimProblems(dir)).toEqual([]);
   });
 
   test("a manager section with no link counts for no team", async () => {
     const { dir, gusSays } = await draftedWithLore(
-      "## {manager=bo}\nnicknames: Karna\n",
+      "## {manager=bo}\nnicknames: Rocco\n",
     );
-    await gusSays("Karna is 7-1.");
+    await gusSays("Rocco is 7-1.");
     expect(await claimProblems(dir)).toEqual([["7-1", "wrong"]]);
   });
 
   test("with no lore.md, the same sentence is read as the section's team", async () => {
     const ws = await fearTheTurtle(8);
     const { path } = await draft(ws.dir, ws.deps);
-    await setGusBlurb(path, "Karna is 7-1.");
+    await setGusBlurb(path, "Rocco is 7-1.");
     expect(await claimProblems(ws.dir)).toEqual([["7-1", "wrong"]]);
   });
 
   test("a nickname in a line comment or list form still counts, in any case", async () => {
     const { dir, gusSays } = await draftedWithLore(
-      "## {team=sleeper:3}\n<!-- nicknames: Not Used -->\n- nicknames: Karna’s Crew\n",
+      "## {team=sleeper:3}\n<!-- nicknames: Not Used -->\n- nicknames: Rocco’s Crew\n",
     );
-    await gusSays("karna's crew is 7-1.");
+    await gusSays("rocco's crew is 7-1.");
     expect(await claimProblems(dir)).toEqual([]);
   });
 });
@@ -176,16 +176,16 @@ describe("a nickname that reads as two holders' is a load error", () => {
       snapshotClash("Bench Mob Rules", "team:sleeper:9", BENCH_MOB),
     ]);
     const nested = await draftedWithLore(
-      "## {team=sleeper:9}\nnicknames: Karna\n\n## {team=sleeper:1}\nnicknames: Big Karna\n",
+      "## {team=sleeper:9}\nnicknames: Rocco\n\n## {team=sleeper:1}\nnicknames: Big Rocco\n",
     );
     await expect(claimProblems(nested.dir)).rejects.toThrow(
-      /"Big Karna".*team:sleeper:9.*team:sleeper:1/,
+      /"Big Rocco".*team:sleeper:9.*team:sleeper:1/,
     );
   });
 
   test("not one section saying it twice, with no team to count for", async () => {
     const { dir } = await draftedWithLore(
-      "## {manager=gone}\nnicknames: Karna, karna\n",
+      "## {manager=gone}\nnicknames: Rocco, rocco\n",
     );
     expect(await claimProblems(dir)).toEqual([]);
   });
@@ -193,7 +193,7 @@ describe("a nickname that reads as two holders' is a load error", () => {
   test("refresh stops on a clash with fresh names, writing nothing", async () => {
     const ws = await fearTheTurtle(8);
     const { path } = await draft(ws.dir, ws.deps);
-    await writeLore(ws.dir, "## {team=sleeper:1}\nnicknames: Karna\n");
+    await writeLore(ws.dir, "## {team=sleeper:1}\nnicknames: Rocco\n");
     const before = await readFile(path, "utf8");
     const snapshots = await readdir(join(ws.dir, ".snapshots"));
     const renamed = {
@@ -204,22 +204,22 @@ describe("a nickname that reads as two holders' is a load error", () => {
           const bo = users.find(
             (u: Json) => u.display_name === "benchwarmer_bo",
           );
-          bo.display_name = "Karna";
+          bo.display_name = "Rocco";
         },
       }),
     };
-    await expect(refresh(ws.dir, renamed)).rejects.toThrow(/"Karna"/);
+    await expect(refresh(ws.dir, renamed)).rejects.toThrow(/"Rocco"/);
     expect(await readFile(path, "utf8")).toBe(before);
     expect(await readdir(join(ws.dir, ".snapshots"))).toEqual(snapshots);
   });
 
   const twoTeams =
-    "## {team=sleeper:3}\nnicknames: Karna\n\n## {team=sleeper:1}\nnicknames: karna\n";
+    "## {team=sleeper:3}\nnicknames: Rocco\n\n## {team=sleeper:1}\nnicknames: rocco\n";
 
   test("two sections naming it, with both named", async () => {
     const { dir } = await draftedWithLore(twoTeams);
     await expect(claimProblems(dir)).rejects.toThrow(
-      /lore\.md: the nickname "karna".*team:sleeper:3.*team:sleeper:1/,
+      /lore\.md: the nickname "rocco".*team:sleeper:3.*team:sleeper:1/,
     );
   });
 
@@ -257,7 +257,7 @@ describe("a nickname that reads as two holders' is a load error", () => {
 
   test("a departed manager still holds their nickname", async () => {
     const { dir } = await draftedWithLore(
-      "## {manager=gone}\nnicknames: Karna\n\n## {team=sleeper:3}\nnicknames: Karna\n",
+      "## {manager=gone}\nnicknames: Rocco\n\n## {team=sleeper:3}\nnicknames: Rocco\n",
     );
     await expect(claimProblems(dir)).rejects.toThrow(
       /manager:gone.*team:sleeper:3/,
@@ -266,29 +266,29 @@ describe("a nickname that reads as two holders' is a load error", () => {
 
   test("not when both sections mean the same team, as setup's prefill does", async () => {
     const { dir, gusSays } = await draftedWithLore(
-      "## {manager=bo}\nnicknames: Karna, benchwarmer_bo\n\n## {team=sleeper:3}\nnicknames: Karna, Bench Mob, benchwarmer_bo\n",
+      "## {manager=bo}\nnicknames: Rocco, benchwarmer_bo\n\n## {team=sleeper:3}\nnicknames: Rocco, Bench Mob, benchwarmer_bo\n",
     );
     await linkHandle(dir, "bo", await accountOf("sleeper:3"));
-    await gusSays("Karna is 7-1.");
+    await gusSays("Rocco is 7-1.");
     expect(await claimProblems(dir)).toEqual([]);
   });
 
   test("draft stops on it before it writes a snapshot", async () => {
     const ws = await fearTheTurtle(8);
     await writeLore(ws.dir, twoTeams);
-    await expect(draft(ws.dir, ws.deps)).rejects.toThrow(/"karna"/);
+    await expect(draft(ws.dir, ws.deps)).rejects.toThrow(/"rocco"/);
     expect(existsSync(join(ws.dir, ".snapshots"))).toBe(false);
   });
 });
 
 describe("a clash with names only one version of the league holds", () => {
-  const BO_AS_KARNA = {
+  const BO_AS_ROCCO = {
     [`${LEAGUE}/users`]: (users: Json) => {
       const bo = users.find((u: Json) => u.display_name === "benchwarmer_bo");
-      bo.display_name = "Karna";
+      bo.display_name = "Rocco";
     },
   };
-  const KARNA_LORE = "## {team=sleeper:1}\nnicknames: Karna\n";
+  const ROCCO_LORE = "## {team=sleeper:1}\nnicknames: Rocco\n";
   /** 1.8 more for Gus Bus in week 8 makes the draft's "55" margins false. */
   const GUS_CORRECTED = { [`${LEAGUE}/matchups/8`]: statCorrection(1, 1.8) };
   const withPatches = (deps: Deps, patches: Record<string, Patch>) => ({
@@ -296,29 +296,29 @@ describe("a clash with names only one version of the league holds", () => {
     transport: patchingTransport(deps.transport, patches),
   });
 
-  /** Week 8 drafted while bo was called Karna, then lore giving Karna to another team. */
-  async function draftedAsKarna() {
+  /** Week 8 drafted while bo was called Rocco, then lore giving Rocco to another team. */
+  async function draftedAsRocco() {
     const ws = await fearTheTurtle(8);
-    const { path } = await draft(ws.dir, withPatches(ws.deps, BO_AS_KARNA));
-    await writeLore(ws.dir, KARNA_LORE);
+    const { path } = await draft(ws.dir, withPatches(ws.deps, BO_AS_ROCCO));
+    await writeLore(ws.dir, ROCCO_LORE);
     return { ...ws, path };
   }
-  const clash = snapshotClash("Karna", "team:sleeper:1", BENCH_MOB);
+  const clash = snapshotClash("Rocco", "team:sleeper:1", BENCH_MOB);
 
   test("check warns of a name only the draft's snapshot holds, and carries on", async () => {
-    const { dir } = await draftedAsKarna();
+    const { dir } = await draftedAsRocco();
     expect(await snapshotClashes(dir)).toEqual([clash]);
   });
 
   test("refresh with no data change carries on with the warning", async () => {
-    const { dir, deps } = await draftedAsKarna();
+    const { dir, deps } = await draftedAsRocco();
     const { changes, warnings } = await refresh(dir, deps);
     expect(changes).toEqual([]);
     expect(warnings).toContain(clash);
   });
 
   test("refresh onto data without that name moves the draft, and the warning goes", async () => {
-    const { dir, deps, path } = await draftedAsKarna();
+    const { dir, deps, path } = await draftedAsRocco();
     const before = frontMatter(await readFile(path, "utf8")).snapshot;
     const { changes, warnings } = await refresh(
       dir,
@@ -330,7 +330,7 @@ describe("a clash with names only one version of the league holds", () => {
   });
 
   test("a second draft says what clashes before it's refused as already there", async () => {
-    const { dir, deps } = await draftedAsKarna();
+    const { dir, deps } = await draftedAsRocco();
     const told: string[] = [];
     await expect(
       draft(dir, deps, { onWarnings: (w) => told.push(...w) }),
@@ -341,7 +341,7 @@ describe("a clash with names only one version of the league holds", () => {
   test("publish gives the stale count with a clash in the fresh names", async () => {
     const ws = await fearTheTurtle(8);
     await draft(ws.dir, ws.deps);
-    await writeLore(ws.dir, KARNA_LORE);
+    await writeLore(ws.dir, ROCCO_LORE);
     const corrected = await publish(
       ws.dir,
       withPatches(ws.deps, GUS_CORRECTED),
@@ -351,34 +351,34 @@ describe("a clash with names only one version of the league holds", () => {
 
     const renamed = await publish(
       ws.dir,
-      withPatches(ws.deps, { ...GUS_CORRECTED, ...BO_AS_KARNA }),
+      withPatches(ws.deps, { ...GUS_CORRECTED, ...BO_AS_ROCCO }),
     );
     expect(renamed.warnings).toEqual([
       ...corrected.warnings,
-      freshClash("Karna", "team:sleeper:1", BENCH_MOB),
+      freshClash("Rocco", "team:sleeper:1", BENCH_MOB),
     ]);
   });
 
   test("refresh with no data change warns of a clash in the fresh names", async () => {
     const ws = await fearTheTurtle(8);
     await draft(ws.dir, ws.deps);
-    await writeLore(ws.dir, KARNA_LORE);
+    await writeLore(ws.dir, ROCCO_LORE);
     const { changes, warnings } = await refresh(
       ws.dir,
-      withPatches(ws.deps, BO_AS_KARNA),
+      withPatches(ws.deps, BO_AS_ROCCO),
     );
     expect(changes).toEqual([]);
     expect(warnings).toContain(
-      freshClash("Karna", "team:sleeper:1", BENCH_MOB),
+      freshClash("Rocco", "team:sleeper:1", BENCH_MOB),
     );
   });
 
   test("publish says it for both the snapshot and fresh data when both have the clash", async () => {
-    const { dir, deps } = await draftedAsKarna();
-    const { warnings } = await publish(dir, withPatches(deps, BO_AS_KARNA));
+    const { dir, deps } = await draftedAsRocco();
+    const { warnings } = await publish(dir, withPatches(deps, BO_AS_ROCCO));
     expect(warnings.filter((w) => w.includes("points at both"))).toEqual([
       clash,
-      freshClash("Karna", "team:sleeper:1", BENCH_MOB),
+      freshClash("Rocco", "team:sleeper:1", BENCH_MOB),
     ]);
   });
 });
@@ -454,7 +454,7 @@ type: friends
 - Founded in a pub
 
 ## {manager=bo}
-nicknames: Karna
+nicknames: Rocco
 - Lives in Leeds <!-- or was it York? -->
 * Hates kickers
 
@@ -470,7 +470,7 @@ type: not reserved here
     expect(lore.type).toBe("friends");
     expect(lore.sections.map((s) => [s.name, s.nicknames, s.entries])).toEqual([
       ["league", [], ["Founded in a pub"]],
-      ["manager:bo", ["Karna"], ["Lives in Leeds", "Hates kickers"]],
+      ["manager:bo", ["Rocco"], ["Lives in Leeds", "Hates kickers"]],
       ["team:sleeper:3", [], []],
       ["running-jokes", [], ["The 2019 trade"]],
       ["draft-day-traditions", [], ["type: not reserved here"]],
@@ -544,9 +544,9 @@ describe("{local} stops a draft", () => {
 
   test("check still reads the file, since nothing is sent", async () => {
     const { dir, gusSays } = await draftedWithLore(
-      "## {team=sleeper:3}\nnicknames: Karna\n- A secret {local}\n",
+      "## {team=sleeper:3}\nnicknames: Rocco\n- A secret {local}\n",
     );
-    await gusSays("Karna is 7-1.");
+    await gusSays("Rocco is 7-1.");
     expect(await claimProblems(dir)).toEqual([]);
   });
 

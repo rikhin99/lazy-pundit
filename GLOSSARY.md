@@ -61,7 +61,7 @@ What kind of group a league is: work, family, friends or other. It is written in
 A braced marker that means something to the tool in a file the pundit writes, such as `{manager=bo}` or `{local}`. Any other braced text in lore or a season's stakes file is an error, so a marker meant to keep something private never silently does nothing.
 
 **Nickname**:
-Another name for a manager or a team, such as "Karna" or "Rad Team". The validator uses nicknames to work out which team a sentence is about. A team's current name and its manager's display name always count as nicknames.
+Another name for a manager or a team, such as "Rocco" or "The Mob". The validator uses nicknames to work out which team a sentence is about. A team's current name and its manager's display name always count as nicknames.
 _Avoid_: Alias
 
 **Persona**:
