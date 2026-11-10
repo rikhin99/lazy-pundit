@@ -153,6 +153,9 @@ export const ORDINAL_CUES: [RegExp, (w: number) => string][] = [
   [/\branked\b|\branking|\bspot\b|\bpower\b/, () => "place"],
 ];
 
+/** A recent window: "averaging 120 over the last three" is form, not `ppg`. */
+const FORM_CUE = /\blast three\b|\blast 3\b|\blately\b/;
+
 export const NUMBER_CUES: [RegExp, (w: number) => string][] = [
   [
     /\bmargin\b|\bwon by\b|\blost by\b|\bwinning by\b|\blosing by\b/,
@@ -165,10 +168,8 @@ export const NUMBER_CUES: [RegExp, (w: number) => string][] = [
   [/\bseason[- ]high\b|(?<!week[- ])\bhigh\b/, () => "high"],
   [/\bseason[- ]low\b|(?<!week[- ])\blow\b/, () => "low"],
   [/\bpoints for\b|\bon the season\b|\bseason total\b|\btotal\b/, () => "pf"],
-  [
-    /\baverag|\bper week\b|\bper game\b|\blast three\b|\blast 3\b/,
-    () => "form3",
-  ],
+  [FORM_CUE, () => "form3"],
+  [/\baverag|\bper week\b|\bper game\b/, () => "ppg"],
   [/\bpoints against\b|\ballowed\b/, () => "pa"],
   [
     /\bluck|\bunlucky\b|\blucky\b|\bcost (them|him|her)\b|\brobbed\b/,
@@ -182,7 +183,10 @@ export function ordinalKey(ctx: string, week: number): string | null {
   return null;
 }
 
-/** The number cue closest to a number: the last one before it, else the first after. */
+/**
+ * The number cue closest to a number: the last one before it, else the first
+ * after. An average cue gives way to a form cue in the number's clause.
+ */
 export function nearestCue(
   before: string,
   after: string,
@@ -205,6 +209,9 @@ export function nearestCue(
       best = key(week);
     }
   }
+  // within the number's own clause
+  const clause = `${before.split(/[;!?]|\.\s/).at(-1)} ${after.split(/[;!?]|\.\s/)[0]}`;
+  if (best === "ppg" && FORM_CUE.test(clause)) return "form3";
   return best;
 }
 

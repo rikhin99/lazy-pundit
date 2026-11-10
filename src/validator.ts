@@ -15,6 +15,7 @@ import {
   type Verdict,
 } from "./validator/judge.ts";
 import { namesTeam, type Span } from "./validator/names.ts";
+import { wrongPlayer } from "./validator/players.ts";
 import { stakesMentions, swears } from "./validator/swears.ts";
 import { type Tag, unwrap } from "./validator/tags.ts";
 import type {
@@ -91,6 +92,8 @@ function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
         hits: [],
       };
     }
+    const other = wrongPlayer(ctx, r, claim.text);
+    if (other) return { status: "wrong", reason: other, hits: [] };
     return agrees(ctx, r, claim.text)
       ? { status: "verified", reason: show(ctx, r), hits: [] }
       : { status: "wrong", reason: show(ctx, r), hits: [] };

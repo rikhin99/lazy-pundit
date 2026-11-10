@@ -271,9 +271,22 @@ describe("cue words pick the stat", () => {
     ["Their low is 70.02.", "70.02", "low"],
     ["982.81 points for on the year.", "982.81", "pf"],
     ["They're averaging 135.04 lately.", "135.04", "form3"],
+    ["They're averaging 122.85 per week.", "122.85", "ppg"],
+    ["They average 122.85 per game.", "122.85", "ppg"],
+    ["Averaging 122.85 on the year.", "122.85", "ppg"],
+    ["Averaging 135.04 over the last three.", "135.04", "form3"],
+    ["135.04 over their last three.", "135.04", "form3"],
+    ["Averaging 122.85 per game; the last three were rough.", "122.85", "ppg"],
     ["They've allowed 805.86.", "805.86", "pa"],
   ])("%s", (text, words, id) => {
     expect(only(3, text)).toEqual([[words, "verified", id]]);
+  });
+
+  test("a season average that's off is checked against ppg, not form", () => {
+    const r = validate(blurb(3, "They're averaging 118 per week."));
+    expect(r.claims.map((c) => [c.text, c.status, c.reason])).toEqual([
+      ["118", "wrong", "ppg is 122.85"],
+    ]);
   });
 
   test("the nearest cue wins: 'by' after 'scored'", () => {
@@ -294,6 +307,127 @@ describe("cue words pick the stat", () => {
   test("a number matching nothing is unchecked", () => {
     expect(only(3, "That's 4444 reasons to worry.")).toEqual([
       ["4444", "unchecked", undefined],
+    ]);
+  });
+});
+
+describe("the player a player fact names", () => {
+  // Bench Mob, week 8: top Jonathan Taylor 38.4, zeros Quentin Johnston,
+  // benchmiss Tyjae Spears 16.7, opp.top Tucker Kraft 31.8.
+  const checked = (text: string, team = 3) =>
+    validate(blurb(team, text)).claims.map((c) => [c.status, c.reason]);
+
+  test.each([
+    [
+      "[Bijan Robinson's 38.4]{ev=w8.top_points} carried them.",
+      "names Bijan Robinson, but w8.top is Jonathan Taylor",
+    ],
+    [
+      "[Bijan Robinson]{ev=w8.top} carried them.",
+      "names Bijan Robinson, but w8.top is Jonathan Taylor",
+    ],
+    [
+      "[DJ Moore put up 38.4]{ev=w8.top_points} for them.",
+      "names DJ Moore, but w8.top is Jonathan Taylor",
+    ],
+    [
+      "[DJ Moore]{ev=w8.top} carried them.",
+      "names DJ Moore, but w8.top is Jonathan Taylor",
+    ],
+    [
+      "[Travis Kelce]{ev=w8.zeros} gave them nothing.",
+      "names Travis Kelce, but w8.zeros is Quentin Johnston",
+    ],
+    [
+      "[Chase Brown's 16.7]{ev=w8.benchmiss_points} sat on the bench.",
+      "names Chase Brown, but w8.benchmiss is Tyjae Spears",
+    ],
+    [
+      "[38.4 from Spears]{ev=w8.top_points} carried them.",
+      "names Spears, but w8.top is Jonathan Taylor",
+    ],
+    [
+      "[Kittle]{ev=w8.opp.top} hurt them.",
+      "names Kittle, but w8.opp.top is Tucker Kraft",
+    ],
+    [
+      "[George Kittle's 31.8]{ev=w8.opp.top_points} hurt them.",
+      "names George Kittle, but w8.opp.top is Tucker Kraft",
+    ],
+  ])("naming another player is wrong: %s", (text, reason) => {
+    const r = validate(blurb(3, text));
+    expect(r.claims.map((c) => [c.status, c.reason])).toEqual([
+      ["wrong", reason],
+    ]);
+    expect(isHard(r.claims[0]?.status ?? "verified")).toBe(true);
+  });
+
+  test("another team's player fact names that team's ID", () => {
+    expect(
+      checked("[Bijan Robinson]{ev=sleeper:3/w8.top} went off.", 12),
+    ).toEqual([
+      [
+        "wrong",
+        "names Bijan Robinson, but sleeper:3/w8.top is Jonathan Taylor",
+      ],
+    ]);
+    expect(checked("[Taylor]{ev=sleeper:3/w8.top} went off.", 12)).toEqual([
+      ["verified", "sleeper:3/w8.top is Jonathan Taylor"],
+    ]);
+  });
+
+  test.each([
+    "[Jonathan Taylor's 38.4]{ev=w8.top_points} carried them.",
+    "[Taylor's 38.4]{ev=w8.top_points} carried them.",
+    "[38.4]{ev=w8.top_points} from their best starter.",
+    "[Jonathan Taylor]{ev=w8.top} carried them.",
+    "[Taylor]{ev=w8.top} carried them.",
+    "[Johnston]{ev=w8.zeros} gave them nothing.",
+    "[Spears' 16.7]{ev=w8.benchmiss_points} sat on the bench.",
+    "[Tucker Kraft]{ev=w8.opp.top} hurt them.",
+    "[Kraft's 31.8]{ev=w8.opp.top_points} hurt them.",
+    "[Bench Mob's Jonathan Taylor]{ev=w8.top} carried them.",
+    "[Bench Mob's 38.4]{ev=w8.top_points} from their best starter.",
+    "[Sunday's 38.4]{ev=w8.top_points} carried them.",
+    "[MVP Taylor]{ev=w8.top} carried them.",
+    "[Colts Jonathan Taylor]{ev=w8.top} carried them.",
+    "[RB Taylor]{ev=w8.top} carried them.",
+    "[The Bench Mob's 38.4]{ev=w8.top_points} from their best starter.",
+    "[The Mob's 38.4]{ev=w8.top_points} from their best starter.",
+    // a lone word no player in the pack holds is never read as a player
+    "[Indy's 38.4]{ev=w8.top_points} carried them.",
+    "[Robinson's 38.4]{ev=w8.top_points} carried them.",
+    "[38.4 against the Texans]{ev=w8.top_points} carried them.",
+  ])("naming the right player, or none, passes: %s", (text) => {
+    expect(checked(text)).toEqual([["verified", expect.any(String)]]);
+  });
+
+  test("a zero list holds each of its players", () => {
+    const pack = week8Evidence();
+    (pack.teams["sleeper:9"] as Record<string, string>)["w8.zeros"] =
+      "Jake Ferguson and Quentin Johnston";
+    const r = (text: string) =>
+      validate(blurb(9, text, { evidence: pack })).claims.map((c) => [
+        c.status,
+        c.reason,
+      ]);
+    expect(r("[Ferguson]{ev=w8.zeros} gave them nothing.")).toEqual([
+      ["verified", expect.any(String)],
+    ]);
+    expect(r("[Quentin Johnston]{ev=w8.zeros} gave them nothing.")).toEqual([
+      ["verified", expect.any(String)],
+    ]);
+    expect(r("[Travis Kelce]{ev=w8.zeros} gave them nothing.")).toEqual([
+      [
+        "wrong",
+        "names Travis Kelce, but w8.zeros is Jake Ferguson and Quentin Johnston",
+      ],
+    ]);
+  });
+
+  test("the right player with the wrong points is wrong on the points", () => {
+    expect(checked("[Taylor's 40]{ev=w8.top_points} carried them.")).toEqual([
+      ["wrong", "w8.top_points is 38.4"],
     ]);
   });
 });

@@ -2,6 +2,7 @@ import type { TeamId } from "../league.ts";
 import { playoffWant } from "./extract.ts";
 import { namesTeam } from "./names.ts";
 import { firstNum, hedgeBefore, numMatch } from "./numbers.ts";
+import { isPlayerName, namesFactPlayer } from "./players.ts";
 import type { Ctx, EvidenceValue, Kind, Resolved } from "./types.ts";
 
 // ---------- evidence ----------
@@ -40,6 +41,8 @@ export function kindOf(id: string, value: EvidenceValue): Kind {
   if (stat === "group") return "group";
   if (stat === "playoffs") return "playoffs";
   if (stat === "knocked_out") return "knocked_out";
+  // a player fact keeps its week (`w8.top`); `resolve` has dropped any team
+  if (isPlayerName(id)) return "player";
   return typeof value === "number" ? "number" : "text";
 }
 
@@ -130,6 +133,8 @@ export function agrees(ctx: Ctx, r: Resolved, words: string): boolean {
     case "knocked_out":
       // Cited, a bare "knocked out" is the bracket's.
       return playoffWant(t) === "eliminated" || /\bknocked out\b/.test(t);
+    case "player":
+      return namesFactPlayer(ctx, r, words);
     case "result": {
       const won = WIN_WORDS.test(t);
       const lost = LOSS_WORDS.test(t);

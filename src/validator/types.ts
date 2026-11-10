@@ -111,6 +111,7 @@ export type Kind =
   | "group"
   | "playoffs"
   | "knocked_out"
+  | "player"
   | "number"
   | "text";
 

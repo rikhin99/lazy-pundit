@@ -320,6 +320,20 @@ const ROWS: Record<number, Row> = {
 
 export const id = (n: number): TeamId => `sleeper:${n}`;
 
+/** Week 8's player facts for the teams whose blurbs test them, from `matchups/8`. */
+const PLAYER_FACTS: Record<number, Record<string, number | string>> = {
+  3: {
+    "w8.top": "Jonathan Taylor",
+    "w8.top_points": 38.4,
+    "w8.zeros": "Quentin Johnston",
+    "w8.benchmiss": "Tyjae Spears",
+    "w8.benchmiss_points": 16.7,
+    "w8.opp.top": "Tucker Kraft",
+    "w8.opp.top_points": 31.8,
+  },
+  9: { "w8.zeros": "Jake Ferguson" },
+};
+
 /** Lore nicknames a pundit might have written down, on top of name and manager. */
 const LORE_NICKNAMES: Record<number, string[]> = {
   1: ["Gus"],
@@ -352,6 +366,7 @@ export function week8Evidence(): EvidencePack {
       pa_rank: r.paRank,
       form3: r.form3,
       form_rank: r.formRank,
+      ppg: Math.round((r.pf / 8) * 100) / 100,
       luck: r.luck,
       standing: r.standing,
       "w8.points": r.points,
@@ -360,6 +375,7 @@ export function week8Evidence(): EvidencePack {
       "w8.result": r.result,
       "w8.opponent": id(r.opp),
       "w8.rank": r.weekRank,
+      ...PLAYER_FACTS[Number(n)],
     };
   }
   return {
@@ -417,7 +433,8 @@ export function blurb(
 
 /**
  * The pack after Sleeper corrects one team's week-8 score by `delta`, as a
- * refresh would see it: its points, margin, points for and form move, and so
+ * refresh would see it: its points, margin, points for, points per game and
+ * form move, and so
  * does its opponent's side.
  */
 export function corrected(team: number, delta: number): EvidencePack {
@@ -431,6 +448,7 @@ export function corrected(team: number, delta: number): EvidencePack {
   t["w8.points"] = r2((t["w8.points"] as number) + delta);
   t.pf = r2((t.pf as number) + delta);
   t.form3 = r2((t.form3 as number) + delta / 3);
+  t.ppg = r2((t.pf as number) / 8);
   o["w8.opp_points"] = t["w8.points"];
   o.pa = r2((o.pa as number) + delta);
   const margin = r2(Math.abs(t["w8.points"] - (t["w8.opp_points"] as number)));

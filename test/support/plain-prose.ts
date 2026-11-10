@@ -35,6 +35,13 @@ export const PLAIN_PROSE = [
   "Their WR1 got knocked out with a hamstring.",
   "Their QB got knocked out in the final minutes.",
   "A rookie knocked out in the first round of the draft.",
+  // average cues with no stat to pin (#69)
+  "The group chat averages a meltdown per week.",
+  "Over the last three weeks the vibes have been immaculate.",
+  "Below average, every single game.",
+  // player names outside any tag (#69)
+  "Bijan Robinson would have changed everything.",
+  "Taylor did his job, nobody else did.",
 ];
 
 /** Blurbs full of checkable claims, from the grounding-prototype scenarios. */

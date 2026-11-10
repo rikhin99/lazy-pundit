@@ -228,6 +228,27 @@ describe("the LLM gate", () => {
     expect(withoutReminder(result.problems)).toEqual([]);
   });
 
+  test("a player fact naming the wrong player fails the gate, and the complaint names the right one", async () => {
+    // The Hustle's week-8 zero was Jake Ferguson.
+    const wrong = "[Travis Kelce]{ev=w8.zeros} gave them nothing.";
+    const { dir, deps, llm } = await withLlm(
+      await withHustle(wrong),
+      `## {team=${HUSTLE}}\n[Jake Ferguson]{ev=w8.zeros} gave them nothing.`,
+    );
+
+    const result = await draft(dir, deps);
+
+    expect(llm.requests).toHaveLength(2);
+    expect(toRewrite(llm.requests[1])).toContain(
+      '"Travis Kelce" (cites w8.zeros): wrong, names Travis Kelce, but w8.zeros is Jake Ferguson',
+    );
+    const text = await readFile(result.path, "utf8");
+    expect(text).toContain(
+      "## Hail Mary Hustle {team=sleeper:9}\n[Jake Ferguson]{ev=w8.zeros} gave them nothing.\n",
+    );
+    expect(withoutReminder(result.problems)).toEqual([]);
+  });
+
   test("prose that never passes is written as its best attempt, with its faults flagged as gate failures", async () => {
     const { dir, deps, llm } = await withLlm(
       await withHustle(

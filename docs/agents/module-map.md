@@ -64,9 +64,10 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `plain-text.ts` | The plain text the league reads | `renderPlainText` |
 | `validator.ts` | The validator's entry: claims, auto-tags, swears and, under `noStakes`, stakes mentions for one blurb | `validate`, `applyAutoTags`, `stripTags`, `isHard` |
 | `validator/types.ts` | Validator input/output and `EvidencePack`, `OrderEvidence` types | types |
-| `validator/extract.ts` (510) | Splitting text into units and finding claim shapes, each with the week it reads (the one its clause names, else the ranking week) | `units` |
+| `validator/extract.ts` (519) | Splitting text into units and finding claim shapes, each with the week it reads (the one its clause names, else the ranking week) | `units` |
 | `validator/judge.ts` (350) | Deciding each claim's status and reason | `judge` |
 | `validator/evidence.ts` | Resolving an evidence ID; whether words agree with a fact | `resolve`, `agrees` |
+| `validator/players.ts` | The player a player fact (`w<N>.top`, `.zeros`, `.benchmiss`, `.opp.top` and their `_points`) names: a different player is wrong, naming both | `wrongPlayer`, `namesFactPlayer`, `isPlayerName`, `teamPrefix` (how a reason names another team's stat) |
 | `validator/tags.ts`, `validator/names.ts`, `validator/numbers.ts`, `validator/swears.ts` | Tag syntax and auto-tag writing, team-name matching, number words, the word list | `TAG`, `stripTags`, `applyAutoTags` (re-exported by `validator.ts`) |
 
 ## Tests (`test/`)

@@ -9,6 +9,7 @@ import {
 } from "./extract.ts";
 import { normalize } from "./names.ts";
 import { numMatch } from "./numbers.ts";
+import { teamPrefix } from "./players.ts";
 import type { ClaimStatus, Ctx, Resolved } from "./types.ts";
 
 // ---------- judging ----------
@@ -31,7 +32,7 @@ export function teamName(ctx: Ctx, team: TeamId): string {
 }
 
 export function show(ctx: Ctx, r: Resolved): string {
-  const who = r.team && r.team !== ctx.input.team ? `${r.team}/` : "";
+  const who = teamPrefix(ctx, r);
   const value =
     r.kind === "team" || r.kind === "teams"
       ? String(r.value)
