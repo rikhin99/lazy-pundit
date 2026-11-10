@@ -387,6 +387,9 @@ _Avoid_: Coaching efficiency, max points
 **Claim**:
 A checkable statement of fact in a blurb: a number, record, rank, streak, result or playoff status. Opinions and jokes are not claims.
 
+**Claim's team**:
+The team an untagged claim is about, and the team whose stats judge it: the section's team, unless another team is the subject of the claim's clause ("while Bench Mob sit at 7-1"). A team named as the object of a result ("lost to Bench Mob", "beat Bench Mob") isn't the claim's team, so a claim that fits only that team's stat is wrong, not verified.
+
 **Evidence pack**:
 The stats and order evidence the tool computes for each team and for the league for a week, each under an evidence ID. The LLM writes claims only from it, and the validator checks claims against it.
 
