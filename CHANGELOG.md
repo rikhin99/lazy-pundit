@@ -15,6 +15,7 @@ The first release, for Sleeper leagues.
 - `check` lists the draft's problems and auto-tags clear claims. Claims in the intro and blurbs, such as records, scores, matchups and playoff status (clinched, eliminated, knocked out), are checked against the evidence pack, and a claim that names a week ("in week 5") against that week's stats.
 - `refresh` refetches the league and recomputes the starting order and stats, leaving the pundit's order and words as they are. `--full` refetches every week.
 - `publish` checks the draft, asks before publishing over a hard problem, writes the frozen copy and the plain text, and copies the plain text to the clipboard.
+- `draft`, `check`, `refresh` and `publish` warn when a house rule's dollar or FAAB outcome has changed in place since the last published week, or a Log entry that week recorded has been changed or removed since; `setup stakes` gives the changed-outcome warning with its diff.
 - `stats` prints the demand-test summary from the pundit's published weeks, to paste to the builder. Nothing is sent anywhere.
 - `doctor` checks Node, the config and credentials, and each workspace.
 - `transcripts delete` removes the workspace's LLM transcripts.

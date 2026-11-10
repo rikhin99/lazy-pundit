@@ -6,10 +6,12 @@ import {
   COMMON_HOUSE_RULES,
   checkLeague,
   type Deps,
+  draft,
   type HandEdit,
   linkedHandles,
   proposedHandles,
   proposedNicknames,
+  publish,
   rerunLeague,
   rerunPreselections,
   rerunStep,
@@ -250,6 +252,34 @@ test("setup stakes keeps league.md's body, and the diff shows the hand edits the
   const after = await readFile(path, "utf8");
   expect(after).toMatch(/Bo paid up\.\n$/);
   expect((await loadLeagueFile(ws)).familyLeague).toBe(true);
+});
+
+test("setup stakes gives the changed-outcome warning for an outcome changed since the last published week, with the diff it confirms", async () => {
+  const rule = COMMON_HOUSE_RULES[0];
+  if (!rule) throw new Error("no common house rule");
+  const paying = (outcome: string) => ({
+    familyLeague: false,
+    stakes: { buyIn: 50, payouts: ["100%"], houseRules: [{ rule, outcome }] },
+  });
+  const { deps, dir } = await setUp({ stakes: paying("$10") });
+  await draft(dir, deps);
+  await publish(dir, deps, { yes: true });
+  const warning = `league.md: ${rule.name} (${rule.id}) pays $20, not the $10 it paid at week 8: winnings to date count $20 for every week. To keep $10 for earlier weeks, split the rule with until: and from:.`;
+  const step: StepRerun = { step: "stakes", stakes: paying("$20") };
+
+  // Declined, the file keeps $10, so nothing's said once the confirm is done.
+  const declined = await rerun(deps, dir, step, false);
+  expect(declined.shown.map((s) => s.warnings)).toEqual([[warning]]);
+  expect(declined.warnings).toEqual([]);
+
+  const confirmed = await rerun(deps, dir, step);
+  expect(confirmed.shown.map((s) => s.warnings)).toEqual([[warning]]);
+  expect(confirmed.warnings).toEqual([warning]);
+
+  // league.md already holds these answers, so no confirm is asked.
+  const again = await rerun(deps, dir, step);
+  expect(again).toMatchObject({ shown: [], written: false });
+  expect(again.warnings).toEqual([warning]);
 });
 
 test("setup stakes refuses answers whose league.md wouldn't load, writing nothing", async () => {

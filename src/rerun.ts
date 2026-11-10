@@ -31,8 +31,11 @@ import { type LeagueType, loadLore } from "./lore.ts";
 import { type PresetName, personaPath } from "./persona.ts";
 import type { PowerScoreMethod } from "./power-score.ts";
 import { punditSettingsPath } from "./pundit-settings.ts";
+import { lastPublishedMeta } from "./ranking-file.ts";
+import { leagueFileChangeWarnings, type Stakes } from "./stakes.ts";
 import {
   type LeagueStep,
+  rankingsDir,
   readWorkspace,
   type SetupStatus,
   type Workspace,
@@ -71,6 +74,8 @@ export interface HandEdit {
   file: string;
   /** Line by line: `-` the file's line, `+` the step's, ` ` around them. */
   diff: string;
+  /** What overwriting means for the published weeks, such as a changed-outcome warning. */
+  warnings: string[];
 }
 
 /** Whether `step` names a step `setup <step>` re-runs. */
@@ -126,6 +131,7 @@ export async function rerunStep(
   const before = await readIfAny(file.path);
   const outcome = await overwrite(file, confirm);
   if (outcome === "declined") return { written: false, warnings: [] };
+  const warnings = file.warnings ?? [];
   try {
     await setStatus(ws, rerun.step, file.status);
   } catch (err) {
@@ -140,7 +146,7 @@ export async function rerunStep(
     }
     throw err;
   }
-  return { written: outcome === "written", warnings: [] };
+  return { written: outcome === "written", warnings };
 }
 
 /**
@@ -205,6 +211,8 @@ interface StepFile {
   placeholder: string;
   versionKey: VersionKey;
   status: SetupStatus;
+  /** What writing the text means for the published weeks, shown with any confirm. */
+  warnings?: string[];
 }
 
 /** The file a workspace step writes from its answers, checked before it's written. */
@@ -239,12 +247,13 @@ async function stepFile(
         rerun.stakes?.familyLeague ??
         (await familyLeague(ws).catch(() => false));
       let text: string;
+      let stakes: Stakes;
       try {
         text = withBodyOf(
           current,
           leagueText(ws.season.year, rerun.stakes, family),
         );
-        readLeagueFile(text, ws.handles);
+        stakes = readLeagueFile(text, ws.handles).stakes;
       } catch (err) {
         if (!(err instanceof WorkspaceFileError)) throw err;
         throw new SetupRefusal(
@@ -257,6 +266,11 @@ async function stepFile(
         placeholder: leagueText(ws.season.year, undefined),
         versionKey: "league",
         status: rerun.stakes ? "done" : "skipped",
+        // As a load of the new league.md would say, against the latest frozen copy.
+        warnings: leagueFileChangeWarnings(
+          stakes,
+          await lastPublishedMeta(rankingsDir(ws), Number.POSITIVE_INFINITY),
+        ),
       };
     }
     case "method":
@@ -341,7 +355,7 @@ async function unlinkedLore(
  * anything but the placeholder is overwritten only if `confirm` says so.
  */
 async function overwrite(
-  file: Pick<StepFile, "path" | "text" | "versionKey"> & {
+  file: Pick<StepFile, "path" | "text" | "versionKey" | "warnings"> & {
     placeholder?: string;
   },
   confirm: (edit: HandEdit) => Promise<boolean>,
@@ -351,7 +365,11 @@ async function overwrite(
   if (
     current !== undefined &&
     current !== file.placeholder &&
-    !(await confirm({ file: file.path, diff: lineDiff(current, file.text) }))
+    !(await confirm({
+      file: file.path,
+      diff: lineDiff(current, file.text),
+      warnings: file.warnings ?? [],
+    }))
   ) {
     return "declined";
   }

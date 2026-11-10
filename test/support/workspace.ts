@@ -293,12 +293,16 @@ export async function published(dir: string, deps: Deps) {
 }
 
 /**
- * A frozen copy's text without the two publish-record lines every publish
- * adds after `edition` (`first_published_at`, `blurb_problems`), so a test of
- * what else the frozen copy keeps compares with the draft's text.
+ * A frozen copy's text without the three publish-record lines every publish
+ * adds after `edition` (`first_published_at`, `blurb_problems`,
+ * `log_entries`), so a test of what else the frozen copy keeps compares with
+ * the draft's text.
  */
 export function withoutPublishRecord(text: string): string {
-  return text.replace(/^(?:first_published_at|blurb_problems): .*\r?\n/gm, "");
+  return text.replace(
+    /^(?:first_published_at|blurb_problems|log_entries): .*\r?\n/gm,
+    "",
+  );
 }
 
 /**

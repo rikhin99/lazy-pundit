@@ -24,14 +24,23 @@ import {
   orderEvidence,
 } from "./movement.ts";
 import { isSmallSample } from "./power-score.ts";
-import { checkOrder, parseRanking, type RankingFile } from "./ranking-file.ts";
+import {
+  checkOrder,
+  lastPublishedMeta,
+  parseRanking,
+  type RankingFile,
+} from "./ranking-file.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import {
   readSnapshot,
   type Snapshot,
   SnapshotDamagedError,
 } from "./snapshot.ts";
-import { type Stakes, stakesWarnings } from "./stakes.ts";
+import {
+  leagueFileChangeWarnings,
+  type Stakes,
+  stakesWarnings,
+} from "./stakes.ts";
 import {
   applyAutoTags,
   type ClaimStatus,
@@ -232,6 +241,7 @@ export async function checkDraft(
       ...clashWarnings,
       ...leagueFileWarnings,
       ...stakesWarnings(stakes, league),
+      ...leagueFileChangeWarnings(stakes, await lastPublishedMeta(dir, week)),
     ],
     stem,
     dir,

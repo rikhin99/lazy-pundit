@@ -296,7 +296,7 @@ describe("publish", () => {
     });
     // The draft verbatim, plus its publish record at the end of the front matter.
     expect(frozen).toContain(
-      "\nedition: 1\nfirst_published_at: 2025-10-28T15:00:00.000Z\nblurb_problems: {hard: 0, soft: 0}\n---\n",
+      "\nedition: 1\nfirst_published_at: 2025-10-28T15:00:00.000Z\nblurb_problems: {hard: 0, soft: 0}\nlog_entries: []\n---\n",
     );
     expect(
       withoutPublishRecord(frozen).replace("edition: 1\n---\n", "---\n"),

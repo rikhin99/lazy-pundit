@@ -11,6 +11,7 @@ import {
 import type { League, TeamId } from "./league.ts";
 import { personaRecordSchema } from "./persona.ts";
 import { powerScoreRecordSchema } from "./power-score.ts";
+import type { RecordedLogEntry } from "./stakes.ts";
 
 /**
  * A ranking file: a draft (`week-NN.md`) or its frozen copy
@@ -69,8 +70,9 @@ export const metaSchema = z.object({
   /** The persona the draft was written in. */
   persona: personaRecordSchema,
   /**
-   * Each house rule's outcome when the draft began, by rule ID, so the next
-   * week's draft can warn about an outcome changed in place.
+   * Each house rule's outcome by rule ID, when the draft began and, in a
+   * frozen copy, as it stood at the last publish, so a later load can warn
+   * about an outcome changed in place.
    */
   house_rule_outcomes: z.record(z.string(), z.string()).optional(),
   created_at: z.string(),
@@ -84,6 +86,20 @@ export const metaSchema = z.object({
       hard: z.number().int().nonnegative(),
       soft: z.number().int().nonnegative(),
     })
+    .optional(),
+  /**
+   * A frozen copy's record of `league.md`'s Log entries for its week and
+   * earlier, taken on each publish, so a later load can warn of one changed or
+   * removed since. A frozen copy from before it has none, and gives no warning.
+   */
+  log_entries: z
+    .array(
+      z.object({
+        week: z.number().int().positive(),
+        rule: z.string().optional(),
+        text: z.string(),
+      }),
+    )
     .optional(),
 });
 
@@ -134,17 +150,41 @@ export async function lastPublished(
   }
 }
 
+/**
+ * The front matter of the season's newest frozen copy of a week up to and
+ * including `through`, which `league.md`'s load warnings compare with. None
+ * before the first publish, or when that frozen copy can't be read: it then
+ * gives no warning rather than stopping the command.
+ */
+export async function lastPublishedMeta(
+  dir: string,
+  through: number,
+): Promise<{ week: number; meta: RankingMeta } | undefined> {
+  try {
+    const last = await lastPublished(dir, through + 1);
+    return last && { week: last.week, meta: last.ranking.meta };
+  } catch (error) {
+    if (error instanceof WorkspaceFileError) return undefined;
+    throw error;
+  }
+}
+
 /** What a frozen copy records of its publish, beside the draft's front matter. */
 export interface PublishRecord {
   edition: number;
   firstPublishedAt: string;
   blurbProblems: BlurbProblems;
+  /** The Log entries for the week and earlier, as `league.md` holds them now. */
+  logEntries: RecordedLogEntry[];
+  /** Each house rule's outcome now, when it isn't what the draft recorded. */
+  houseRuleOutcomes?: Record<string, string>;
 }
 
 /**
  * A frozen copy of a checked draft's `text`: the same text, word for word, with
  * only the publish record's lines (`edition`, `first_published_at`,
- * `blurb_problems`) added or changed.
+ * `blurb_problems`, `log_entries`, and `house_rule_outcomes` when an outcome
+ * changed since the draft) added or changed.
  */
 export function frozenCopy(
   file: string,
@@ -159,12 +199,26 @@ export function frozenCopy(
     "first_published_at",
     record.firstPublishedAt,
   );
-  return setFrontMatterValue(
+  const withProblems = setFrontMatterValue(
     file,
     withFirst,
     "blurb_problems",
     record.blurbProblems,
   );
+  const withLog = setFrontMatterValue(
+    file,
+    withProblems,
+    "log_entries",
+    record.logEntries,
+  );
+  return record.houseRuleOutcomes
+    ? setFrontMatterValue(
+        file,
+        withLog,
+        "house_rule_outcomes",
+        record.houseRuleOutcomes,
+      )
+    : withLog;
 }
 
 /** What a new draft's sections hold: the week intro and each team's blurb. */

@@ -17,6 +17,9 @@
 #   family          a family league type, so the family league and Family persona are preselected
 #   setup-lore      every default into <home>/ws, a hand edit to lore.md, then setup lore
 #                   declined at the diff and run again confirmed
+#   setup-stakes    the stakes scenario into <home>/ws, week 8 drafted and published,
+#                   then setup stakes paying $20, whose changed-outcome warning
+#                   shows before the confirm
 #
 # It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
 # with the wizard's code. Look in that home for what the wizard wrote. A new
@@ -31,8 +34,8 @@ set cancelled {bad-id cancel cancel-folder another}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another stakes family setup-lore}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|stakes|family|setup-lore"
+if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another stakes family setup-lore setup-stakes}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|stakes|family|setup-lore|setup-stakes"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -113,7 +116,7 @@ need "Workspace folder"
 if {$scenario eq "cancel-folder"} { send $CTRL_C; finish }
 if {$scenario eq "folder"} {
   send "$folder\r"
-} elseif {$scenario eq "setup-lore"} {
+} elseif {$scenario in {setup-lore setup-stakes}} {
   send "$home/ws\r"
 } else {
   send "\r"
@@ -143,7 +146,9 @@ need "nicknames each team"
 send "\r"
 
 need "bragging rights"
-if {$scenario eq "stakes"} {
+# Money at stake: buy-in 50, the default payouts, a weekly high score paying `outcome`.
+proc money {outcome} {
+  global DOWN
   send $DOWN; after 200; send "\r"
   need "Buy-in"
   send "50\r"
@@ -152,7 +157,10 @@ if {$scenario eq "stakes"} {
   need "house rules"
   send " "; after 200; send "\r"
   need "its outcome"
-  send "\$10\r"
+  send "$outcome\r"
+}
+if {$scenario in {stakes setup-stakes}} {
+  money "\$10"
 } else {
   send "\r"
 }
@@ -188,10 +196,25 @@ if {$scenario eq "another"} {
   finish
 }
 send "\r"
-if {$scenario ne "setup-lore"} { finish }
+if {$scenario ni {setup-lore setup-stakes}} { finish }
 
 expect eof
 wait
+if {$scenario eq "setup-stakes"} {
+  cd "$home/ws"
+  exec node "$repo/src/cli.ts" draft 2>@1
+  exec node "$repo/src/cli.ts" publish --yes 2>@1
+  spawn node "$repo/src/cli.ts" setup stakes
+  need "bragging rights"
+  money "\$20"
+  need "family league"
+  send "\r"
+  need "pays \$20, not the \$10 it paid at week 8"
+  need "Overwrite"
+  send "y"; after 200; send "\r"
+  need "stakes set"
+  finish
+}
 set lore [open "$home/ws/lore.md" a]
 puts $lore "\n## Running jokes\n\n- The trade that never was."
 close $lore

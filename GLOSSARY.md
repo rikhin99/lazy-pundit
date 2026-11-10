@@ -213,7 +213,7 @@ The buy-in times the number of teams. Payouts are stated as amounts or shares of
 What one final place wins: an amount or a share of the pot. Winner takes all unless the stakes say otherwise.
 
 **House rule**:
-A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words), optionally its spirit (whether it is meant seriously or as a joke), and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize. `from:` and `until:` weeks limit a rule, so splitting a rule in two keeps the old outcome for earlier weeks, while changing an outcome in place recomputes winnings to date as if it had always applied, with a warning.
+A rule the league runs on top of the platform: a name, an outcome (money, FAAB or anything written in words), optionally its spirit (whether it is meant seriously or as a joke), and, optionally, a trigger the tool can work out, such as the week's low score. Every tied team triggers a rule, and the tool counts how often each team has triggered it but never splits a prize. `from:` and `until:` weeks limit a rule, so splitting a rule in two keeps the old outcome for earlier weeks, while changing an outcome in place recomputes winnings to date as if it had always applied, with a changed-outcome warning.
 _Avoid_: Side bet, punishment (for the whole thing)
 
 **Trigger**:
@@ -230,7 +230,13 @@ _Avoid_: Bench points
 A week in which named pairs of managers are meant to face each other. A pairing names managers, not teams, and counts only if the platform's schedule really matches them that week.
 
 **Log entry**:
-A dated record of something that happened under the stakes in a given week, such as a fine issued or how a punishment turned out. It belongs to one season, and the prose uses it only around the week it happened unless the pundit pins it.
+A dated record of something that happened under the stakes in a given week, such as a fine issued or how a punishment turned out. It belongs to one season, and the prose uses it only around the week it happened unless the pundit pins it. The Log is only appended to: each frozen copy records the entries for its week and earlier.
+
+**Changed-outcome warning**:
+What loading `league.md` says when a house rule's dollar or FAAB outcome differs from the one the last published week recorded: winnings to date now count the new outcome for every week, and splitting the rule with `until:` and `from:` keeps the old one for earlier weeks. `setup stakes` gives it with its diff. Publishing again records the outcomes as they then stand. It changes nothing.
+
+**Log-edit warning**:
+What loading `league.md` says when a Log entry the last published week's frozen copy recorded has been changed or removed since, naming the entry. Appending an entry, or pinning one later, gives none. Publishing again records the Log as it then stands. It changes nothing.
 
 **Stakes section**:
 One headed part of the free-text rules a season's stakes hold beside the structured ones. A sentence that uses one cites the section's name, and the validator checks only that the section exists.

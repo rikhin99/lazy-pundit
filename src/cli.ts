@@ -847,13 +847,15 @@ program
     const dir = await workspace(deps);
     intro(`Lazy Pundit setup ${step}`);
     const rerun = await askRerun(deps, dir, step);
-    const { written, warnings } = await rerunStep(
-      deps,
-      dir,
-      rerun,
-      confirmOverwrite,
-    );
-    for (const warning of warnings) log.warn(warning);
+    let confirmed: string[] = [];
+    const { written, warnings } = await rerunStep(deps, dir, rerun, (edit) => {
+      confirmed = edit.warnings;
+      return confirmOverwrite(edit);
+    });
+    // A confirm already showed its warnings, with the diff.
+    for (const warning of warnings) {
+      if (!confirmed.includes(warning)) log.warn(warning);
+    }
     outro(written ? `${step} set.` : `${step} left as it was.`);
   });
 
@@ -904,6 +906,7 @@ async function confirmOverwrite(edit: HandEdit): Promise<boolean> {
   log.warn(
     `${shown(edit.file)} differs from what this step writes (- the file, + the step):\n${edit.diff}`,
   );
+  for (const warning of edit.warnings) log.warn(warning);
   return answered(
     await confirm({
       message: `Overwrite ${shown(edit.file)}?`,

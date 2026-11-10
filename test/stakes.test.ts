@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
@@ -6,6 +6,7 @@ import {
   type Deps,
   draft,
   publish,
+  refresh,
   WorkspaceFileError,
 } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
@@ -15,10 +16,12 @@ import {
   FEAR_THE_TURTLE_ID,
   fearTheTurtle,
   fixedClock,
+  frontMatter,
   patchingTransport,
   published,
   rankingsDir,
   statCorrection,
+  withoutPublishRecord,
 } from "./support/workspace.ts";
 
 const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
@@ -68,6 +71,11 @@ async function drafted(week: number, fields: string, deps?: (d: Deps) => Deps) {
   );
   const text = await readFile(path, "utf8");
   return { ...ws, deps: d, result, path, text };
+}
+
+/** The frozen copy beside a draft at `path`. */
+function publishedPathOf(ws: { path: string }): string {
+  return ws.path.replace(/\.md$/, ".published.md");
 }
 
 /** The draft's line right after `heading`. */
@@ -472,6 +480,69 @@ describe("a changed outcome", () => {
     );
   });
 
+  test("check, publish and refresh give the same warning, and still run", async () => {
+    const ws = await drafted(7, `house-rules:\n${highScore("$10")}`);
+    await published(ws.dir, ws.deps);
+    const deps = atWeek(ws.deps, 8);
+    await draft(ws.dir, deps);
+    await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
+    const warning =
+      "league.md: Weekly high score (high-score) pays $20, not the $10 it paid at week 7: winnings to date count $20 for every week. To keep $10 for earlier weeks, split the rule with until: and from:.";
+
+    expect((await check(ws.dir, deps)).warnings).toContainEqual(warning);
+    expect((await refresh(ws.dir, deps)).warnings).toContainEqual(warning);
+    // The claims citing the winnings are now wrong, so publish asks first.
+    const result = await publish(ws.dir, deps, { yes: true });
+    expect(result.published).toBe(true);
+    expect(result.warnings).toContainEqual(warning);
+  });
+
+  test("after the week is published, the warning compares with its own frozen copy", async () => {
+    const ws = await drafted(8, `house-rules:\n${highScore("$10")}`);
+    await published(ws.dir, ws.deps);
+    await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
+
+    expect((await check(ws.dir, ws.deps)).warnings).toContainEqual(
+      expect.stringContaining("not the $10 it paid at week 8"),
+    );
+  });
+
+  test("outcomes unchanged since the draft leave its house_rule_outcomes lines as they are", async () => {
+    const ws = await drafted(8, `house-rules:\n${highScore("$10")}`);
+    expect(ws.text).toContain("house_rule_outcomes");
+    await published(ws.dir, ws.deps);
+
+    const copy = await readFile(publishedPathOf(ws), "utf8");
+
+    expect(withoutPublishRecord(copy).replace("edition: 1\n", "")).toBe(
+      ws.text,
+    );
+  });
+
+  test("publishing again records the outcomes as they then stand", async () => {
+    const ws = await drafted(8, `house-rules:\n${highScore("$10")}`);
+    await published(ws.dir, ws.deps);
+    await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
+    await publish(ws.dir, ws.deps, { yes: true });
+
+    const { warnings } = await check(ws.dir, ws.deps);
+
+    expect(warnings.filter((w) => /pays/.test(w))).toEqual([]);
+    const copy = frontMatter(await readFile(publishedPathOf(ws), "utf8"));
+    expect(copy.house_rule_outcomes).toEqual({ "high-score": "$20" });
+  });
+
+  test("a frozen copy of the week that can't be read gives no warning and no error", async () => {
+    const ws = await drafted(8, `house-rules:\n${highScore("$10")}`);
+    const { publishedPath } = await published(ws.dir, ws.deps);
+    await writeFile(publishedPath, "not a ranking\n");
+    await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
+
+    const { warnings } = await check(ws.dir, ws.deps);
+
+    expect(warnings.filter((w) => /pays/.test(w))).toEqual([]);
+  });
+
   test("a rule split with from: and until: isn't a change in place", async () => {
     const ws = await drafted(7, `house-rules:\n${highScore("$10")}`);
     await published(ws.dir, ws.deps);
@@ -571,6 +642,122 @@ describe("league.md's body", () => {
         /^league\.md line \d+ is above the first ## heading/,
       ),
     );
+  });
+});
+
+describe("the Log is only appended to", () => {
+  const FIELDS = `house-rules:\n${highScore()}`;
+  /** Week 7 published with `BODY`'s Log, then `league.md`'s body set to `body`. */
+  async function publishedThenEdited(body: string) {
+    const ws = await stakesDraft({ week: 7, fields: FIELDS, body: BODY });
+    const result = await published(ws.dir, ws.deps);
+    await writeLeagueFile(ws.dir, FIELDS, body);
+    return { ...ws, publishedPath: result.publishedPath };
+  }
+  const logEdits = (warnings: string[]) =>
+    warnings.filter((w) => w.includes("Log entry"));
+
+  test("a published week's Log entry edited after it was published gives a warning naming it", async () => {
+    const ws = await publishedThenEdited(
+      BODY.replace("The Rascals cashed in.", "The Rascals cashed in twice."),
+    );
+
+    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([
+      'league.md: the Log entry {week=5}{rule=high-score} "The Rascals cashed in." was changed or removed after week 7 was published, so what that week could cite no longer stands as it was. The Log is only appended to: put the entry back as it was and write any change as a new entry, or publish to record the Log as it now stands.',
+    ]);
+  });
+
+  test("a removed Log entry warns too, as do check, publish and refresh", async () => {
+    const ws = await publishedThenEdited(
+      BODY.replace("- {week=7} Bo was fined for a late lineup.\n", ""),
+    );
+    const deps = atWeek(ws.deps, 8);
+    await draft(ws.dir, deps);
+    const named = [
+      expect.stringContaining(
+        'the Log entry {week=7} "Bo was fined for a late lineup." was changed or removed after week 7',
+      ),
+    ];
+
+    expect(logEdits((await check(ws.dir, deps)).warnings)).toEqual(named);
+    expect(logEdits((await refresh(ws.dir, deps)).warnings)).toEqual(named);
+    expect(
+      logEdits((await publish(ws.dir, deps, { yes: true })).warnings),
+    ).toEqual(named);
+  });
+
+  test("the draft after it warns as well", async () => {
+    const ws = await publishedThenEdited(
+      BODY.replace("- {week=7} Bo was fined for a late lineup.\n", ""),
+    );
+
+    const result = await draft(ws.dir, atWeek(ws.deps, 8));
+
+    expect(logEdits(result.warnings)).toEqual([
+      expect.stringContaining('the Log entry {week=7} "Bo was fined'),
+    ]);
+  });
+
+  test("a week drafted again after it was published compares with its own frozen copy, as check does", async () => {
+    const ws = await publishedThenEdited(
+      BODY.replace("The Rascals cashed in.", "The Rascals cashed in twice."),
+    );
+    await rm(ws.path);
+
+    const result = await draft(ws.dir, ws.deps);
+
+    expect(logEdits(result.warnings)).toEqual([
+      expect.stringContaining("after week 7 was published"),
+    ]);
+  });
+
+  test("a new entry appended, or an entry pinned later, gives no warning", async () => {
+    const ws = await publishedThenEdited(
+      `${BODY.replace("{week=7} Bo", "{week=7}{pinned} Bo")}- {week=6} Wendy paid up late.\n`,
+    );
+
+    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([]);
+  });
+
+  test("an entry for a week after the published one isn't recorded, so editing it gives no warning", async () => {
+    const ws = await publishedThenEdited(
+      BODY.replace("Gus collected.", "Gus collected, eventually."),
+    );
+
+    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([]);
+  });
+
+  test("removing one of two identical entries warns once", async () => {
+    const twice = "- {week=7} Bo was fined for a late lineup.\n";
+    const ws = await stakesDraft({
+      week: 7,
+      fields: FIELDS,
+      body: BODY.replace(twice, `${twice}${twice}`),
+    });
+    await published(ws.dir, ws.deps);
+    await writeLeagueFile(ws.dir, FIELDS, BODY);
+
+    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toHaveLength(1);
+  });
+
+  test("publishing again records the Log as it then stands", async () => {
+    const ws = await publishedThenEdited(
+      BODY.replace("The Rascals cashed in.", "The Rascals cashed in twice."),
+    );
+    await publish(ws.dir, ws.deps, { yes: true });
+
+    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([]);
+  });
+
+  test("a frozen copy published before the Log was recorded loads with no Log warning", async () => {
+    const ws = await publishedThenEdited("## Log\n");
+    const text = await readFile(ws.publishedPath, "utf8");
+    expect(text).toMatch(/^log_entries: /m);
+    await writeFile(ws.publishedPath, text.replace(/^log_entries: .*\n/m, ""));
+
+    const { warnings } = await check(ws.dir, ws.deps);
+
+    expect(logEdits(warnings)).toEqual([]);
   });
 });
 

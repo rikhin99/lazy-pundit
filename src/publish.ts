@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { checkDraft, isBlurbProblem, type Problem } from "./check.ts";
+import {
+  type CheckedDraft,
+  checkDraft,
+  isBlurbProblem,
+  type Problem,
+} from "./check.ts";
 import type { Deps } from "./deps.ts";
 import { rawFrontMatterValue, WorkspaceFileError } from "./front-matter.ts";
 import type { PersonaRecord } from "./persona.ts";
@@ -14,6 +19,7 @@ import {
   type RankingMeta,
 } from "./ranking-file.ts";
 import { freshDataWarnings } from "./refresh.ts";
+import { houseRuleOutcomes, logRecord } from "./stakes.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -112,12 +118,7 @@ export async function publish(
     }
   }
 
-  const record = publishRecord(
-    ownCopy,
-    checked.ranking.meta.created_at,
-    deps.clock.now(),
-    problems,
-  );
+  const record = publishRecord(ownCopy, checked, deps.clock.now());
   await writeWorkspaceFile(
     publishedPath,
     frozenCopy(name, checked.text, record),
@@ -187,16 +188,19 @@ interface LastEdition {
  * The publish record of a new edition after `last`: edition 1 on the week's
  * first publish, else one more than the last, keeping the last edition's first
  * publish time when it froze the same draft (`createdAt`): a draft made again
- * after the week was published starts its own.
+ * after the week was published starts its own. The Log entries and house
+ * rules' outcomes are taken fresh, as `league.md` stands now, so a later load
+ * warns only of what changed after this publish.
  */
 function publishRecord(
   last: LastEdition | undefined,
-  createdAt: string,
+  checked: CheckedDraft,
   now: Date,
-  problems: Problem[],
 ): PublishRecord {
-  const blurb = problems.filter(isBlurbProblem);
-  const sameDraft = last?.meta?.created_at === createdAt;
+  const { meta } = checked.ranking;
+  const blurb = checked.problems.filter(isBlurbProblem);
+  const sameDraft = last?.meta?.created_at === meta.created_at;
+  const outcomes = houseRuleOutcomes(checked.stakes);
   return {
     edition: last === undefined ? 1 : last.edition + 1,
     firstPublishedAt:
@@ -205,5 +209,11 @@ function publishRecord(
       hard: blurb.filter((p) => p.severity === "hard").length,
       soft: blurb.filter((p) => p.severity === "soft").length,
     },
+    logEntries: logRecord(checked.stakes, checked.week),
+    // Left as the draft wrote it when unchanged, so the line stays as it is.
+    ...(outcomes &&
+      !isDeepStrictEqual(outcomes, meta.house_rule_outcomes) && {
+        houseRuleOutcomes: outcomes,
+      }),
   };
 }

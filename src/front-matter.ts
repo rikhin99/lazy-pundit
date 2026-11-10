@@ -53,8 +53,12 @@ function setKeyLine(
   return `${text.slice(0, end)}${eol}${line}${text.slice(end)}`;
 }
 
-/** A value `setFrontMatterValue` can write: text, a list of text, or a map of plain values. */
-export type FrontMatterValue = string | string[] | Record<string, unknown>;
+/** A value `setFrontMatterValue` can write: text, a list of text, a map of plain values, or a list of such maps. */
+export type FrontMatterValue =
+  | string
+  | string[]
+  | Record<string, unknown>
+  | Record<string, unknown>[];
 
 /**
  * Sets one top-level key's value in a file's front matter, leaving every other

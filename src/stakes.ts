@@ -358,7 +358,7 @@ export function houseRuleOutcomes(
  * outcomes `earlier` recorded at `week`: winnings to date count the new
  * outcome for every week.
  */
-export function changedOutcomeWarnings(
+function changedOutcomeWarnings(
   stakes: Stakes,
   earlier: Record<string, string> | undefined,
   week: number,
@@ -375,6 +375,67 @@ export function changedOutcomeWarnings(
       `league.md: ${r.name} (${r.id}) pays ${now}, not the ${was} it paid at week ${week}: winnings to date count ${now} for every week. To keep ${was} for earlier weeks, split the rule with until: and from:.`,
     ];
   });
+}
+
+/** One Log entry as a frozen copy records it: what a later change is measured by. */
+export type RecordedLogEntry = {
+  week: number;
+  rule?: string | undefined;
+  text: string;
+};
+
+/** The Log entries for `week` and earlier, for a frozen copy of `week` to record. */
+export function logRecord(stakes: Stakes, week: number): RecordedLogEntry[] {
+  if (stakes.kind !== "recorded") return [];
+  return stakes.log
+    .filter((e) => e.week <= week)
+    .map((e) => ({
+      week: e.week,
+      ...(e.rule !== undefined && { rule: e.rule }),
+      text: e.text,
+    }));
+}
+
+/**
+ * What loading `league.md` says against the last published week's frozen
+ * copy: the changed-outcome warnings, then a Log-edit warning for each Log
+ * entry it recorded that's no longer in the Log as it was. Pinning an entry
+ * later, or appending one, changes nothing it recorded. None before the first
+ * publish, and no Log-edit warning from a frozen copy with no Log record.
+ */
+export function leagueFileChangeWarnings(
+  stakes: Stakes,
+  published:
+    | {
+        week: number;
+        meta: {
+          house_rule_outcomes?: Record<string, string> | undefined;
+          log_entries?: RecordedLogEntry[] | undefined;
+        };
+      }
+    | undefined,
+): string[] {
+  if (!published) return [];
+  const { week, meta } = published;
+  // Each entry in the Log now matches at most one recorded entry.
+  const now = logRecord(stakes, Number.POSITIVE_INFINITY).map(logKey);
+  const gone = (meta.log_entries ?? []).filter((e) => {
+    const at = now.indexOf(logKey(e));
+    if (at < 0) return true;
+    now.splice(at, 1);
+    return false;
+  });
+  return [
+    ...changedOutcomeWarnings(stakes, meta.house_rule_outcomes, week),
+    ...gone.map(
+      (e) =>
+        `league.md: the Log entry {week=${e.week}}${e.rule === undefined ? "" : `{rule=${e.rule}}`} "${e.text}" was changed or removed after week ${week} was published, so what that week could cite no longer stands as it was. The Log is only appended to: put the entry back as it was and write any change as a new entry, or publish to record the Log as it now stands.`,
+    ),
+  ];
+}
+
+function logKey(e: RecordedLogEntry): string {
+  return JSON.stringify([e.week, e.rule ?? null, e.text]);
 }
 
 /** One house rule's trigger winners that changed between two leagues' data. */

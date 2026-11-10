@@ -50,13 +50,18 @@ import {
 } from "./prices.ts";
 import { FIRST_DRAFT_SYSTEM, firstDraftPrompt, loreBlock } from "./prompt.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
-import { type DraftProse, lastPublished, renderDraft } from "./ranking-file.ts";
+import {
+  type DraftProse,
+  lastPublished,
+  lastPublishedMeta,
+  renderDraft,
+} from "./ranking-file.ts";
 import { dataChangedWarning, fetchOrContinue } from "./refresh.ts";
 import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
 import {
-  changedOutcomeWarnings,
   houseRuleOutcomes,
+  leagueFileChangeWarnings,
   sentStakes,
   stakesSectionNames,
   stakesWarnings,
@@ -131,7 +136,7 @@ export async function draft(
   const path = join(dir, `${weekStem(week)}.md`);
   // Before the snapshot, the LLM call and a draft in the way, which would
   // hide it: an earlier frozen copy that can't be read stops the draft here.
-  const earlier = await lastPublished(dir, week);
+  await lastPublished(dir, week);
   // Before the snapshot and the LLM call: a draft in the way needs neither.
   if (
     await access(path).then(
@@ -159,11 +164,8 @@ export async function draft(
   const data = draftData(league, week, stakes, included);
   warn([
     ...stakesWarnings(stakes, league),
-    ...changedOutcomeWarnings(
-      stakes,
-      earlier?.ranking.meta.house_rule_outcomes,
-      earlier?.week ?? 0,
-    ),
+    // As check does: against the newest frozen copy through this week.
+    ...leagueFileChangeWarnings(stakes, await lastPublishedMeta(dir, week)),
   ]);
   const outcomes = houseRuleOutcomes(stakes);
   const { anthropicApiKey, warnings: credentialWarnings } =
