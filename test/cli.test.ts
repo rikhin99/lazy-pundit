@@ -22,6 +22,7 @@ import {
   rankingsDir,
   statCorrection,
   WEEKS,
+  withFrontMatter,
   writeSettings,
 } from "./support/workspace.ts";
 
@@ -270,9 +271,10 @@ test("check on a draft with indented front matter prints the fix on one line and
   const { dir, deps } = await fearTheTurtle(8);
   const { path } = await draft(dir, deps);
   const text = await readFile(path, "utf8");
-  const [, yaml = "", body] = text.split("---\n");
-  const keys = yaml.trimEnd().replace(/^/gm, "  ");
-  await writeFile(path, `---\n${keys}\n---\n${body}`);
+  await writeFile(
+    path,
+    withFrontMatter(text, (lines) => lines.map((line) => `  ${line}`)),
+  );
 
   const { code, stdout, stderr } = await cli(dir, ["check"]);
 
@@ -280,6 +282,26 @@ test("check on a draft with indented front matter prints the fix on one line and
   expect(stdout).toBe("");
   expect(stderr).toBe(
     "week-08.md: put each front-matter key at the start of its line, with no indent and no braces around the keys\n",
+  );
+});
+
+test("check on a draft with one front-matter key indented prints what to check on one line and fails", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  const { path } = await draft(dir, deps);
+  const text = await readFile(path, "utf8");
+  await writeFile(
+    path,
+    withFrontMatter(text, (lines) =>
+      lines.map((line) => (line.startsWith("week:") ? `  ${line}` : line)),
+    ),
+  );
+
+  const { code, stdout, stderr } = await cli(dir, ["check"]);
+
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toBe(
+    "week-08.md: the front matter isn't valid YAML; check each key's indent, and use spaces, not tabs\n",
   );
 });
 

@@ -301,9 +301,28 @@ export function withoutPublishRecord(text: string): string {
   return text.replace(/^(?:first_published_at|blurb_problems): .*\r?\n/gm, "");
 }
 
+/**
+ * A Markdown file's text with its front matter rewritten: `rewrite` gets the
+ * lines between the `---` fences and returns the ones to put there instead,
+ * such as every key indented, as the pundit's editing might leave them.
+ */
+export function withFrontMatter(
+  text: string,
+  rewrite: (lines: string[]) => string[],
+): string {
+  const { yaml, end } = fenced(text);
+  const lines = rewrite(yaml.split(/\r?\n/));
+  return `---\n${lines.join("\n")}\n---\n${text.slice(end)}`;
+}
+
 /** The YAML front matter of a Markdown file. */
 export function frontMatter(text: string): Record<string, unknown> {
+  return parseYaml(fenced(text).yaml);
+}
+
+/** The text between a Markdown file's `---` fences, and where the closing one ends. */
+function fenced(text: string): { yaml: string; end: number } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
   if (!match?.[1]) throw new Error("no front matter");
-  return parseYaml(match[1]);
+  return { yaml: match[1], end: match[0].length };
 }

@@ -175,6 +175,32 @@ function keySpan(
 }
 
 /**
+ * Whether front matter that doesn't parse would after an indent fix: one
+ * indented line moved to the start of its line, or every indent's tabs
+ * turned to spaces. Only then does the refusal's indent hint hold, since a
+ * value with a colon or an unclosed bracket also fails, on the same codes.
+ */
+function indentFixes(yaml: string): boolean {
+  const lines = yaml.split("\n");
+  const parses = (candidate: string) => {
+    try {
+      parse(candidate);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const untabbed = yaml.replace(/^[ \t]+/gm, (indent) =>
+    indent.replace(/\t/g, "  "),
+  );
+  if (untabbed !== yaml && parses(untabbed)) return true;
+  return lines.some(
+    (line, i) =>
+      /^[ \t]/.test(line) && parses(lines.with(i, line.trimStart()).join("\n")),
+  );
+}
+
+/**
  * Splits a Markdown file into its YAML front matter and body, refusing any
  * file whose version, under `versionKey`, isn't the one this build reads.
  */
@@ -191,9 +217,15 @@ export function readFrontMatter(
   try {
     data = parse(match[1] ?? "");
   } catch (cause) {
-    throw new WorkspaceFileError(`${file}: the front matter isn't valid YAML`, {
-      cause,
-    });
+    // A fixed hint, not the parser's line: for one key indented on its own,
+    // the parser points at the line before it.
+    const hint = indentFixes(match[1] ?? "")
+      ? "; check each key's indent, and use spaces, not tabs"
+      : "";
+    throw new WorkspaceFileError(
+      `${file}: the front matter isn't valid YAML${hint}`,
+      { cause },
+    );
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     throw new WorkspaceFileError(`${file}: the front matter isn't a mapping`);

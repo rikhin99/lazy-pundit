@@ -18,6 +18,7 @@ import {
   frontMatter,
   onStandings,
   rankingsDir,
+  withFrontMatter,
   withoutReminder,
 } from "./support/workspace.ts";
 
@@ -42,6 +43,25 @@ async function drafted() {
     writeFile(path, change(await readFile(path, "utf8")));
   const read = () => readFile(path, "utf8");
   return { ...ws, path, edit, read };
+}
+
+/** Drafts week 8 and reshapes its front matter, counting requests from then on. */
+async function reshaped(shape: (text: string) => string) {
+  const ws = await drafted();
+  await ws.edit(shape);
+  let requests = 0;
+  const inner = ws.deps.transport;
+  const deps = {
+    ...ws.deps,
+    transport: {
+      request: (req: Parameters<typeof inner.request>[0]) => {
+        requests++;
+        return inner.request(req);
+      },
+    },
+  };
+  const snapshots = () => readdir(join(ws.dir, ".snapshots"));
+  return { ...ws, deps, requests: () => requests, snapshots };
 }
 
 /** The 1-based line of the first line containing `needle`. */
@@ -516,45 +536,21 @@ describe("a draft whose front matter publish and refresh can't edit", () => {
 
   /** The front matter's lines indented two spaces, as the pundit's editing might leave them. */
   const indented = (text: string) =>
-    text.replace(
-      /^---\n([\s\S]*?)\n---\n/,
-      (_, yaml: string) => `---\n${yaml.replace(/^/gm, "  ")}\n---\n`,
-    );
+    withFrontMatter(text, (lines) => lines.map((line) => `  ${line}`));
 
   /** The front matter as one `{...}` flow map. */
   const flowMap = (text: string) =>
-    text.replace(
-      /^---\n[\s\S]*?\n---\n/,
-      `---\n${JSON.stringify(frontMatter(text))}\n---\n`,
-    );
+    withFrontMatter(text, () => [JSON.stringify(frontMatter(text))]);
 
   /** A `{...}` flow map with each key on its own line, at its start. */
   const flowMapOverLines = (text: string) =>
-    text.replace(
-      /^---\n[\s\S]*?\n---\n/,
-      `---\n{\n${Object.entries(frontMatter(text))
+    withFrontMatter(text, () => [
+      "{",
+      Object.entries(frontMatter(text))
         .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-        .join(",\n")}\n}\n---\n`,
-    );
-
-  /** Drafts week 8 and reshapes its front matter, counting requests from then on. */
-  async function reshaped(shape: (text: string) => string) {
-    const ws = await drafted();
-    await ws.edit(shape);
-    let requests = 0;
-    const inner = ws.deps.transport;
-    const deps = {
-      ...ws.deps,
-      transport: {
-        request: (req: Parameters<typeof inner.request>[0]) => {
-          requests++;
-          return inner.request(req);
-        },
-      },
-    };
-    const snapshots = () => readdir(join(ws.dir, ".snapshots"));
-    return { ...ws, deps, requests: () => requests, snapshots };
-  }
+        .join(",\n"),
+      "}",
+    ]);
 
   const SHAPES = [
     ["indented", indented],
@@ -600,5 +596,82 @@ describe("a draft whose front matter publish and refresh can't edit", () => {
     const { problems } = await check(dir, deps);
 
     expect(withoutReminder(problems)).toEqual([]);
+  });
+});
+
+describe("front matter that isn't valid YAML", () => {
+  /** The refusal for `file`, with the hint an indent fix earns. */
+  const message = (file: string) =>
+    `${file}: the front matter isn't valid YAML; check each key's indent, and use spaces, not tabs`;
+  const MESSAGE = message("week-08.md");
+
+  /** `key`'s line in the front matter with `indent` before it, the rest as they are. */
+  const indentKey = (key: string, indent: string) => (text: string) =>
+    withFrontMatter(text, (lines) =>
+      lines.map((line) => (line.startsWith(`${key}:`) ? indent + line : line)),
+    );
+
+  /** A tab before every line of the front matter, as a pasted copy might have. */
+  const tabbed = (text: string) =>
+    withFrontMatter(text, (lines) => lines.map((line) => `\t${line}`));
+
+  const SHAPES = [
+    ["one key indented two spaces", indentKey("week", "  ")],
+    ["a tab before one key", indentKey("week", "\t")],
+    ["a tab before every key", tabbed],
+  ] as const;
+
+  test.each(SHAPES)(
+    "%s: check names the draft and what to check",
+    async (_, shape) => {
+      const { dir, deps } = await reshaped(shape);
+
+      const failed = check(dir, deps);
+
+      await expect(failed).rejects.toThrow(WorkspaceFileError);
+      await expect(failed).rejects.toThrow(MESSAGE);
+    },
+  );
+
+  test.each(SHAPES)(
+    "%s: publish and refresh give the same message, before fetching and writing nothing",
+    async (_, shape) => {
+      const { dir, deps, read, requests, snapshots } = await reshaped(shape);
+      const before = await read();
+      const snapshotsBefore = await snapshots();
+
+      await expect(publish(dir, deps)).rejects.toThrow(MESSAGE);
+      await expect(refresh(dir, deps)).rejects.toThrow(MESSAGE);
+
+      expect(requests()).toBe(0);
+      expect(await snapshots()).toEqual(snapshotsBefore);
+      expect(await read()).toBe(before);
+      expect(await readdir(rankingsDir(dir))).toEqual(["week-08.md"]);
+    },
+  );
+
+  test("workspace.md with one key indented gets the same hint, naming workspace.md", async () => {
+    const { dir, deps } = await drafted();
+    const file = join(dir, "workspace.md");
+    const before = await readFile(file, "utf8");
+    await writeFile(file, indentKey("pundit", "  ")(before));
+
+    await expect(check(dir, deps)).rejects.toThrow(message("workspace.md"));
+  });
+
+  /** An extra key `notes` with `value` after the front matter's last key. */
+  const withNotes = (value: string) => (text: string) =>
+    withFrontMatter(text, (lines) => [...lines, `notes: ${value}`]);
+
+  test.each([
+    ["a value with a colon", withNotes("half: time")],
+    ["an unclosed bracket", withNotes("[1, 2")],
+    ["an unclosed quote", withNotes('"half time')],
+  ])("%s: no indent fixes it, so check gives no hint", async (_, shape) => {
+    const { dir, deps } = await reshaped(shape);
+
+    await expect(check(dir, deps)).rejects.toMatchObject({
+      message: "week-08.md: the front matter isn't valid YAML",
+    });
   });
 });
