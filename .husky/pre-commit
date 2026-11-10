@@ -1,3 +1,4 @@
+git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++ ' | node scripts/denylist-check.ts
 npm run typecheck
 npm run lint
 npm test

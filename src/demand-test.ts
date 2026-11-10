@@ -145,10 +145,10 @@ function count(n: number): string {
 function medianOf(values: number[]): number | undefined {
   if (values.length === 0) return undefined;
   const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
+  const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1
-    ? sorted[mid]
-    : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
+    ? sorted[middle]
+    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
 /**

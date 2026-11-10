@@ -94,7 +94,7 @@ npm run scrub:sleeper
 
 The branch, not the unpacked folder, is what exists: list it with `git ls-tree -r --name-only fixtures/raw`, and rerun `npm run fixtures:raw` after the branch changes, since an older unpack goes stale silently.
 
-Tests that need the raw files run only when `fixtures/raw/` is present. The fixture name check reads an optional, never-committed `fixtures/denylist.txt` (one real name per line, `#` comments allowed).
+Tests that need the raw files run only when `fixtures/raw/` is present. The fixture name check reads an optional, never-committed `fixtures/denylist.txt` (one real name per line, `#` comments allowed). So do the commit hooks (each commit's diff and message) and an agent hook on `gh` issue and comment text, through `scripts/denylist-check.ts`: without the file, they pass everything.
 
 ### Releasing
 
