@@ -19,6 +19,13 @@ const REFUSED: Record<string, object> = {
     tool_name: "Bash",
     tool_input: { command: "gh issue view 71 --comments" },
   },
+  "commit-message-file.sh": {
+    tool_name: "Bash",
+    tool_input: {
+      command:
+        "cat > /tmp/msg.txt <<'EOF'\nA message\nEOF\ngit commit -F /tmp/msg.txt",
+    },
+  },
   "read-by-outline.sh": {
     tool_name: "Read",
     tool_input: { file_path: join(ROOT, "GLOSSARY.md") },

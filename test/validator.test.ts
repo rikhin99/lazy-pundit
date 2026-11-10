@@ -7,7 +7,11 @@ import {
   type ValidationResult,
   validate,
 } from "../src/index.ts";
-import { CLAIM_HEAVY, PLAIN_PROSE } from "./support/plain-prose.ts";
+import {
+  CLAIM_HEAVY,
+  PLAIN_PROSE,
+  TAGGED_PLAIN,
+} from "./support/plain-prose.ts";
 import { blurb, corrected, week8Evidence } from "./support/week8-evidence.ts";
 
 /** What the pundit sees per claim: its text and status. */
@@ -1053,6 +1057,18 @@ describe("invariants over a corpus", () => {
 
   test.each(PLAIN_PROSE)(
     "no false hard problem, in any section: %s",
+    (text) => {
+      for (const team of TEAMS) {
+        const hard = validate(blurb(team, text)).claims.filter((c) =>
+          isHard(c.status),
+        );
+        expect(hard, `section ${team}`).toEqual([]);
+      }
+    },
+  );
+
+  test.each(TAGGED_PLAIN)(
+    "a true tagged claim is never hard, in any section: %s",
     (text) => {
       for (const team of TEAMS) {
         const hard = validate(blurb(team, text)).claims.filter((c) =>

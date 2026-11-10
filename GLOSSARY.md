@@ -387,6 +387,9 @@ The stats and order evidence the tool computes for each team and for the league 
 **Evidence ID**:
 The name of one stat in the evidence pack, such as `record` or `w8.points`. A claim cites it in the draft as `[7-1]{ev=record}`. Publishing strips it.
 
+**Player fact**:
+An evidence ID that names an NFL player in a team's week: its top starter (`w8.top`), its starters who scored zero (`w8.zeros`), its best bench player when the lineup left points on the bench (`w8.benchmiss`) and its opponent's top starter (`w8.opp.top`), with that player's points under `_points`. A claim citing one that names a different player is wrong.
+
 **Order evidence**:
 A team's place, movement and group, read from the draft's current order each time it's checked rather than fixed when the draft begins. Its source is the pundit, not the platform. A claim can cite it like any other evidence.
 _Avoid_: rank, for a team's place in the pundit's ranking. A team's rank is its position in the standings.

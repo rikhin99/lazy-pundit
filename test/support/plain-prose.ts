@@ -44,6 +44,28 @@ export const PLAIN_PROSE = [
   "Taylor did his job, nobody else did.",
 ];
 
+/**
+ * True tagged claims with the words a validator rule that reads inside a tag
+ * can trip on: team names (with "The"), places, positions, initials, days.
+ * Each cites a team by ID, so it holds in any section; none may come back
+ * hard. Add a sentence whenever a rule starts judging the words in a tag.
+ */
+export const TAGGED_PLAIN = [
+  "[The Bench Mob's 38.4]{ev=sleeper:3/w8.top_points} came from one man.",
+  "[Jonathan Taylor's 38.4]{ev=sleeper:3/w8.top_points} against the Texans.",
+  "[Taylor]{ev=sleeper:3/w8.top} went off on Sunday.",
+  "[RB Taylor's 38.4]{ev=sleeper:3/w8.top_points} was the week.",
+  "[MVP Taylor]{ev=sleeper:3/w8.top} did it again.",
+  "[Colts Jonathan Taylor]{ev=sleeper:3/w8.top} did it again.",
+  "[Indy's 38.4]{ev=sleeper:3/w8.top_points} carried them.",
+  "[Sunday's 38.4]{ev=sleeper:3/w8.top_points} carried them.",
+  "[Johnston]{ev=sleeper:3/w8.zeros} gave them nothing.",
+  "[Spears' 16.7]{ev=sleeper:3/w8.benchmiss_points} rotted on the bench.",
+  "[Kraft's 31.8]{ev=sleeper:3/w8.opp.top_points} hurt the Bench Mob.",
+  "[The Hail Mary Hustle's Jake Ferguson]{ev=sleeper:9/w8.zeros} gave them nothing.",
+  "They're averaging [122.85]{ev=sleeper:3/ppg} per week.",
+];
+
 /** Blurbs full of checkable claims, from the grounding-prototype scenarios. */
 export const CLAIM_HEAVY = [
   "Seven straight and counting. Bench Mob edged Snap Judgement by 2.71 to sit 7-1, and they lead the league in points at 982.8.",
