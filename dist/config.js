@@ -1,0 +1,280 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join } from "node:path";
+import { parse, parseDocument, stringify } from "yaml";
+import { z } from "zod";
+/**
+ * The operator's files in the config folder, outside any workspace:
+ *
+ *   config.yaml       name, model, spend cap, price overrides, workspaces
+ *   credentials.yaml  the Anthropic key and espn_s2, at mode 0600
+ *   spend.yaml        LLM spend by calendar month
+ *
+ * Each carries `format:`, versioned by `CONFIG_FORMAT`.
+ */
+export const CONFIG_FORMAT = 1;
+export class ConfigFileError extends Error {
+    name = "ConfigFileError";
+}
+/** A league slug: the workspace's short name, as in `--league <slug>`. */
+const slugSchema = z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "use lowercase letters, digits and dashes");
+/** A price per million tokens, in US dollars. */
+const priceSchema = z.object({
+    input_per_mtok: z.number().nonnegative(),
+    output_per_mtok: z.number().nonnegative(),
+});
+export const configSchema = z.object({
+    format: z.literal(CONFIG_FORMAT),
+    /** The operator's pundit name, the default for each new workspace. */
+    name: z.string().min(1).optional(),
+    model: z.string().min(1).default("claude-sonnet-5-5"),
+    /** The spend cap: the most LLM spend per calendar month, across every league. */
+    spend_cap_usd: z.number().nonnegative().default(5),
+    /** Prices that replace or add to the table shipped with the tool, by model. */
+    prices: z.record(z.string(), priceSchema).default({}),
+    /** Each league workspace by slug: its folder. */
+    workspaces: z
+        .record(slugSchema, z.string().refine(isAbsolute, {
+        error: "give the workspace's full path, such as /Users/you/lazy-pundit/<slug> (not ~ or a relative path)",
+    }))
+        .default({}),
+});
+/** The config with no `config.yaml`: every default. */
+export function defaultConfig() {
+    return configSchema.parse({ format: CONFIG_FORMAT });
+}
+export const credentialsSchema = z.object({
+    format: z.literal(CONFIG_FORMAT),
+    anthropic_api_key: z.string().min(1).optional(),
+    espn_s2: z
+        .object({ value: z.string().min(1), saved_at: z.iso.date() })
+        .optional(),
+});
+export const spendSchema = z.object({
+    format: z.literal(CONFIG_FORMAT),
+    /** Spend in US dollars by calendar month in local time (`2025-10`). */
+    months: z
+        .record(z.string().regex(/^\d{4}-\d{2}$/), z.number().nonnegative())
+        .default({}),
+});
+export function configPath(deps) {
+    return join(deps.configDir, "config.yaml");
+}
+export function credentialsPath(deps) {
+    return join(deps.configDir, "credentials.yaml");
+}
+export function spendPath(deps) {
+    return join(deps.configDir, "spend.yaml");
+}
+/**
+ * The credentials to use: each environment override, else the stored value.
+ * Warns when other users on the machine can read `credentials.yaml`.
+ */
+export async function loadCredentials(deps) {
+    const path = credentialsPath(deps);
+    const stored = await readConfigFile(path, credentialsSchema);
+    const result = envCredentials(deps.env);
+    if (stored) {
+        const open = exposure(path, (await stat(path)).mode & 0o777);
+        if (open)
+            result.warnings.push(`${open.message} ${open.fix}`);
+    }
+    if (!result.anthropicApiKey && stored?.anthropic_api_key) {
+        result.anthropicApiKey = { value: stored.anthropic_api_key, from: "file" };
+    }
+    if (!result.espnS2 && stored?.espn_s2) {
+        result.espnS2 = {
+            value: stored.espn_s2.value,
+            from: "file",
+            savedAt: stored.espn_s2.saved_at,
+        };
+    }
+    return result;
+}
+/** Only the credentials the environment gives, as when nothing is stored. */
+export function envCredentials(env) {
+    return {
+        ...(env.anthropicApiKey
+            ? { anthropicApiKey: { value: env.anthropicApiKey, from: "env" } }
+            : {}),
+        ...(env.espnS2 ? { espnS2: { value: env.espnS2, from: "env" } } : {}),
+        warnings: [],
+    };
+}
+/**
+ * Adds a workspace to `config.yaml`'s list. A new file gets the defaults written
+ * out, so they can be seen and edited; an existing one keeps everything as
+ * written, comments included, gains `name` only if it has none, and changes
+ * `spend_cap_usd` only when given one.
+ */
+export async function listWorkspace(deps, entry) {
+    const path = configPath(deps);
+    const config = await readConfig(deps);
+    if (config === undefined) {
+        const { model, spend_cap_usd } = configSchema.parse({
+            format: CONFIG_FORMAT,
+        });
+        await writeConfigFile(path, stringify({
+            format: CONFIG_FORMAT,
+            name: entry.name,
+            model,
+            spend_cap_usd: entry.spendCap ?? spend_cap_usd,
+            workspaces: { [entry.slug]: entry.dir },
+        }), 0o600);
+        return;
+    }
+    const doc = parseDocument(await readFile(path, "utf8"));
+    if (config.name === undefined)
+        doc.set("name", entry.name);
+    if (entry.spendCap !== undefined)
+        doc.set("spend_cap_usd", entry.spendCap);
+    doc.setIn(["workspaces", entry.slug], entry.dir);
+    const mode = (await stat(path)).mode & 0o777;
+    await writeConfigFile(path, doc.toString(), mode);
+}
+/**
+ * Removes workspaces from `config.yaml`'s list, keeping the rest of the file
+ * as written, comments included.
+ */
+export async function dropWorkspaces(deps, slugs) {
+    const path = configPath(deps);
+    await readConfigFile(path, configSchema);
+    const doc = parseDocument(await readFile(path, "utf8"));
+    for (const slug of slugs)
+        doc.deleteIn(["workspaces", slug]);
+    const mode = (await stat(path)).mode & 0o777;
+    await writeConfigFile(path, doc.toString(), mode);
+}
+/**
+ * Sets `spend_cap_usd` in `config.yaml`, keeping the rest of the file as
+ * written, comments included. A missing file gets the defaults written out.
+ */
+export async function setSpendCap(deps, cap) {
+    const path = configPath(deps);
+    if ((await readConfig(deps)) === undefined) {
+        const { model } = defaultConfig();
+        await writeConfigFile(path, stringify({ format: CONFIG_FORMAT, model, spend_cap_usd: cap }), 0o600);
+        return;
+    }
+    const doc = parseDocument(await readFile(path, "utf8"));
+    doc.set("spend_cap_usd", cap);
+    const mode = (await stat(path)).mode & 0o777;
+    await writeConfigFile(path, doc.toString(), mode);
+}
+/**
+ * What's wrong with a credentials file's permission bits, and the fix, or
+ * undefined when only its owning user can use it.
+ */
+export function exposure(path, mode) {
+    if ((mode & 0o077) === 0)
+        return undefined;
+    const how = mode & 0o044 ? "read" : "changed";
+    return {
+        message: `${path} can be ${how} by other users on this machine (mode 0${mode.toString(8)}).`,
+        fix: `Run: chmod 600 ${path}`,
+    };
+}
+/**
+ * Stores credentials in `credentials.yaml` at mode 0600, keeping any stored
+ * value not given. A new `espn_s2` is dated today. Returns the file's path.
+ */
+export async function saveCredentials(deps, values) {
+    const path = credentialsPath(deps);
+    const stored = (await readConfigFile(path, credentialsSchema)) ?? {
+        format: CONFIG_FORMAT,
+    };
+    const next = {
+        ...stored,
+        ...(values.anthropicApiKey
+            ? { anthropic_api_key: values.anthropicApiKey }
+            : {}),
+        ...(values.espnS2
+            ? {
+                espn_s2: {
+                    value: values.espnS2,
+                    saved_at: localDate(deps.clock.now()),
+                },
+            }
+            : {}),
+    };
+    await writeConfigFile(path, stringify(credentialsSchema.parse(next)), 0o600);
+    return path;
+}
+/** `2025-10`: the calendar month in local time that spend is counted under. */
+export function spendMonth(d) {
+    return localDate(d).slice(0, 7);
+}
+/** The spend counted for `month` in `spend.yaml`: 0 with no file or entry. */
+export async function monthSpend(deps, month) {
+    const spend = await readConfigFile(spendPath(deps), spendSchema);
+    return spend?.months[month] ?? 0;
+}
+/** Adds `usd` to `month` in `spend.yaml`, keeping every other month. */
+export async function addSpend(deps, month, usd) {
+    const path = spendPath(deps);
+    const spend = (await readConfigFile(path, spendSchema)) ?? {
+        format: CONFIG_FORMAT,
+        months: {},
+    };
+    const total = (spend.months[month] ?? 0) + usd;
+    // Rounded to a millionth of a dollar, so float noise never piles up.
+    spend.months[month] = Math.round(total * 1e6) / 1e6;
+    await writeConfigFile(path, stringify(spendSchema.parse(spend)), 0o600);
+}
+/** `2025-10-28`, in local time. */
+function localDate(d) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+/**
+ * Writes one of the operator's files whole, through a temp file renamed into place,
+ * so a crash never leaves half a file and the new file has `mode` from the
+ * start. A new config folder is made at mode 0700, closed to other users.
+ */
+async function writeConfigFile(path, text, mode) {
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    const tmp = `${path}.tmp-${randomUUID()}`;
+    await writeFile(tmp, text, { mode });
+    await rename(tmp, path);
+}
+/** Reads `config.yaml`, or undefined if there is none. */
+export function readConfig(deps) {
+    return readConfigFile(configPath(deps), configSchema);
+}
+/**
+ * Reads and parses one of the operator's YAML files. A missing file is undefined;
+ * a file that doesn't parse, or has another format version, is refused with
+ * its path and what to fix.
+ */
+export async function readConfigFile(path, schema) {
+    let text;
+    try {
+        text = await readFile(path, "utf8");
+    }
+    catch (err) {
+        if (err.code === "ENOENT")
+            return undefined;
+        throw new ConfigFileError(`Can't read ${path}`, { cause: err });
+    }
+    let data;
+    try {
+        data = parse(text) ?? {};
+    }
+    catch (cause) {
+        throw new ConfigFileError(`${path} isn't valid YAML`, { cause });
+    }
+    const format = data?.format;
+    if (format !== CONFIG_FORMAT) {
+        throw new ConfigFileError(format === undefined
+            ? `${path} has no format version; add "format: ${CONFIG_FORMAT}" at the top`
+            : `${path} is format ${String(format)}, but this version of Lazy Pundit reads only format ${CONFIG_FORMAT}`);
+    }
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+        throw new ConfigFileError(`${path}: ${z.prettifyError(parsed.error)}`);
+    }
+    return parsed.data;
+}
+//# sourceMappingURL=config.js.map

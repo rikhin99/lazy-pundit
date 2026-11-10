@@ -19,25 +19,6 @@
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepare": "npm run build && husky",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check --error-on-warnings .",
-    "format": "biome check --write .",
-    "test": "vitest run",
-    "scrub:sleeper": "node scripts/scrub-sleeper.ts",
-    "fixtures:raw": "git archive fixtures/raw fixtures/raw | tar -x",
-    "fixture:show": "node scripts/show-fixture.ts",
-    "fixture:workspace": "node scripts/fixture-workspace.ts",
-    "drive:wizard": "expect scripts/drive-wizard.exp",
-    "drive:wizard:all": "bash scripts/drive-wizard-all.sh",
-    "outline": "node scripts/outline.ts",
-    "mutate": "node scripts/mutate.ts",
-    "trace": "node scripts/trace-context.ts",
-    "release": "node scripts/release.ts",
-    "install:smoke": "bash scripts/install-smoke.sh"
-  },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
     "@types/node": "^24.19.2",
