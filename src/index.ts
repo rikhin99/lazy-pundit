@@ -180,6 +180,17 @@ export {
   type TeamStanding,
   type Tiebreak,
 } from "./standings.ts";
+export {
+  renderStatsTable,
+  STATS_TABLE_SORTS,
+  type StatsTable,
+  type StatsTableLook,
+  type StatsTableRow,
+  type StatsTableSort,
+  sortProblem,
+  statsTable,
+  statsTableLook,
+} from "./stats-table.ts";
 export { deleteTranscripts } from "./transcripts.ts";
 export {
   httpTransport,

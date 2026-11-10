@@ -66,22 +66,28 @@ import {
   punditNameProblem,
   type RerunStep,
   refresh,
+  renderStatsTable,
   rerunLeague,
   rerunPreselections,
   rerunStep,
   rerunStop,
   SetupRefusal,
   STAKES_QUESTION,
+  STATS_TABLE_SORTS,
   type StakesAnswers,
   type StakesFields,
+  type StatsTableSort,
   type StepRerun,
   setUpWorkspace,
   setupChecklist,
   sleeperLeagues,
+  sortProblem,
   spendCapNote,
   spendCapProblem,
   spendCapWarning,
   stats,
+  statsTable,
+  statsTableLook,
   systemDeps,
   type TeamNicknames,
   WINNER_TAKES_ALL,
@@ -208,7 +214,34 @@ program
     console.log(
       `Drafted week ${result.week}: ${shown(result.path)} (snapshot ${result.snapshot})`,
     );
+    console.log("See the stats behind the starting order: lazy-pundit table");
     report(result.problems);
+  });
+
+program
+  .command("table")
+  .description(
+    "Print the Stats table: the latest draft's teams in its order, each with its starting place and stats.",
+  )
+  .option(
+    "--sort <column>",
+    `best first by ${STATS_TABLE_SORTS.join(", ")}; ties keep the draft's order`,
+  )
+  .action(async (opts: { sort?: string }) => {
+    const deps = systemDeps();
+    const problem =
+      opts.sort === undefined ? undefined : sortProblem(opts.sort);
+    if (problem) {
+      console.error(problem);
+      process.exitCode = 1;
+      return;
+    }
+    const table = await statsTable(await workspace(deps), {
+      ...(opts.sort ? { sort: opts.sort as StatsTableSort } : {}),
+    });
+    process.stdout.write(
+      renderStatsTable(table, statsTableLook(process.stdout, deps.env)),
+    );
   });
 
 program

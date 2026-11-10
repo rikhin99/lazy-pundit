@@ -11,6 +11,7 @@ The first release, for Sleeper leagues.
 - `init` sets up a league workspace step by step: the pundit's name, the Sleeper league picked from a Sleeper account's leagues, manager handles, lore and nicknames, stakes and house rules, the family league and persona, the power-score method, the Anthropic key and the spend cap. Any step can be skipped and answered later.
 - `setup` shows the setup checklist, and `setup <step>` re-runs one step (`handles`, `lore`, `stakes`, `method`, `key`, `cap`, `persona`), showing a diff before overwriting a hand edit.
 - `draft` fetches the league and starts a draft for the last scored week: the teams in the starting order from the chosen power-score method (standings, points per game, all-play, form, the ffwrapped formula, the FFMWR rank average or the ramped blend), each with its stats. With an Anthropic key, the LLM writes the week intro and the blurbs following the persona, under the spend cap, and its transcripts are kept in the workspace. With no key, past the cap or on an error, the draft has stat lines instead. `--include-in-progress` adds the in-progress week's stats as evidence for provisional claims.
+- `table` prints the Stats table for the latest draft: each team in the draft's current order with its starting place, record, standings rank, points per game, all-play record, form, luck and streak, from the data the draft was built from. `--sort <column>` puts the best first. It reads only the draft and its snapshot, with no fetch, and `draft` points to it.
 - `check` lists the draft's problems and auto-tags clear claims. Claims in the intro and blurbs, such as records, scores, matchups and playoff status (clinched, eliminated, knocked out), are checked against the evidence pack, and a claim that names a week ("in week 5") against that week's stats.
 - `refresh` refetches the league and recomputes the starting order and stats, leaving the pundit's order and words as they are. `--full` refetches every week.
 - `publish` checks the draft, asks before publishing over a hard problem, writes the frozen copy and the plain text, and copies the plain text to the clipboard.
@@ -23,6 +24,7 @@ The first release, for Sleeper leagues.
 - ESPN leagues (and Yahoo).
 - `revise`, the LLM revision of one blurb or the intro.
 - `preview`, the local editing view beside the draft.
+- An interactive Stats table.
 - Style pages and awards.
 - `season add` and `handles`, for carrying a workspace into a new season.
 - Week-0 (preseason) drafts.

@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { draft, publish } from "../src/index.ts";
+import { draft, publish, renderStatsTable, statsTable } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
   FEAR_THE_TURTLE_ID,
@@ -414,4 +414,75 @@ test("draft and check each print the personal-data warning once", async () => {
 
   const checked = await cli(dir, ["check"]);
   expect(checked.stderr.split(warning)).toHaveLength(2);
+});
+
+test("draft points to the Stats table on the line after Drafted week", async () => {
+  const { dir } = await fearTheTurtle(8);
+
+  const { code, stdout } = await cli(dir, ["draft"]);
+
+  expect(code).toBe(0);
+  const lines = stdout.split("\n");
+  const drafted = lines.findIndex((l) => l.startsWith("Drafted week 8:"));
+  expect(lines[drafted + 1]).toBe(
+    "See the stats behind the starting order: lazy-pundit table",
+  );
+});
+
+test("table prints the Stats table with no fetch, plain when it isn't a terminal", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+
+  const { code, stdout, stderr } = await cli(dir, ["table"], "", undefined, {
+    LAZY_PUNDIT_REPLAY: join(tmpdir(), "lazy-pundit-no-replay"),
+  });
+
+  expect(code).toBe(0);
+  expect(stderr).toBe("");
+  expect(stdout).not.toContain("\x1b");
+  expect(stdout).toBe(renderStatsTable(await statsTable(dir), { bold: false }));
+  expect(stdout.split("\n").slice(0, 3)).toEqual([
+    "Week 8 draft · data through week 8 · method: ramped blend",
+    "",
+    expect.stringMatching(
+      /^ # {2}Start {2}Team +Record {2}Rank {5}PPG {2}All-play {4}Form {3}Luck {2}Streak$/,
+    ),
+  ]);
+});
+
+test("table --sort orders the rows, and an unknown column fails on one line", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+
+  const sorted = await cli(dir, ["table", "--sort", "rank"]);
+  const nope = await cli(dir, ["table", "--sort", "nope"]);
+
+  expect(sorted.code).toBe(0);
+  expect(sorted.stdout).toBe(
+    renderStatsTable(await statsTable(dir, { sort: "rank" }), { bold: false }),
+  );
+  expect(nope.code).toBe(1);
+  expect(nope.stdout).toBe("");
+  expect(nope.stderr).toBe(
+    'There\'s no "nope" column to sort by; use start, record, rank, ppg, all-play, form or luck.\n',
+  );
+});
+
+test("table with no draft prints check's message on one line and fails", async () => {
+  const { dir } = await fearTheTurtle(8);
+
+  const { code, stdout, stderr } = await cli(dir, ["table"]);
+
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  // The CLI names the folder by its real path, which on macOS starts /private.
+  expect(stderr).toMatch(
+    /^No draft in \/.*\/pundits\/rikhin\/2025; run `lazy-pundit draft` first\n$/,
+  );
+});
+
+test("--help lists table", async () => {
+  const { stdout } = await cli(tmpdir(), ["--help"]);
+
+  expect(stdout).toMatch(/^ {2}table .*Stats table/m);
 });

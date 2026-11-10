@@ -27,12 +27,13 @@ Install from a release (`#semver:^0` or a tag such as `#v0.1.0`), not from `#mai
 
 ```sh
 lazy-pundit draft     # fetch the league; write pundits/<pundit>/<season>/week-NN.md in the starting order
+lazy-pundit table     # the Stats table: each team in the draft's order, its starting place and stats
                       # now edit: reorder the ## team sections, rewrite the intro and blurbs
 lazy-pundit check     # list the draft's problems and tag the claims it can check
 lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it to the clipboard
 ```
 
-With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `publish` asks before publishing a draft with hard problems, or with a relaxed family-league persona; `-y` skips the question.
+With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `table` reads the draft's own data, with no fetch: run it again after moving sections to see each team's place (#) against its starting place (Start), or with `--sort ppg` (or `start`, `record`, `rank`, `all-play`, `form`, `luck`) for the best first. `publish` asks before publishing a draft with hard problems, or with a relaxed family-league persona; `-y` skips the question.
 
 **Also:**
 

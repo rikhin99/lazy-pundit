@@ -476,6 +476,9 @@ The share of the LLM's words, as its LLM prose file holds them, that the frozen 
 **Editing view**:
 What the pundit sees while ranking: the starting order, the stats behind it, and every flag and claim problem, gathered in one problems list. In Stage 1 it's a local preview page beside the Markdown file the pundit edits, plus the same list in the terminal.
 
+**Stats table**:
+The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against.
+
 **Published ranking**:
 What the league sees, and anything copied, pasted or screenshotted from it. It is fixed at publish time. It carries no tool-internal flags or scores unless the pundit puts them there. It comes as plain text for pasting and as publish styles for screenshots, all rendered from the same frozen copy.
 _Avoid_: Post

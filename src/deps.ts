@@ -34,6 +34,8 @@ export interface Environment {
   espnS2?: string;
   /** The running Node's version, such as `v24.1.0`. */
   nodeVersion: string;
+  /** `NO_COLOR`, set and not empty: no bold or colour in the terminal. */
+  noColor?: true;
 }
 
 /**
@@ -45,6 +47,7 @@ export interface Environment {
  *   XDG_CACHE_HOME         cache folder, else ~/.cache (then /lazy-pundit)
  *   ANTHROPIC_API_KEY      overrides the stored Anthropic key
  *   LAZY_PUNDIT_ESPN_S2    overrides the stored espn_s2 cookie
+ *   NO_COLOR               not empty: the terminal output has no bold
  *   LAZY_PUNDIT_CLIPBOARD  `off` leaves the clipboard alone, as on a machine
  *                          without one, so scripted runs don't overwrite it
  *   LAZY_PUNDIT_REPLAY     a snapshot's folder: every request replays it, not
@@ -78,6 +81,7 @@ export function systemDeps(): Deps {
         : {}),
       ...(env.LAZY_PUNDIT_ESPN_S2 ? { espnS2: env.LAZY_PUNDIT_ESPN_S2 } : {}),
       nodeVersion: process.version,
+      ...(env.NO_COLOR ? { noColor: true as const } : {}),
     },
   };
 }
