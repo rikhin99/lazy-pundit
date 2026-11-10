@@ -14,6 +14,13 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: post the explanation with `gh issue comment <number> --body "..."`, then `gh issue close <number>`. On an already-closed issue, `gh issue close --comment` drops the comment and still exits 0.
 
+## Personal data stays off GitHub
+
+The repo goes public with #96.
+
+- **Prototype branches**: a prototype branch is scrubbed against `fixtures/denylist.txt` before it's pushed, or it stays local. The three existing ones (`prototype/grounding`, `prototype/power-score`, `prototype/ranking-views`, which issues cite as primary sources) are local-only once #96 deletes them from origin, kept in the gitignored `private/prototypes.bundle`: in a clone of it, `git fetch origin 'refs/heads/prototype/*:refs/heads/prototype/*'` restores them as branches.
+- **Issue and comment text**: an issue or comment never holds a tester's or another manager's real name, username or team name, or a real league ID (the maintainer's own handle is on every issue anyway): write a placeholder (Tester A, `<league ID>`) the first time. Editing it out later leaves it readable in the text's edit history, which anyone can open on a public repo, and a revision can only be deleted by hand in the web UI.
+
 ## Reading spec #37
 
 Spec #37's decisions (Implementation Decisions, Testing Decisions, Out of Scope, Further Notes) are in its first comment, not the body. The body holds only the user stories. Save each part to a file and grep `^#` for the sections a ticket names, rather than printing them whole:
