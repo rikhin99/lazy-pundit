@@ -67,4 +67,24 @@ describe("the repo's hooks", () => {
     expect(run.status).toBe(2);
     expect(run.stderr).not.toBe("");
   });
+
+  // In #76, `grep -n -E 'logKey|^' src/stakes.ts` printed every line (4.8k).
+  test.each([
+    ["grep -n -E 'logKey|^' src/stakes.ts", 2],
+    ["grep -n -E 'logKey||lastPublished' src/stakes.ts", 2],
+    ["grep -n -E '.*|logKey' src/stakes.ts", 2],
+    ["grep -n -E 'logKey|lastPublished' src/stakes.ts || true", 0],
+    ["grep -n -E '^export|^function' src/stakes.ts", 0],
+  ])("read-by-outline.sh on %s exits %i", (command, status) => {
+    const run = spawnSync(
+      join(ROOT, ".claude", "hooks", "read-by-outline.sh"),
+      {
+        input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: ROOT },
+        encoding: "utf8",
+      },
+    );
+
+    expect(run.status).toBe(status);
+  });
 });

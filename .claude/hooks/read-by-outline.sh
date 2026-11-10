@@ -35,6 +35,14 @@ Read)
   ;;
 Bash)
   cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
+  # A grep pattern with an alternative that matches any line (empty, ^, $,
+  # .*) prints the whole file: in #76, `'logKey|^'` printed stakes.ts (4.8k).
+  for p in $(printf '%s' "$cmd" | grep -Eo "grep( +-[A-Za-z0-9]+)* +'[^']*\|[^']*'" | sed -E "s/^[^']*'//; s/'$//" | tr ' ' '\001'); do
+    if printf '|%s|' "$p" | tr '\001' ' ' | sed 's/\\|/|/g' | grep -Eq '\|(\^?(\.\*)?\$?)\|'; then
+      echo "This grep pattern has an alternative that matches every line (empty, ^, \$ or .*), so it prints the whole file. Drop that alternative, or use \`npm run outline -- <file>\` and a range." >&2
+      exit 2
+    fi
+  done
   # `head -N <file>` and `cat <file> | head -N` read N lines: count them as
   # `sed -n 1,Np <file>`.
   cmd=$(printf '%s' "$cmd" | sed -E \
