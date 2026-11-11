@@ -72,6 +72,80 @@ export const TAGGED_PLAIN = [
   "They're averaging [122.85]{ev=sleeper:3/ppg} per week.",
 ];
 
+/**
+ * True untagged claims that name more than one team, each as its section's
+ * team number, the sentence, and the evidence ID each claim must verify
+ * against in order (null where two stats match, so no one ID is written).
+ * Add a sentence whenever a change moves which team or week a claim reads.
+ */
+export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
+  [
+    6,
+    "Pete lost to Gus Bus by 55 and sits at 3-5.",
+    ["w8.result", "w8.margin", "record"],
+  ],
+  [
+    6,
+    "Lost to Gus Bus by 55 and sits at 3-5.",
+    ["w8.result", "w8.margin", "record"],
+  ],
+  [
+    6,
+    "Gus Bus beat us by 55, and we sit at 3-5.",
+    ["sleeper:1/w8.margin", "record"],
+  ],
+  [
+    6,
+    "While Bench Mob sit at 7-1, we are 3-5.",
+    ["sleeper:3/record", "record"],
+  ],
+  [
+    6,
+    "Bench Mob are 7-1; meanwhile this team sits at 3-5 in 11th.",
+    ["sleeper:3/record", "record", null],
+  ],
+  [
+    6,
+    "Gus Bus won by 55 and the loss leaves them 3-5.",
+    ["sleeper:1/w8.margin", "record"],
+  ],
+  [6, "Bench Mob lead, with Pete at 3-5.", ["record"]],
+  [6, "At 7-1, Bench Mob lead the league.", ["sleeper:3/record"]],
+  [6, "Gus Bus, at 4-4, sit in sixth.", ["sleeper:1/record", null]],
+  [
+    6,
+    "Pete lost to Gus Bus (4-4) and sits at 3-5.",
+    ["w8.result", "sleeper:1/record", "record"],
+  ],
+  [6, "Pete trails Bench Mob, who sit at 7-1.", ["sleeper:3/record"]],
+  [
+    6,
+    "Pete fell to Gus Bus, who are 4-4 now.",
+    ["w8.result", "sleeper:1/record"],
+  ],
+  [6, "Gus Bus dropped 133.22 on Pete.", ["sleeper:1/w8.points"]],
+  [
+    6,
+    "Gus Bus have won one straight, while Pete has lost three straight.",
+    ["sleeper:1/streak", "streak"],
+  ],
+  [
+    6,
+    "Bench Mob are 7-1 in first, and Pete is 3-5 in 11th.",
+    ["sleeper:3/record", null, "record", null],
+  ],
+  [
+    7,
+    "Kim Possible Kicks beat Red Zone Rascals 101.56-95.38, while Bench Mob sit at 7-1 in first.",
+    ["w8.result", null, "sleeper:3/record", null],
+  ],
+  [
+    null,
+    "Pylon Patrol lost to Gus Bus and sits at 3-5.",
+    ["sleeper:6/w8.result", "sleeper:6/record"],
+  ],
+];
+
 /** Blurbs full of checkable claims, from the grounding-prototype scenarios. */
 export const CLAIM_HEAVY = [
   "Seven straight and counting. Bench Mob edged Snap Judgement by 2.71 to sit 7-1, and they lead the league in points at 982.8.",

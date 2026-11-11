@@ -42,6 +42,10 @@ const REFUSED: Record<string, object> = {
     tool_name: "Bash",
     tool_input: { command: "gh issue comment 96 --body 'Zorblax won'" },
   },
+  "git-log-subjects.sh": {
+    tool_name: "Bash",
+    tool_input: { command: "git log --oneline -3" },
+  },
 };
 
 /** Runs a hook as the harness does, on a Bash command. */
@@ -111,6 +115,18 @@ describe("the repo's hooks", () => {
     ["gh issue list --search Zorblax", 0],
   ])("denylist-gh.sh on %s exits %i", (command, status) => {
     expect(runHook("denylist-gh.sh", command).status).toBe(status);
+  });
+
+  // A commit message here is one long line: in #100's retro, `git log
+  // --oneline -3` printed about 3k.
+  test.each([
+    ["git log --oneline -3", 2],
+    ["git log --oneline --stat -- CHANGELOG.md", 2],
+    ["git -C . log --oneline", 2],
+    ["git log --format='%h %<(100,trunc)%s' -3", 0],
+    ["git log -1 261c76f", 0],
+  ])("git-log-subjects.sh on %s exits %i", (command, status) => {
+    expect(runHook("git-log-subjects.sh", command).status).toBe(status);
   });
 
   test("denylist-gh.sh lets everything through without a denylist", () => {

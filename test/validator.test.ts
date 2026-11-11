@@ -11,6 +11,7 @@ import {
   CLAIM_HEAVY,
   PLAIN_PROSE,
   TAGGED_PLAIN,
+  TRUE_UNTAGGED,
 } from "./support/plain-prose.ts";
 import { blurb, corrected, week8Evidence } from "./support/week8-evidence.ts";
 
@@ -1159,6 +1160,17 @@ describe("invariants over a corpus", () => {
         );
         expect(hard, `section ${team}`).toEqual([]);
       }
+    },
+  );
+
+  test.each(TRUE_UNTAGGED)(
+    "a true untagged claim verifies against its claim's team, in section %s: %s",
+    (team, text, ids) => {
+      const r = validate(blurb(team, text));
+      expect(r.claims.map((c) => [c.text, c.status, c.id ?? null])).toEqual(
+        r.claims.map((c, i) => [c.text, "verified", ids[i] ?? null]),
+      );
+      expect(r.claims).toHaveLength(ids.length);
     },
   );
 
