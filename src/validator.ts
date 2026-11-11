@@ -1,4 +1,5 @@
 import type { TeamId } from "./league.ts";
+import { claimsTeam } from "./validator/claims-team.ts";
 import { agrees, resolve } from "./validator/evidence.ts";
 import {
   extract,
@@ -14,7 +15,7 @@ import {
   show,
   type Verdict,
 } from "./validator/judge.ts";
-import { namesTeam, type Span } from "./validator/names.ts";
+import type { Span } from "./validator/names.ts";
 import { wrongPlayer } from "./validator/players.ts";
 import { stakesMentions, swears } from "./validator/swears.ts";
 import { type Tag, unwrap } from "./validator/tags.ts";
@@ -60,8 +61,8 @@ interface Claim {
   start: number;
   end: number;
   tag?: Tag;
-  /** For an untagged claim: its shape and the teams its sentence names. */
-  untagged?: { shape: Found; teams: TeamId[] };
+  /** For an untagged claim: its shape and the claim's team. */
+  untagged?: { shape: Found; team: TeamId | null };
 }
 
 function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
@@ -99,7 +100,7 @@ function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
       : { status: "wrong", reason: show(ctx, r), hits: [] };
   }
   const u = claim.untagged as NonNullable<Claim["untagged"]>;
-  return judge(ctx, u.teams, claim.text, u.shape);
+  return judge(ctx, u.team, claim.text, u.shape);
 }
 
 export function validate(input: ValidatorInput): ValidationResult {
@@ -130,10 +131,6 @@ export function validate(input: ValidatorInput): ValidationResult {
     });
   }
   for (const { s, start } of units(plain)) {
-    const named = (Object.keys(input.nicknames) as TeamId[]).filter(
-      (t) => t !== input.team && namesTeam(ctx, t, s),
-    );
-    const teams = input.team ? [input.team, ...named] : named;
     for (const f of extract(ctx, s)) {
       const a = start + f.start;
       const b = start + f.end;
@@ -142,7 +139,10 @@ export function validate(input: ValidatorInput): ValidationResult {
         text: s.slice(f.start, f.end),
         start: a,
         end: b,
-        untagged: { shape: f, teams },
+        untagged: {
+          shape: f,
+          team: claimsTeam(ctx, s, f.start, input.team),
+        },
       });
     }
   }

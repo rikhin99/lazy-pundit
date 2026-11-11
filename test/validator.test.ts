@@ -183,8 +183,103 @@ describe("grounding prototype scenarios, pundit prose", () => {
       ["beat Bye Bye Bea", "wrong", "w8.opponent is Red Zone Rascals"],
       ["101.56-95.38", "verified", "week 8 score was 101.56-95.38"],
       ["second straight win", "verified", "streak is W2"],
-      ["8-0", "wrong", "record is 3-5, allplay is 35-53"],
+      ["8-0", "wrong", "sleeper:3/record is 7-1, sleeper:3/allplay is 62-26"],
       ["first", "verified", "sleeper:3/standing is 1, sleeper:3/place is 1"],
+    ]);
+  });
+
+  test("a claim's team: the team a result is against doesn't lend its stats", () => {
+    const judged = (text: string) =>
+      validate(blurb(6, text)).claims.map((c) => [
+        c.text,
+        c.status,
+        c.reason,
+        c.id,
+      ]);
+    // Gus Bus is 4-4, sixth, with 876.16 points for; Pylon Patrol is 3-5,
+    // eleventh, with 806.48.
+    expect(judged("Pete lost to Gus Bus by 55 and sits at 4-4.")).toEqual([
+      [
+        "lost to Gus Bus",
+        "verified",
+        "w8.result is L against Gus Bus",
+        "w8.result",
+      ],
+      ["55", "verified", "w8.margin is 55", "w8.margin"],
+      ["4-4", "wrong", "record is 3-5, allplay is 31-57", undefined],
+    ]);
+    expect(judged("Pete lost to Gus Bus by 55 and sits in sixth.")).toEqual([
+      [
+        "lost to Gus Bus",
+        "verified",
+        "w8.result is L against Gus Bus",
+        "w8.result",
+      ],
+      ["55", "verified", "w8.margin is 55", "w8.margin"],
+      ["sixth", "wrong", "standing is 11, place is 11", undefined],
+    ]);
+    expect(
+      judged("Pete lost to Gus Bus by 55 and has 876.16 points for."),
+    ).toEqual([
+      [
+        "lost to Gus Bus",
+        "verified",
+        "w8.result is L against Gus Bus",
+        "w8.result",
+      ],
+      ["55", "verified", "w8.margin is 55", "w8.margin"],
+      ["876.16", "wrong", "pf is 806.48", undefined],
+    ]);
+  });
+
+  test("a claim's team: a team named beside the claim is its team", () => {
+    const judged = (text: string) =>
+      validate(blurb(6, text)).claims.map((c) => [c.text, c.status, c.id]);
+    expect(judged("Gus Bus, at 4-4, sit in sixth.")).toEqual([
+      ["4-4", "verified", "sleeper:1/record"],
+      ["sixth", "verified", undefined],
+    ]);
+    expect(judged("Pete lost to Gus Bus (4-4) by 55.")).toEqual([
+      ["lost to Gus Bus", "verified", "w8.result"],
+      ["4-4", "verified", "sleeper:1/record"],
+      ["55", "verified", "w8.margin"],
+    ]);
+    expect(judged("Pete trails Bench Mob, who sit at 7-1.")).toEqual([
+      ["7-1", "verified", "sleeper:3/record"],
+    ]);
+    expect(judged("Pete fell to Gus Bus, who are 4-4 now.")).toEqual([
+      ["fell to Gus Bus", "verified", "w8.result"],
+      ["4-4", "verified", "sleeper:1/record"],
+    ]);
+    expect(judged("At 7-1, Bench Mob lead the league.")).toEqual([
+      ["7-1", "verified", "sleeper:3/record"],
+    ]);
+  });
+
+  test("a claim's team: a pronoun or a name in a later clause is the section's team again", () => {
+    const judged = (text: string) =>
+      validate(blurb(6, text)).claims.map((c) => [c.text, c.status, c.id]);
+    expect(judged("Gus Bus beat us by 55, and we sit at 3-5.")).toEqual([
+      ["55,", "verified", "sleeper:1/w8.margin"],
+      ["3-5", "verified", "record"],
+    ]);
+    expect(judged("While Bench Mob sit at 7-1, we are 3-5.")).toEqual([
+      ["7-1", "verified", "sleeper:3/record"],
+      ["3-5", "verified", "record"],
+    ]);
+    expect(
+      judged("Bench Mob are 7-1; meanwhile this team sits at 3-5 in 11th."),
+    ).toEqual([
+      ["7-1", "verified", "sleeper:3/record"],
+      ["3-5", "verified", "record"],
+      ["11th", "verified", undefined],
+    ]);
+    expect(judged("Gus Bus won by 55 and the loss leaves them 3-5.")).toEqual([
+      ["55", "verified", "sleeper:1/w8.margin"],
+      ["3-5", "verified", "record"],
+    ]);
+    expect(judged("Bench Mob lead, with Pete at 3-5.")).toEqual([
+      ["3-5", "verified", "record"],
     ]);
   });
 });

@@ -66,7 +66,8 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `validator.ts` | The validator's entry: claims, auto-tags, swears and, under `noStakes`, stakes mentions for one blurb | `validate`, `applyAutoTags`, `stripTags`, `isHard` |
 | `validator/types.ts` | Validator input/output and `EvidencePack`, `OrderEvidence` types | types |
 | `validator/extract.ts` (519) | Splitting text into units and finding claim shapes, each with the week it reads (the one its clause names, else the ranking week) | `units` |
-| `validator/judge.ts` (350) | Deciding each claim's status and reason | `judge` |
+| `validator/judge.ts` (330) | Deciding each claim's status and reason, an untagged claim from its claim's team's stats only | `judge` |
+| `validator/claims-team.ts` | The claim's team of an untagged claim: its clause's subject (a pronoun is the section's team), not a team a result is against or a preposition names; brackets or a "who" clause after a name, a fronted phrase, and a clause naming none carrying on the one before | `claimsTeam` |
 | `validator/evidence.ts` | Resolving an evidence ID; whether words agree with a fact | `resolve`, `agrees` |
 | `validator/players.ts` | The player a player fact (`w<N>.top`, `.zeros`, `.benchmiss`, `.opp.top` and their `_points`) names: a different player is wrong, naming both | `wrongPlayer`, `namesFactPlayer`, `isPlayerName`, `teamPrefix` (how a reason names another team's stat) |
 | `validator/tags.ts`, `validator/names.ts`, `validator/numbers.ts`, `validator/swears.ts` | Tag syntax and auto-tag writing, team-name matching, number words, the word list | `TAG`, `stripTags`, `applyAutoTags` (re-exported by `validator.ts`) |

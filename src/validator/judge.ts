@@ -46,9 +46,10 @@ export function show(ctx: Ctx, r: Resolved): string {
 export const LOOSE_PLAYOFF_PHRASE =
   "a loose playoff phrase; only clinched, a bye or eliminated is checked";
 
+/** Judges an untagged claim against its claim's team's stats only. */
 export function judge(
   ctx: Ctx,
-  teams: TeamId[],
+  team: TeamId | null,
   text: string,
   f: Found,
 ): Verdict {
@@ -61,25 +62,20 @@ export function judge(
   });
 
   if (shape.type === "result") {
-    const subjects = teams.filter((t) => t !== shape.opponent);
     const want = shape.won ? "W" : "L";
-    for (const t of subjects) {
-      const opp = resolve(ctx, `w${week}.opponent`, t);
-      const res = resolve(ctx, `w${week}.result`, t);
-      if (opp?.value === shape.opponent && res?.value === want) {
-        return {
-          status: "verified",
-          reason: `w${week}.result is ${want} against ${teamName(ctx, shape.opponent)}`,
-          hits: [{ team: t, stat: `w${week}.result` }],
-        };
-      }
-    }
-    const me = subjects[0];
+    const me = team === shape.opponent ? null : team;
     if (!me) return none("unchecked", "no team to check this result against");
     const opp = resolve(ctx, `w${week}.opponent`, me);
     const res = resolve(ctx, `w${week}.result`, me);
     if (!opp || !res)
       return none("unchecked", `no week ${week} result in the evidence pack`);
+    if (opp.value === shape.opponent && res.value === want) {
+      return {
+        status: "verified",
+        reason: `w${week}.result is ${want} against ${teamName(ctx, shape.opponent)}`,
+        hits: [{ team: me, stat: `w${week}.result` }],
+      };
+    }
     if (opp.value !== shape.opponent) {
       return none(
         "wrong",
@@ -90,33 +86,26 @@ export function judge(
   }
 
   if (shape.type === "score")
-    return judgeScore(ctx, teams, shape, f.end - f.start, week);
+    return judgeScore(ctx, team, shape, f.end - f.start, week);
 
   if (shape.type === "place") {
-    const hits: Hit[] = [];
-    let first: Resolved | null = null;
-    for (const t of teams) {
-      const r = resolve(ctx, shape.key, t);
-      if (!r || typeof r.value !== "number") continue;
-      first ??= r;
-      if (shape.test(r.value)) hits.push({ team: t, stat: shape.key });
-    }
-    if (hits.length)
-      return { status: "verified", reason: verifiedReason(ctx, hits), hits };
-    if (!first) return none("unchecked", noStats(ctx, week, [shape.key]));
-    return none("wrong", show(ctx, first));
+    const r = team ? resolve(ctx, shape.key, team) : null;
+    if (!r || typeof r.value !== "number")
+      return none("unchecked", noStats(ctx, week, [shape.key]));
+    if (!shape.test(r.value)) return none("wrong", show(ctx, r));
+    const hits: Hit[] = [{ team, stat: shape.key }];
+    return { status: "verified", reason: verifiedReason(ctx, hits), hits };
   }
 
   if (shape.type === "move") {
-    const t = teams[0];
-    const r = t ? resolve(ctx, "move", t) : null;
-    if (!t || !r) return none("unchecked", "no movement to check against");
+    const r = team ? resolve(ctx, "move", team) : null;
+    if (!team || !r) return none("unchecked", "no movement to check against");
     const ok = r.value === shape.by;
     if (ok)
       return {
         status: "verified",
-        reason: verifiedReason(ctx, [{ team: t, stat: "move" }]),
-        hits: [{ team: t, stat: "move" }],
+        reason: verifiedReason(ctx, [{ team, stat: "move" }]),
+        hits: [{ team, stat: "move" }],
       };
     if (r.value === "new")
       return none("wrong", "move is new: the team has no earlier place");
@@ -126,9 +115,8 @@ export function judge(
   if (shape.type === "group") {
     if (!groupsOf(ctx).length)
       return none("unchecked", "the ranking has no groups");
-    const t = teams[0];
-    const r = t ? resolve(ctx, "group", t) : null;
-    if (!t) return none("unchecked", "no team to check this group against");
+    if (!team) return none("unchecked", "no team to check this group against");
+    const r = resolve(ctx, "group", team);
     const label = r ? String(r.value) : null;
     const ok =
       label !== null &&
@@ -141,7 +129,7 @@ export function judge(
       return {
         status: "verified",
         reason: `group is ${label}`,
-        hits: [{ team: t, stat: "group" }],
+        hits: [{ team, stat: "group" }],
       };
     return none(
       "wrong",
@@ -153,27 +141,23 @@ export function judge(
     if (shape.want === null) {
       return none("unchecked", LOOSE_PLAYOFF_PHRASE);
     }
-    for (const t of teams) {
-      const r = resolve(ctx, "playoffs", t);
-      const v = r?.value;
-      const ok =
-        v === shape.want || (shape.want === "clinched" && v === "clinched_bye");
-      // A team knocked out of the bracket was eliminated, though it clinched.
-      const stat = ok
-        ? "playoffs"
-        : shape.want === "eliminated" && resolve(ctx, "knocked_out", t)
-          ? "knocked_out"
-          : null;
-      if (stat) {
-        return {
-          status: "verified",
-          reason: verifiedReason(ctx, [{ team: t, stat }]),
-          hits: [{ team: t, stat }],
-        };
-      }
+    const r = team ? resolve(ctx, "playoffs", team) : null;
+    const v = r?.value;
+    const ok =
+      v === shape.want || (shape.want === "clinched" && v === "clinched_bye");
+    // A team knocked out of the bracket was eliminated, though it clinched.
+    const stat = ok
+      ? "playoffs"
+      : shape.want === "eliminated" && team && resolve(ctx, "knocked_out", team)
+        ? "knocked_out"
+        : null;
+    if (stat) {
+      return {
+        status: "verified",
+        reason: verifiedReason(ctx, [{ team, stat }]),
+        hits: [{ team, stat }],
+      };
     }
-    const t = teams[0];
-    const r = t ? resolve(ctx, "playoffs", t) : null;
     return none(
       "wrong",
       r
@@ -200,11 +184,10 @@ export function judge(
   };
   const hitsFor = (keys: string[]): Hit[] => {
     const hits: Hit[] = [];
-    for (const t of teams) {
-      for (const k of keys) {
-        const r = resolve(ctx, k, t);
-        if (r && matches(r)) hits.push({ team: t, stat: k });
-      }
+    if (!team) return hits;
+    for (const k of keys) {
+      const r = resolve(ctx, k, team);
+      if (r && matches(r)) hits.push({ team, stat: k });
     }
     return hits;
   };
@@ -214,13 +197,12 @@ export function judge(
     if (hits.length)
       return { status: "verified", reason: verifiedReason(ctx, hits), hits };
     if (shape.score) {
-      const v = judgeScore(ctx, teams, shape.score, f.end - f.start, week);
+      const v = judgeScore(ctx, team, shape.score, f.end - f.start, week);
       if (v.status === "verified") return v;
     }
-    const t = teams[0];
-    const facts = t
+    const facts = team
       ? shape.keys
-          .map((k) => resolve(ctx, k, t))
+          .map((k) => resolve(ctx, k, team))
           .filter((r): r is Resolved => !!r)
       : [];
     if (!facts.length) return none("unchecked", noStats(ctx, week, shape.keys));
@@ -229,8 +211,8 @@ export function judge(
 
   // nothing says which stat: try every stat of the right shape
   const pool = new Set<string>();
-  for (const t of teams) {
-    for (const [k, v] of Object.entries(ctx.evidence.teams[t] ?? {})) {
+  if (team) {
+    for (const [k, v] of Object.entries(ctx.evidence.teams[team] ?? {})) {
       const kind = kindOf(k, v);
       if (
         shape.ordinal
@@ -240,7 +222,7 @@ export function judge(
         pool.add(k);
       }
     }
-    if (shape.ordinal && ctx.order[t]) pool.add("place");
+    if (shape.ordinal && ctx.order[team]) pool.add("place");
   }
   const hits = hitsFor([...pool]);
   if (!shape.ordinal) {
@@ -266,7 +248,8 @@ export function judge(
 
 export function judgeScore(
   ctx: Ctx,
-  teams: TeamId[],
+  /** The claim's team; its matchup's score is read from either side. */
+  team: TeamId | null,
   shape: ScoreWords,
   length: number,
   /** The week the claim reads (`Found.week`). */
@@ -276,17 +259,16 @@ export function judgeScore(
   const O = `w${week}.opp_points`;
   const first = { start: 0, end: shape.split };
   const second = { start: shape.split + 1, end: length };
-  for (const t of teams) {
-    const pts = resolve(ctx, P, t)?.value;
-    const opp = resolve(ctx, O, t)?.value;
-    if (typeof pts !== "number" || typeof opp !== "number") continue;
+  const pts = team ? resolve(ctx, P, team)?.value : undefined;
+  const opp = team ? resolve(ctx, O, team)?.value : undefined;
+  if (typeof pts === "number" && typeof opp === "number") {
     if (numMatch(shape.a, null, pts) && numMatch(shape.b, null, opp)) {
       return {
         status: "verified",
         reason: `week ${week} score was ${pts}-${opp}`,
         hits: [
-          { team: t, stat: P, part: first },
-          { team: t, stat: O, part: second },
+          { team, stat: P, part: first },
+          { team, stat: O, part: second },
         ],
       };
     }
@@ -295,15 +277,12 @@ export function judgeScore(
         status: "verified",
         reason: `week ${week} score was ${opp}-${pts}, from the opponent's side`,
         hits: [
-          { team: t, stat: O, part: first },
-          { team: t, stat: P, part: second },
+          { team, stat: O, part: first },
+          { team, stat: P, part: second },
         ],
       };
     }
   }
-  const t = teams[0];
-  const pts = t ? resolve(ctx, P, t)?.value : undefined;
-  const opp = t ? resolve(ctx, O, t)?.value : undefined;
   if (pts === undefined || opp === undefined) {
     return {
       status: "unchecked",

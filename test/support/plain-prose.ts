@@ -42,6 +42,12 @@ export const PLAIN_PROSE = [
   // player names outside any tag (#69)
   "Bijan Robinson would have changed everything.",
   "Taylor did his job, nobody else did.",
+  // other teams beside the words that pick a claim's team (#100)
+  "Pete lost to Gus Bus (again) and blamed the kicker.",
+  "Pete trails Bench Mob, who never sleep.",
+  "At home, Bench Mob lead the way, with Pete behind them.",
+  "Gus Bus beat us, and we know it.",
+  "Nobody wants to be on the wrong end of Bench Mob, than whom nobody is hotter.",
 ];
 
 /**

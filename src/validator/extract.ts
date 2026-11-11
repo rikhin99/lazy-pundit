@@ -101,7 +101,7 @@ const NAMED_WEEK =
   /\b(?:(?:in|during|for)\s+(?:week|wk)\s*(\d{1,2})\b|(?:week|wk)\s*(\d{1,2})['’]s\b|this week\b)/gi;
 
 /** Where one clause ends and the next begins. */
-const CLAUSE_BREAK =
+export const CLAUSE_BREAK =
   /[,;:()—–]|\s-\s|\b(?:and|but|while|though|although|whereas)\b/gi;
 
 /**
