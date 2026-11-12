@@ -21,6 +21,7 @@ import {
   personaStatus,
   personaText,
   proposedHandles,
+  RERUN_STEPS,
   SetupRefusal,
   type StakesAnswers,
   settingsText,
@@ -41,17 +42,6 @@ import {
   type Workspace,
 } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
-
-/** The setup steps `setup <step>` re-runs, in the order `init` asks them. */
-export const RERUN_STEPS = [
-  "handles",
-  "lore",
-  "stakes",
-  "method",
-  "key",
-  "cap",
-  "persona",
-] as const;
 
 export type RerunStep = (typeof RERUN_STEPS)[number];
 

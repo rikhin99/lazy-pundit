@@ -18,6 +18,7 @@ import {
   type ChecklistItem,
   COMMON_HOUSE_RULES,
   ConfigFileError,
+  changeAnswersNote,
   check,
   checkKey,
   checkLeague,
@@ -764,7 +765,7 @@ async function setUpLeague(deps: Deps): Promise<boolean> {
     }),
   )?.trim();
   const where = { punditName, league, ...(dir ? { dir } : {}) };
-  await checkWorkspace(deps, where);
+  log.info(changeAnswersNote(deps, await checkWorkspace(deps, where)));
   const handles = await askHandles(league);
   const lore = handles.skipRest
     ? { skipRest: true }

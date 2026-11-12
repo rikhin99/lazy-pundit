@@ -1,9 +1,18 @@
-import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { dropWorkspaces } from "../src/config.ts";
 import {
+  changeAnswersNote,
   checkLeague,
+  checkWorkspace,
   type Deps,
   defaultPunditName,
   draft,
@@ -328,6 +337,61 @@ test("a league already set up is refused before the live fetch", async () => {
   await expect(
     refuseLeagueSetUp(deps, { punditName: "Rikhin", leagueId: "2" }),
   ).resolves.toBeUndefined();
+});
+
+test("init says how to change each answer after setup, naming every step setup re-runs", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const { slug, dir } = await checkWorkspace(deps, {
+    punditName: "Rikhin",
+    league,
+  });
+
+  expect(changeAnswersNote(deps, { slug, dir })).toBe(
+    `To change an answer after setup, run lazy-pundit --league fear-the-turtle setup <step>, with <step> one of: handles, lore, stakes, method, key, cap, persona.\nTo change the pundit name, platform, league or folder, delete ${dir} and the fear-the-turtle: line under workspaces: in ${join(deps.configDir, "config.yaml")}, then run lazy-pundit init again.`,
+  );
+});
+
+test("a league whose folder and config.yaml line were deleted, as the note says, is set up again under its own slug", async () => {
+  const deps = atWeek(await operator(), 8);
+  const where = {
+    punditName: "Rikhin",
+    league: await checkLeague(deps, FEAR_THE_TURTLE_ID),
+  };
+  const first = await setUpWorkspace(deps, where);
+  await rm(first.dir, { recursive: true });
+  const config = join(deps.configDir, "config.yaml");
+  const listed = await readFile(config, "utf8");
+  // The league's line, deleted by hand, leaves a bare `workspaces:`; the
+  // operator's comment on it should outlive the next league listed.
+  const commented = listed.replace(
+    "workspaces:\n",
+    "# Each league's folder.\nworkspaces:\n",
+  );
+  await writeFile(
+    config,
+    commented.replace(`  fear-the-turtle: ${first.dir}\n`, ""),
+  );
+  expect(await readFile(config, "utf8")).toMatch(
+    /\n# Each league's folder\.\nworkspaces:\n$/,
+  );
+
+  await expect(
+    refuseLeagueSetUp(deps, {
+      punditName: "Rikhin",
+      leagueId: FEAR_THE_TURTLE_ID,
+    }),
+  ).resolves.toBeUndefined();
+  const own = { slug: "fear-the-turtle", dir: first.dir };
+  expect(await checkWorkspace(deps, where)).toEqual(own);
+  expect(await setUpWorkspace(deps, where)).toMatchObject(own);
+  expect(await readFile(config, "utf8")).toBe(commented);
+  expect(
+    await findWorkspace(deps, {
+      cwd: deps.workspacesDir,
+      league: "fear-the-turtle",
+    }),
+  ).toBe(first.dir);
 });
 
 test("a pundit's name defaults from config.yaml", async () => {

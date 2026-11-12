@@ -4,8 +4,13 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 ## 0.1.1
 
+### Added
+
+- `init` says, once the workspace folder is accepted and before the first setup step, how to change an answer afterwards: `lazy-pundit --league <slug> setup <step>` for the setup steps it names, and for the pundit name, platform, league or folder, deleting the workspace's folder and its line under `workspaces:` in `config.yaml` (both paths given), then running `init` again.
+
 ### Fixed
 
+- A `config.yaml` whose `workspaces:` has nothing under it, as deleting its last line by hand leaves it, reads as listing no workspaces, and `init` lists the next one under it. Before, every command refused the file.
 - `check` no longer verifies a claim about the section's team from an opponent's stat. In a blurb such as "lost to Gus Bus by 55 and sits at 4-4", the record is judged against the section's team, the claim's team, and is wrong if it isn't that team's record, though the opponent's record fits. A claim is judged against another team only when that team is the subject of its clause ("while Bench Mob sit at 7-1") or the claim comes straight after its name, in brackets or a "who" clause ("lost to Gus Bus (4-4)", "trails Bench Mob, who sit at 7-1"). "We", "they" and "this team" are the section's team.
 - `check` reads "the fourth loss in a row" and "a 2nd win in a row" as streak claims, as it already read "fourth straight loss" and "four losses in a row": each is verified or wrong against the team's streak and auto-tagged when true. Before, the streak in such a sentence was neither verified nor listed. "3rd straight loss", with the ordinal in digits, is read too.
 - A Sleeper team name or manager display name with spaces at its ends ("Team C ") is trimmed, so the draft's heading, tagged team names and `check`'s problems list no longer carry the extra space. Spaces inside a name stay as Sleeper has them. A draft written by 0.1.0 with the untrimmed name still checks and refreshes without a new problem, but keeps the extra space, and publishes it, until the pundit removes it by hand, which is safe.

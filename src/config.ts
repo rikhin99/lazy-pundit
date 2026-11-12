@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import { parse, parseDocument, stringify } from "yaml";
+import { isMap, parse, parseDocument, stringify } from "yaml";
 import { type ZodType, z } from "zod";
 import type { Deps } from "./deps.ts";
 
@@ -40,16 +40,22 @@ export const configSchema = z.object({
   spend_cap_usd: z.number().nonnegative().default(5),
   /** Prices that replace or add to the table shipped with the tool, by model. */
   prices: z.record(z.string(), priceSchema).default({}),
-  /** Each league workspace by slug: its folder. */
-  workspaces: z
-    .record(
-      slugSchema,
-      z.string().refine(isAbsolute, {
-        error:
-          "give the workspace's full path, such as /Users/you/lazy-pundit/<slug> (not ~ or a relative path)",
-      }),
-    )
-    .default({}),
+  /**
+   * Each league workspace by slug: its folder. A bare `workspaces:`, left when
+   * the last line under it is deleted by hand, lists none.
+   */
+  workspaces: z.preprocess(
+    (workspaces) => workspaces ?? undefined,
+    z
+      .record(
+        slugSchema,
+        z.string().refine(isAbsolute, {
+          error:
+            "give the workspace's full path, such as /Users/you/lazy-pundit/<slug> (not ~ or a relative path)",
+        }),
+      )
+      .default({}),
+  ),
 });
 
 export type Config = z.output<typeof configSchema>;
@@ -172,6 +178,11 @@ export async function listWorkspace(
   const doc = parseDocument(await readFile(path, "utf8"));
   if (config.name === undefined) doc.set("name", entry.name);
   if (entry.spendCap !== undefined) doc.set("spend_cap_usd", entry.spendCap);
+  // A bare `workspaces:` is a null, which setIn can't add under. Set in place,
+  // it keeps the key's spot in the file and the comments on it.
+  if (doc.has("workspaces") && !isMap(doc.get("workspaces"))) {
+    doc.set("workspaces", doc.createNode({}));
+  }
   doc.setIn(["workspaces", entry.slug], entry.dir);
   const mode = (await stat(path)).mode & 0o777;
   await writeConfigFile(path, doc.toString(), mode);

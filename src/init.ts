@@ -3,6 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { stringify } from "yaml";
 import { checkAnthropicKey } from "./anthropic.ts";
 import {
+  configPath,
   defaultConfig,
   listWorkspace,
   loadCredentials,
@@ -891,6 +892,32 @@ export async function checkWorkspace(
   );
   await refuseFolderInUse(dir);
   return { slug, dir };
+}
+
+/**
+ * The setup steps `setup <step>` re-runs, in the order `init` asks them. Here
+ * rather than in `rerun.ts`, which imports this file, so init's note can name
+ * them.
+ */
+export const RERUN_STEPS = [
+  "handles",
+  "lore",
+  "stakes",
+  "method",
+  "key",
+  "cap",
+  "persona",
+] as const;
+
+/**
+ * Said once the folder is accepted, before the first setup step: how to change
+ * an answer after setup, for the setup steps and for the steps before them.
+ */
+export function changeAnswersNote(
+  deps: Pick<Deps, "configDir">,
+  workspace: { slug: string; dir: string },
+): string {
+  return `To change an answer after setup, run lazy-pundit --league ${workspace.slug} setup <step>, with <step> one of: ${RERUN_STEPS.join(", ")}.\nTo change the pundit name, platform, league or folder, delete ${workspace.dir} and the ${workspace.slug}: line under workspaces: in ${configPath(deps)}, then run lazy-pundit init again.`;
 }
 
 /** What the key and cap step still has to ask this operator. */

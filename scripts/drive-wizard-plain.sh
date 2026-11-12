@@ -18,16 +18,18 @@ printf '%s\n' "$raw" |
     pending != "" { if ($0 == "│") print pending; pending = "" }
     # A line clack wrapped, with no symbol of its own, belongs to the last kept one.
     cont && $0 != "" && $0 !~ /^(│|└|┌|◇|◆|●|■|▲)/ && $0 !~ /^(HOME|EXIT) / { print; next }
-    { cont = 0 }
+    # A log line of several lines: each one after the first is "│  <text>".
+    logged && /^│  ./ { print; next }
+    { cont = 0; logged = 0 }
     answer {
       answer = 0
       if ($0 ~ /^│  ./ && $0 !~ /^│  _$/) { print; next }
     }
     /◇  / { sub(/^.*◇/, "◇"); print; answer = 1; cont = 1; next }
     /◆  / { sub(/^.*◆/, "◆"); pending = $0; next }
-    /●  / { sub(/^.*●/, "●"); print; cont = 1; next }
-    /▲  / { sub(/^.*▲/, "▲"); print; cont = 1; next }
-    /■  / { sub(/^.*■/, "■"); print; cont = 1; next }
+    /●  / { sub(/^.*●/, "●"); print; cont = 1; logged = 1; next }
+    /▲  / { sub(/^.*▲/, "▲"); print; cont = 1; logged = 1; next }
+    /■  / { sub(/^.*■/, "■"); print; cont = 1; logged = 1; next }
     /^└  ./ { print; next }
     /^[A-Z]/ { print }
   '
