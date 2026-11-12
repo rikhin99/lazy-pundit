@@ -183,6 +183,7 @@ export async function operator(): Promise<Deps> {
     cacheDir: join(home, ".cache", "lazy-pundit"),
     configDir: join(home, ".config", "lazy-pundit"),
     workspacesDir: join(home, "lazy-pundit"),
+    homeDir: home,
     env: { nodeVersion: "v24.0.0" },
   };
 }

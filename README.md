@@ -15,7 +15,7 @@ node -v
 - **git**: npm fetches Lazy Pundit from GitHub with it. On a Mac, if `git --version` offers to install the command line developer tools, click Install, wait for it to finish, and run `git --version` again. On Linux, install `git` with your package manager.
 - **Node**: `node -v` should print `v24` or higher. If it prints an older version or isn't found, install the LTS version from [nodejs.org](https://nodejs.org/), then open a new terminal and run `node -v` again. Node comes with npm, which installs Lazy Pundit.
 
-Lazy Pundit hasn't been tried on Windows. If you try it, run everything inside WSL (Windows Subsystem for Linux) as on Linux, and install Node inside WSL with a version manager such as [nvm](https://github.com/nvm-sh/nvm), since the installer from nodejs.org installs Windows' own Node.
+On Windows, Lazy Pundit works inside WSL (Windows Subsystem for Linux): run everything there as on Linux, and install Node inside WSL with a version manager such as [nvm](https://github.com/nvm-sh/nvm), since the installer from nodejs.org installs Windows' own Node. It hasn't been tried outside WSL, in PowerShell or cmd.
 
 ## Install
 
@@ -42,8 +42,12 @@ Run `lazy-pundit init`. It asks:
 1. **Your name**, as it goes on your rankings.
 2. **Which platform the league is on.** Pick Sleeper; ESPN and Yahoo stop there for now.
 3. **Your Sleeper league.** When it asks for your Sleeper account, type your account name on Sleeper (not the email or phone number you sign in with), and pick the league from that account's leagues this season. If you're not sure of the name, leave it empty and type the league ID instead: the number in the league's URL on sleeper.com. Every Sleeper league can be read this way, with no login. An account name Sleeper doesn't know gives "Sleeper has no account named …", and init asks again. An account with no leagues this season says so, and init asks for a league ID.
-4. **The workspace folder.** Leave it empty for a new folder in `~/lazy-pundit/`, named after the league (`~/lazy-pundit/fear-the-turtle`, say).
+4. **The workspace folder**: the folder itself, not one to make it in. Type its full path (`/Users/you/leagues/fear-the-turtle`, say) or start it with `~/` (`~/leagues/fear-the-turtle`); init refuses any other path and asks again. Leave it empty for the folder the question names: for your first league, a new folder in `~/lazy-pundit/` named after the league (`~/lazy-pundit/fear-the-turtle`); after that, a new folder next to the last workspace you set up. A path ending in `.` is likely a typo, so init asks whether to use it without the dot.
 5. **The setup steps**: manager handles, lore and nicknames, stakes and house rules (with whether it's a family league, read by people of any age, which keeps every persona clean), the power-score method, your Anthropic key and spend cap, and the persona. Each one but the spend cap can be skipped (the cap is passed over when you skip the key), with "Skip the rest" for all that are left, and answered later with `lazy-pundit setup <step>`.
+
+**One league per workspace.** Each league gets its own folder, so for several leagues run `init` for each (or answer Yes to "Set up another league?"), and keep their folders under one parent, such as `~/leagues/fear-the-turtle` and `~/leagues/<another league>`. After the first, init offers the next folder in the same parent.
+
+**Moving a workspace.** Nothing in a workspace records where it is, so move its folder, then change its line under `workspaces:` in `config.yaml` (see Config and credentials) to the new full path. Everything in it comes along. Deleting the folder and running `init` again, as init's note says, sets the league up from scratch instead.
 
 **The Anthropic key is optional.** With one, the LLM (Claude) writes a first draft of the intro and blurbs in your persona. With none, `draft` writes a stat line for each team instead, and you write the words yourself. To get a key, make an account at [console.anthropic.com](https://console.anthropic.com/), add a little credit to the account, and create an API key. You can add the key later with `lazy-pundit setup key`.
 

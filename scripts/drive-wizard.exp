@@ -3,7 +3,12 @@
 # the fetch replayed offline. Run it with `npm run -s drive:wizard -- <scenario>`.
 #
 #   full            every default, the key skipped, no second league
-#   folder <path>   the same, with this workspace folder
+#   folder <path>   the same, with this workspace folder (~/my-league works too)
+#   relative        the folder typed as my-league, refused, asked again, left empty
+#   dot             the folder typed as <home>/ws., the fix without the dot taken
+#   dot-keep        the same, with <home>/ws. kept as typed
+#   next-to         config.yaml already lists a workspace at <home>/elsewhere/league-a,
+#                   so the folder left empty is <home>/elsewhere/fear-the-turtle
 #   bad-id          an unknown league ID, re-asked, then Ctrl-C
 #   yahoo, espn     pick a platform that stops the wizard
 #   cancel          Ctrl-C at the first prompt
@@ -36,8 +41,8 @@ set cancelled {bad-id cancel cancel-folder another again}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
+if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -92,6 +97,15 @@ proc need {prompt} {
 set DOWN "\033\[B"
 set CTRL_C "\x03"
 
+if {$scenario eq "next-to"} {
+  # A workspace for another league, listed but never made, so the league
+  # match skips it.
+  file mkdir "$home/.config/lazy-pundit"
+  set config [open "$home/.config/lazy-pundit/config.yaml" w]
+  puts $config "format: 1\nworkspaces:\n  league-a: $home/elsewhere/league-a"
+  close $config
+}
+
 spawn node "$repo/src/cli.ts" init
 need "pundit name"
 if {$scenario eq "cancel"} { send $CTRL_C; finish }
@@ -114,10 +128,21 @@ if {$scenario eq "bad-id"} {
 }
 send "900000000000000001\r"
 
+if {$scenario eq "next-to"} { need "next to your last one" }
 need "Workspace folder"
 if {$scenario eq "cancel-folder"} { send $CTRL_C; finish }
 if {$scenario eq "folder"} {
   send "$folder\r"
+} elseif {$scenario eq "relative"} {
+  send "my-league\r"
+  need "full path"
+  need "Workspace folder"
+  send "\r"
+} elseif {$scenario in {dot dot-keep}} {
+  send "$home/ws.\r"
+  need "ends in a dot"
+  if {$scenario eq "dot-keep"} { send $DOWN; after 200 }
+  send "\r"
 } elseif {$scenario in {setup-lore setup-stakes}} {
   send "$home/ws\r"
 } else {
@@ -191,6 +216,16 @@ need "Which persona"
 send "\r"
 
 need "Set up another"
+# The dot scenarios' workspace is in the folder picked, and only there.
+if {$scenario in {dot dot-keep}} {
+  set made [expr {$scenario eq "dot" ? "$home/ws" : "$home/ws."}]
+  set unmade [expr {$scenario eq "dot" ? "$home/ws." : "$home/ws"}]
+  if {![file exists "$made/workspace.md"] || [file exists $unmade]} {
+    puts "\nWRONG FOLDER: $made should hold the workspace, $unmade shouldn't exist"
+    exec kill -9 [exp_pid]
+    exit 7
+  }
+}
 if {$scenario eq "another"} {
   send "y"; after 200; send "\r"
   need "pundit name"

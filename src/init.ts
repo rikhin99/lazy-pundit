@@ -1,5 +1,5 @@
 import { mkdir, readdir, rm } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { stringify } from "yaml";
 import { checkAnthropicKey } from "./anthropic.ts";
 import {
@@ -865,26 +865,71 @@ export async function setupChecklist(
 }
 
 /**
+ * The folder a league's workspace gets when the folder question is left
+ * empty: next to the last workspace `config.yaml` lists, in a folder named
+ * after its slug, or in the workspaces folder with none listed. `nextTo` is
+ * that last workspace, so the wizard can say why.
+ */
+export async function defaultWorkspaceFolder(
+  deps: Pick<Deps, "configDir" | "workspacesDir">,
+  league: LeagueCheck,
+): Promise<{ dir: string; nextTo?: string }> {
+  const listed = (await readConfig(deps))?.workspaces ?? {};
+  return defaultFolder(deps, listed, freeSlug(listed, league.name));
+}
+
+function defaultFolder(
+  deps: Pick<Deps, "workspacesDir">,
+  listed: Record<string, string>,
+  slug: string,
+): { dir: string; nextTo?: string } {
+  const last = Object.values(listed).at(-1);
+  if (last === undefined) return { dir: join(deps.workspacesDir, slug) };
+  return { dir: join(dirname(last), slug), nextTo: last };
+}
+
+/**
+ * A typed folder whose last part ends in a dot, such as `my-league.`, without
+ * those dots: likely a typo, which would make a sibling of the folder meant.
+ * Undefined for any other path, and for a last part of only dots.
+ */
+export function withoutTrailingDots(typed: string): string | undefined {
+  const path = typed.replace(/\/+$/, "");
+  const fixed = path.replace(/\.+$/, "");
+  if (fixed === path || fixed === "" || fixed.endsWith("/")) return undefined;
+  return fixed;
+}
+
+/** A typed folder with a leading `~` or `~/` in the home folder; any other as typed. */
+function inHome(deps: Pick<Deps, "homeDir">, typed: string): string {
+  return typed === "~" || typed.startsWith("~/")
+    ? join(deps.homeDir, typed.slice(1))
+    : typed;
+}
+
+/**
  * Where a league's workspace would go: its slug and folder, or the refusal
  * `setUpWorkspace` would give. Nothing is written, so the wizard can say so
  * right after the folder question rather than after every other step.
  */
 export async function checkWorkspace(
-  deps: Pick<Deps, "configDir" | "workspacesDir">,
+  deps: Pick<Deps, "configDir" | "workspacesDir" | "homeDir">,
   answers: { punditName: string; league: LeagueCheck; dir?: string },
 ): Promise<{ slug: string; dir: string }> {
   const { league } = answers;
   const name = answers.punditName.trim();
   const nameProblem = punditNameProblem(name);
   if (nameProblem !== undefined) throw new SetupRefusal(nameProblem);
-  if (answers.dir !== undefined && !isAbsolute(answers.dir)) {
+  const chosen =
+    answers.dir === undefined ? undefined : inHome(deps, answers.dir);
+  if (chosen !== undefined && !isAbsolute(chosen)) {
     throw new SetupRefusal(
-      `Give the workspace's full path, such as ${join(deps.workspacesDir, "my-league")}, not ${answers.dir}.`,
+      `Give the workspace's full path, such as ${join(deps.workspacesDir, "my-league")} or ~/my-league, not ${answers.dir}.`,
     );
   }
   const listed = (await readConfig(deps))?.workspaces ?? {};
   const slug = freeSlug(listed, league.name);
-  const dir = answers.dir ?? join(deps.workspacesDir, slug);
+  const dir = chosen ?? defaultFolder(deps, listed, slug).dir;
   await refuseLeagueInWorkspace(
     [...Object.values(listed), dir],
     league.leagueId,
@@ -1048,7 +1093,7 @@ const WRITTEN = [
  * file `writeStepFiles` adds goes in `WRITTEN`.
  */
 export async function setUpWorkspace(
-  deps: Pick<Deps, "configDir" | "workspacesDir" | "clock" | "env">,
+  deps: Pick<Deps, "configDir" | "workspacesDir" | "homeDir" | "clock" | "env">,
   answers: {
     punditName: string;
     league: LeagueCheck;

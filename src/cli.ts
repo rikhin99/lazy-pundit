@@ -27,6 +27,7 @@ import {
   type DoctorCheck,
   DraftExistsError,
   defaultPunditName,
+  defaultWorkspaceFolder,
   deleteTranscripts,
   doctor,
   draft,
@@ -94,6 +95,7 @@ import {
   type TeamNicknames,
   WINNER_TAKES_ALL,
   WorkspaceFileError,
+  withoutTrailingDots,
 } from "./index.ts";
 
 /** The `lazy-pundit` bin: it parses args, prompts and prints. The library does the rest. */
@@ -732,6 +734,53 @@ async function askPersona(
   return picked === SKIP ? undefined : (picked as PresetName);
 }
 
+/**
+ * Asks for the workspace folder until one is accepted, questioning a last part
+ * that ends in a dot before anything is checked or made.
+ */
+async function askFolder(
+  deps: Deps,
+  punditName: string,
+  league: LeagueCheck,
+): Promise<{ slug: string; dir: string }> {
+  const emptyAnswer = await defaultWorkspaceFolder(deps, league);
+  if (emptyAnswer.nextTo !== undefined) {
+    log.info(
+      `A new workspace goes next to your last one, ${emptyAnswer.nextTo}.`,
+    );
+  }
+  for (;;) {
+    const typed = answered(
+      await text({
+        message: `Workspace folder (leave empty for ${emptyAnswer.dir})`,
+      }),
+    )?.trim();
+    const fixed = typed ? withoutTrailingDots(typed) : undefined;
+    const dir =
+      typed && fixed
+        ? answered(
+            await select({
+              message: `${typed} ends in a dot. Which folder?`,
+              options: [
+                { value: fixed, label: fixed },
+                { value: typed, label: `${typed}, as typed` },
+              ],
+            }),
+          )
+        : typed;
+    try {
+      return await checkWorkspace(deps, {
+        punditName,
+        league,
+        ...(dir ? { dir } : {}),
+      });
+    } catch (err) {
+      if (!(err instanceof SetupRefusal)) throw err;
+      log.error(err.message);
+    }
+  }
+}
+
 /** One league through every step, or false if the platform stops setup. */
 async function setUpLeague(deps: Deps): Promise<boolean> {
   const punditName = answered(
@@ -759,13 +808,9 @@ async function setUpLeague(deps: Deps): Promise<boolean> {
   const league = await askLeague(deps, punditName);
   log.success(`${league.name}, ${league.season}: ${league.teams} teams.`);
   for (const warning of league.warnings) log.warn(warning);
-  const dir = answered(
-    await text({
-      message: `Workspace folder (leave empty for a new one in ${deps.workspacesDir})`,
-    }),
-  )?.trim();
-  const where = { punditName, league, ...(dir ? { dir } : {}) };
-  log.info(changeAnswersNote(deps, await checkWorkspace(deps, where)));
+  const folder = await askFolder(deps, punditName, league);
+  log.info(changeAnswersNote(deps, folder));
+  const where = { punditName, league, dir: folder.dir };
   const handles = await askHandles(league);
   const lore = handles.skipRest
     ? { skipRest: true }

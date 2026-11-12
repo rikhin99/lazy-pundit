@@ -51,6 +51,7 @@ export {
   checkLeague,
   checkWorkspace,
   defaultPunditName,
+  defaultWorkspaceFolder,
   familyLeagueDefault,
   familyLeagueLowers,
   HANDLES_SKIPPED,
@@ -94,6 +95,7 @@ export {
   spendCapWarning,
   type TeamNicknames,
   WINNER_TAKES_ALL,
+  withoutTrailingDots,
 } from "./init.ts";
 export type {
   Claim,

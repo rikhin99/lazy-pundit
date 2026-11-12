@@ -8,13 +8,14 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { dropWorkspaces } from "../src/config.ts";
+import { dropWorkspaces, listWorkspace } from "../src/config.ts";
 import {
   changeAnswersNote,
   checkLeague,
   checkWorkspace,
   type Deps,
   defaultPunditName,
+  defaultWorkspaceFolder,
   draft,
   FetchError,
   findWorkspace,
@@ -25,6 +26,7 @@ import {
   SetupRefusal,
   setUpWorkspace,
   sleeperLeagues,
+  withoutTrailingDots,
 } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import {
@@ -476,7 +478,7 @@ test("a chosen folder is used; a relative one or one in use is refused with noth
   const home = dirname(deps.workspacesDir);
 
   await expect(
-    setUpWorkspace(deps, { punditName: "Rikhin", league, dir: "~/leagues/x" }),
+    setUpWorkspace(deps, { punditName: "Rikhin", league, dir: "leagues/x" }),
   ).rejects.toThrow(/full path/);
 
   const inUse = join(home, "in-use");
@@ -498,6 +500,81 @@ test("a chosen folder is used; a relative one or one in use is refused with noth
   expect(await findWorkspace(deps, { cwd: "/", league: set.slug })).toBe(
     chosen,
   );
+});
+
+test("a second league's workspace defaults to a folder next to the last one listed", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const home = dirname(deps.workspacesDir);
+  expect(await defaultWorkspaceFolder(deps, league)).toEqual({
+    dir: join(deps.workspacesDir, "fear-the-turtle"),
+  });
+
+  for (const [slug, parent] of [
+    ["league-z", "first"],
+    ["league-a", "elsewhere"],
+  ] as const) {
+    await listWorkspace(deps, {
+      name: "Rikhin",
+      slug,
+      dir: join(home, parent, slug),
+    });
+  }
+  const dir = join(home, "elsewhere", "fear-the-turtle");
+  expect(await defaultWorkspaceFolder(deps, league)).toEqual({
+    dir,
+    nextTo: join(home, "elsewhere", "league-a"),
+  });
+  expect(await checkWorkspace(deps, { punditName: "Rikhin", league })).toEqual({
+    slug: "fear-the-turtle",
+    dir,
+  });
+});
+
+test("a folder typed with ~ is in the home folder; any other relative one is refused", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const home = deps.homeDir;
+  for (const [typed, refusal] of [
+    [
+      "leagues/x",
+      `Give the workspace's full path, such as ${home}/lazy-pundit/my-league or ~/my-league, not leagues/x.`,
+    ],
+    [
+      "~bo/x",
+      `Give the workspace's full path, such as ${home}/lazy-pundit/my-league or ~/my-league, not ~bo/x.`,
+    ],
+    [
+      "./x",
+      `Give the workspace's full path, such as ${home}/lazy-pundit/my-league or ~/my-league, not ./x.`,
+    ],
+  ] as const) {
+    await expect(
+      checkWorkspace(deps, { punditName: "Rikhin", league, dir: typed }),
+    ).rejects.toThrow(refusal);
+  }
+  const dir = join(deps.homeDir, "leagues", "x");
+  expect(
+    await setUpWorkspace(deps, {
+      punditName: "Rikhin",
+      league,
+      dir: "~/leagues/x",
+    }),
+  ).toMatchObject({ slug: "fear-the-turtle", dir });
+  expect(
+    await findWorkspace(deps, { cwd: "/", league: "fear-the-turtle" }),
+  ).toBe(dir);
+});
+
+test("a typed folder whose last part ends in a dot is offered without the dots", () => {
+  expect(withoutTrailingDots("/a/lazy-pundit-testing.")).toBe(
+    "/a/lazy-pundit-testing",
+  );
+  expect(withoutTrailingDots("~/b/league..")).toBe("~/b/league");
+  expect(withoutTrailingDots("/a/b./")).toBe("/a/b");
+  for (const typed of ["/a/b", "/a/.", "/a/..", "/a/...", "/a.b/c", "~"]) {
+    expect(withoutTrailingDots(typed)).toBeUndefined();
+  }
 });
 
 test("a pundit name with no letter or digit is refused", async () => {

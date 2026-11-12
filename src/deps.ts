@@ -23,6 +23,8 @@ export interface Deps {
   configDir: string;
   /** The folder new league workspaces go in by default, one per league slug. */
   workspacesDir: string;
+  /** The operator's home folder, which a typed `~` stands for. */
+  homeDir: string;
   /** What the environment overrides or reports. */
   env: Environment;
 }
@@ -75,6 +77,7 @@ export function systemDeps(): Deps {
       "lazy-pundit",
     ),
     workspacesDir: join(home, "lazy-pundit"),
+    homeDir: home,
     env: {
       ...(env.ANTHROPIC_API_KEY
         ? { anthropicApiKey: env.ANTHROPIC_API_KEY }
