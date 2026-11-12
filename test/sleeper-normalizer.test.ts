@@ -324,6 +324,29 @@ describe("Sleeper league settings, teams and transactions", () => {
     expect(team("sleeper:5")).toMatchObject({ name: "Team 5", managers: [] });
   });
 
+  test("team names and display names lose spaces at their ends; a blank team name falls back to the display name", async () => {
+    const league = await patched(8, {
+      users: (users) => {
+        for (const u of users) {
+          if (u.user_id === "800000000000000001")
+            u.metadata = { ...u.metadata, team_name: "  Team  C " };
+          if (u.user_id === "800000000000000003") {
+            u.display_name = " benchwarmer_bo  ";
+            u.metadata = { ...u.metadata, team_name: "   " };
+          }
+        }
+      },
+    });
+    const team = (id: string) => league.teams.find((t) => t.id === id);
+    expect(team("sleeper:1")?.name).toBe("Team  C");
+    expect(team("sleeper:3")).toMatchObject({
+      name: "benchwarmer_bo",
+      managers: [
+        { accountId: "800000000000000003", displayName: "benchwarmer_bo" },
+      ],
+    });
+  });
+
   test("current rosters carry each player's status and injury", async () => {
     const league = await committed(15);
     const roster = league.teams.find((t) => t.id === "sleeper:5")?.roster ?? [];

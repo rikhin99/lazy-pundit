@@ -201,6 +201,45 @@ describe("draft", () => {
     );
   });
 
+  test("a Sleeper team name with spaces at its ends is written and checked trimmed", async () => {
+    const { dir, deps: base } = await onStandings(8);
+    const deps: Deps = {
+      ...base,
+      transport: patchingTransport(base.transport, {
+        [`${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}/users`]: (users) => {
+          for (const u of users)
+            if (u.display_name === "tank_commander")
+              u.metadata = { ...u.metadata, team_name: " Team C " };
+        },
+      }),
+    };
+
+    const { path } = await draft(dir, deps);
+
+    const text = await readFile(path, "utf8");
+    const heading = "## Team C {team=sleeper:10}\n";
+    expect(text).toContain(heading);
+    expect(text).toContain(
+      "[lost to]{ev=w8.result} [Team C]{ev=w8.opponent} by [31.3]{ev=w8.margin}\n",
+    );
+
+    // Team C is 4-4.
+    await writeFile(path, text.replace(heading, `${heading}At 5-3.\n`));
+    const { problems } = await check(dir, deps);
+    expect(withoutReminder(problems)).toEqual([
+      expect.objectContaining({ section: "Team C", text: "5-3" }),
+    ]);
+
+    // A 0.1.0 draft holds the untrimmed name, and still checks clean.
+    await writeFile(
+      path,
+      text
+        .replace(heading, "## Team C  {team=sleeper:10}\n")
+        .replace("[Team C]{ev=w8.opponent}", "[Team C ]{ev=w8.opponent}"),
+    );
+    expect(withoutReminder((await check(dir, deps)).problems)).toEqual([]);
+  });
+
   test.each([
     [1, "week-01.md"],
     [15, "week-15.md"],

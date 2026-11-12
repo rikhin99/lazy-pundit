@@ -46,8 +46,9 @@ const leagueSchema = z.object({
 const usersSchema = z.array(
   z.object({
     user_id: z.string(),
-    display_name: z.string().nullish(),
-    metadata: z.object({ team_name: z.string().nullish() }).nullish(),
+    // Sleeper keeps spaces at a name's ends; inner runs stay as they are.
+    display_name: z.string().trim().nullish(),
+    metadata: z.object({ team_name: z.string().trim().nullish() }).nullish(),
   }),
 );
 
