@@ -13,6 +13,8 @@
 #   key             enter a key, which the replay can't check, so it's saved with
 #                   a warning that it couldn't be checked; cap 0.10
 #   another         every default, then a second league, cancelled at its name
+#   again           every default, then a second league with the same league ID
+#                   typed, refused as already set up, re-asked, then Ctrl-C
 #   stakes          money at stake: buy-in 50, the default payouts, a $10 weekly high score
 #   family          a family league type, so the family league and Family persona are preselected
 #   setup-lore      every default into <home>/ws, a hand edit to lore.md, then setup lore
@@ -30,12 +32,12 @@
 
 # The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
 # setup does. drive-wizard-all.sh reads this line.
-set cancelled {bad-id cancel cancel-folder another}
+set cancelled {bad-id cancel cancel-folder another again}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another stakes family setup-lore setup-stakes}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|stakes|family|setup-lore|setup-stakes"
+if {$scenario ni {full folder bad-id yahoo espn cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -192,6 +194,21 @@ need "Set up another"
 if {$scenario eq "another"} {
   send "y"; after 200; send "\r"
   need "pundit name"
+  send $CTRL_C
+  finish
+}
+if {$scenario eq "again"} {
+  send "y"; after 200; send "\r"
+  need "pundit name"
+  send "\r"
+  need "Which platform"
+  send "\r"
+  need "username"
+  send "\r"
+  need "number in the"
+  send "900000000000000001\r"
+  need "already set up in"
+  need "username"
   send $CTRL_C
   finish
 }

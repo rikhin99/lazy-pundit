@@ -183,7 +183,7 @@ A change the pundit made by hand to a file a setup step wrote. Re-running the st
 `init`'s prompts: they ask for each setup step's answers in order and hand them to the library. Only the CLI has one.
 
 **Pick list**:
-The league data step's list of a platform account's leagues this season, to choose from instead of typing a league ID.
+The league data step's list of a platform account's leagues this season, to choose from instead of typing a league ID. A league a listed workspace already holds is marked with that workspace's folder, and picking it is refused.
 
 **Credentials**:
 The operator's secrets: the Anthropic key and the ESPN cookie. They belong to the operator, never to a league workspace, so a workspace can be shared or backed up without them.

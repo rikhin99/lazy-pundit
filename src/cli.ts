@@ -66,6 +66,7 @@ import {
   punditNameProblem,
   type RerunStep,
   refresh,
+  refuseLeagueSetUp,
   renderStatsTable,
   rerunLeague,
   rerunPreselections,
@@ -405,7 +406,7 @@ async function askLeagueId(deps: Deps): Promise<string> {
           options: [
             ...leagues.map((l) => ({
               value: l.leagueId,
-              label: `${l.name} (${l.season}, ${l.teams} teams)`,
+              label: `${l.name} (${l.season}, ${l.teams} teams)${l.setUpIn === undefined ? "" : `, set up in ${l.setUpIn}`}`,
             })),
             { value: "", label: "Type a league ID instead" },
           ],
@@ -422,11 +423,12 @@ async function askLeagueId(deps: Deps): Promise<string> {
   ).trim();
 }
 
-/** Asks for a league until one passes the live fetch. */
-async function askLeague(deps: Deps): Promise<LeagueCheck> {
+/** Asks for a league until one isn't set up yet and passes the live fetch. */
+async function askLeague(deps: Deps, punditName: string): Promise<LeagueCheck> {
   for (;;) {
     try {
       const leagueId = await askLeagueId(deps);
+      await refuseLeagueSetUp(deps, { punditName, leagueId });
       log.info("Fetching the league from Sleeper…");
       return await checkLeague(deps, leagueId);
     } catch (err) {
@@ -753,7 +755,7 @@ async function setUpLeague(deps: Deps): Promise<boolean> {
     log.warn(stop);
     return false;
   }
-  const league = await askLeague(deps);
+  const league = await askLeague(deps, punditName);
   log.success(`${league.name}, ${league.season}: ${league.teams} teams.`);
   for (const warning of league.warnings) log.warn(warning);
   const dir = answered(

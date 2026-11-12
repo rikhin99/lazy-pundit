@@ -576,11 +576,21 @@ function seasonAt(date: Date): string {
   return String(date.getMonth() < 2 ? year - 1 : year);
 }
 
-/** The league data step's pick list: a Sleeper account's leagues this season. */
+/** A league in the pick list, with the folder of the workspace that holds it, if one does. */
+export interface PickListLeague extends LeagueChoice {
+  setUpIn?: string;
+}
+
+/**
+ * The league data step's pick list: a Sleeper account's leagues this season,
+ * each marked with the listed workspace that already holds it. Sleeper gives
+ * each season's league its own ID, so one set up for an earlier season only
+ * isn't marked.
+ */
 export async function sleeperLeagues(
-  deps: Pick<Deps, "transport" | "clock">,
+  deps: Pick<Deps, "transport" | "clock" | "configDir">,
   accountName: string,
-): Promise<LeagueChoice[]> {
+): Promise<PickListLeague[]> {
   const leagues = await sleeperUserLeagues(
     deps.transport,
     accountName,
@@ -589,7 +599,28 @@ export async function sleeperLeagues(
   if (leagues === undefined) {
     throw new SetupRefusal(`Sleeper has no account named ${accountName}.`);
   }
-  return leagues;
+  const dirs = await listedWorkspaceDirs(deps);
+  return Promise.all(
+    leagues.map(async (league) => {
+      const holder = await workspaceHolding(dirs, league.leagueId);
+      return holder === undefined ? league : { ...league, setUpIn: holder.dir };
+    }),
+  );
+}
+
+/**
+ * Refuses a league a listed workspace already holds, as the folder check
+ * would, so `init` can say so before the league data step's live fetch.
+ */
+export async function refuseLeagueSetUp(
+  deps: Pick<Deps, "configDir">,
+  answers: { punditName: string; leagueId: string },
+): Promise<void> {
+  await refuseLeagueInWorkspace(
+    await listedWorkspaceDirs(deps),
+    answers.leagueId,
+    slugOf(answers.punditName.trim()),
+  );
 }
 
 /** What's wrong with a pundit name, which has to give a slug, or undefined. */
@@ -599,25 +630,42 @@ export function punditNameProblem(name: string): string | undefined {
     : undefined;
 }
 
-/** Refuses a league one of these folders already holds a workspace for. */
-async function refuseLeagueInWorkspace(
+/** The folders `config.yaml` lists a workspace in. */
+async function listedWorkspaceDirs(
+  deps: Pick<Deps, "configDir">,
+): Promise<string[]> {
+  return Object.values((await readConfig(deps))?.workspaces ?? {});
+}
+
+/** The first of these folders whose workspace holds the league, with its pundit. */
+async function workspaceHolding(
   dirs: string[],
   leagueId: string,
-  pundit: string,
-): Promise<void> {
+): Promise<{ dir: string; pundit: string } | undefined> {
   for (const dir of dirs) {
     // A listed workspace that can't be read is `doctor`'s to report.
     const ws = await readWorkspace(dir).catch((err: unknown) => {
       if (err instanceof WorkspaceFileError) return undefined;
       throw err;
     });
-    if (ws?.season.leagueId !== leagueId) continue;
-    throw new SetupRefusal(
-      ws.pundit === pundit
-        ? `This league is already set up in ${dir}.`
-        : `This league's workspace in ${dir} belongs to ${ws.pundit}, and multi-pundit is a later stage.`,
-    );
+    if (ws?.season.leagueId === leagueId) return { dir, pundit: ws.pundit };
   }
+  return undefined;
+}
+
+/** Refuses a league one of these folders already holds a workspace for. */
+async function refuseLeagueInWorkspace(
+  dirs: string[],
+  leagueId: string,
+  pundit: string,
+): Promise<void> {
+  const holder = await workspaceHolding(dirs, leagueId);
+  if (holder === undefined) return;
+  throw new SetupRefusal(
+    holder.pundit === pundit
+      ? `This league is already set up in ${holder.dir}.`
+      : `This league's workspace in ${holder.dir} belongs to ${holder.pundit}, and multi-pundit is a later stage.`,
+  );
 }
 
 /** The league's slug, numbered if another league's workspace has it. */

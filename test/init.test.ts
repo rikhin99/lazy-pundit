@@ -12,6 +12,7 @@ import {
   PLATFORM_WAIT_MS,
   platformStop,
   punditNameProblem,
+  refuseLeagueSetUp,
   SetupRefusal,
   setUpWorkspace,
   sleeperLeagues,
@@ -252,6 +253,81 @@ test("an unknown Sleeper username is refused by name", async () => {
   await expect(sleeperLeagues(await operator(), "nobody")).rejects.toThrow(
     /no account named nobody/,
   );
+});
+
+test("the pick list marks a league a listed workspace already holds", async () => {
+  const fixture = atWeek(await operator(), 8);
+  const league = await checkLeague(fixture, FEAR_THE_TURTLE_ID);
+  const { dir } = await setUpWorkspace(fixture, {
+    punditName: "Rikhin",
+    league,
+  });
+  const deps = {
+    ...fixture,
+    transport: sleeperAccount(fixture.transport, "rikhin", [
+      {
+        league_id: FEAR_THE_TURTLE_ID,
+        name: "Fear The Turtle",
+        season: "2025",
+        total_rosters: 12,
+      },
+      { league_id: "2", name: "Family", season: "2025", total_rosters: 8 },
+    ]),
+  };
+  expect(await sleeperLeagues(deps, "rikhin")).toEqual([
+    {
+      leagueId: FEAR_THE_TURTLE_ID,
+      name: "Fear The Turtle",
+      season: "2025",
+      teams: 12,
+      setUpIn: dir,
+    },
+    { leagueId: "2", name: "Family", season: "2025", teams: 8 },
+  ]);
+});
+
+test("a league set up only for an earlier season isn't marked", async () => {
+  const fixture = atWeek(await operator(), 8);
+  const league = await checkLeague(fixture, FEAR_THE_TURTLE_ID);
+  // Sleeper gives each season's league its own ID.
+  await setUpWorkspace(fixture, {
+    punditName: "Rikhin",
+    league: { ...league, leagueId: "700", season: "2024" },
+  });
+  const deps = {
+    ...fixture,
+    transport: sleeperAccount(fixture.transport, "rikhin", [
+      {
+        league_id: FEAR_THE_TURTLE_ID,
+        name: "Fear The Turtle",
+        season: "2025",
+        total_rosters: 12,
+      },
+    ]),
+  };
+  const [choice] = await sleeperLeagues(deps, "rikhin");
+  expect(choice).not.toHaveProperty("setUpIn");
+});
+
+test("a league already set up is refused before the live fetch", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const { dir } = await setUpWorkspace(deps, { punditName: "Rikhin", league });
+
+  await expect(
+    refuseLeagueSetUp(deps, {
+      punditName: " Rikhin ",
+      leagueId: FEAR_THE_TURTLE_ID,
+    }),
+  ).rejects.toThrow(`This league is already set up in ${dir}.`);
+  await expect(
+    refuseLeagueSetUp(deps, { punditName: "Bo", leagueId: FEAR_THE_TURTLE_ID }),
+  ).rejects.toThrow(
+    `This league's workspace in ${dir} belongs to rikhin, and multi-pundit is a later stage.`,
+  );
+  await expect(
+    refuseLeagueSetUp(deps, { punditName: "Rikhin", leagueId: "2" }),
+  ).resolves.toBeUndefined();
 });
 
 test("a pundit's name defaults from config.yaml", async () => {
