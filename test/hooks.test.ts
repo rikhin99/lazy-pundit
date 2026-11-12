@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -45,6 +45,11 @@ const REFUSED: Record<string, object> = {
   "git-log-subjects.sh": {
     tool_name: "Bash",
     tool_input: { command: "git log --oneline -3" },
+  },
+  "plain-prose-reminder.sh": {
+    tool_name: "Edit",
+    session_id: `refused-${basename(TMP)}`,
+    tool_input: { file_path: join(ROOT, "src", "validator", "extract.ts") },
   },
 };
 
@@ -127,6 +132,24 @@ describe("the repo's hooks", () => {
     ["git log -1 261c76f", 0],
   ])("git-log-subjects.sh on %s exits %i", (command, status) => {
     expect(runHook("git-log-subjects.sh", command).status).toBe(status);
+  });
+
+  // In #100 and #102 the standards review's one hard finding was a validator
+  // change with no plain-prose entries.
+  test("plain-prose-reminder.sh speaks once a session, on a claim-shape file", () => {
+    const session = `once-${basename(TMP)}`;
+    const edit = (...path: string[]) =>
+      spawnSync(join(ROOT, ".claude", "hooks", "plain-prose-reminder.sh"), {
+        input: JSON.stringify({
+          tool_name: "Edit",
+          session_id: session,
+          tool_input: { file_path: join(ROOT, ...path) },
+        }),
+        encoding: "utf8",
+      }).status;
+    expect(edit("src", "validator", "judge.ts")).toBe(0);
+    expect(edit("src", "validator", "claims-team.ts")).toBe(2);
+    expect(edit("src", "validator", "extract.ts")).toBe(0);
   });
 
   test("denylist-gh.sh lets everything through without a denylist", () => {
