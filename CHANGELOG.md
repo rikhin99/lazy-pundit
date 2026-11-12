@@ -7,6 +7,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 ### Fixed
 
 - `check` no longer verifies a claim about the section's team from an opponent's stat. In a blurb such as "lost to Gus Bus by 55 and sits at 4-4", the record is judged against the section's team, the claim's team, and is wrong if it isn't that team's record, though the opponent's record fits. A claim is judged against another team only when that team is the subject of its clause ("while Bench Mob sit at 7-1") or the claim comes straight after its name, in brackets or a "who" clause ("lost to Gus Bus (4-4)", "trails Bench Mob, who sit at 7-1"). "We", "they" and "this team" are the section's team.
+- `check` reads "the fourth loss in a row" and "a 2nd win in a row" as streak claims, as it already read "fourth straight loss" and "four losses in a row": each is verified or wrong against the team's streak and auto-tagged when true. Before, the streak in such a sentence was neither verified nor listed. "3rd straight loss", with the ordinal in digits, is read too.
 
 ## 0.1.0
 

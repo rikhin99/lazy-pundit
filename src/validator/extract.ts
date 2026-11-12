@@ -333,10 +333,11 @@ export function extract(ctx: Ctx, s: string): Found[] {
     });
   }
 
-  // streaks
+  // streaks: "three straight (losses)", a skid or heater, "three losses in a
+  // row", "the third loss in a row"
   for (const m of s.matchAll(
     new RegExp(
-      `\\b(?:\\d+|${NUMW}|${ORDW})(?:[- ]games?)?(?: straight| consecutive| in a row)+(?! weeks?\\b)(?:\\s+(?:wins?|losses|loss|games|w's|l's|heater|skid|win(?:ning)? streak|losing streak)\\b)?|\\b(?:\\d+|${NUMW})[- ]game (?:heater|skid|win(?:ning)? streak|losing streak)\\b|\\b(?:\\d+|${NUMW}) (?:wins|losses) in a row\\b`,
+      `\\b(?:\\d+(?:st|nd|rd|th)?|${NUMW}|${ORDW})(?:[- ]games?)?(?: straight| consecutive| in a row)+(?! weeks?\\b)(?:\\s+(?:wins?|losses|loss|games|w's|l's|heater|skid|win(?:ning)? streak|losing streak)\\b)?|\\b(?:\\d+|${NUMW})[- ]game (?:heater|skid|win(?:ning)? streak|losing streak)\\b|\\b(?:\\d+(?:st|nd|rd|th)?|${NUMW}|${ORDW}) (?:wins?|loss(?:es)?) in a row\\b`,
       "gi",
     ),
   )) {

@@ -189,6 +189,64 @@ describe("grounding prototype scenarios, pundit prose", () => {
     ]);
   });
 
+  test("a streak as '<ordinal> loss/win in a row' is judged like '<ordinal> straight loss'", () => {
+    const judged = (team: number, text: string) => {
+      const r = validate(blurb(team, text));
+      return {
+        claims: r.claims.map((c) => [c.text, c.status, c.reason, c.id]),
+        tagged: applyAutoTags(text, r.autoTags),
+      };
+    };
+    // Pylon Patrol (sleeper:6) is on L3; Kim Possible Kicks (sleeper:7) on W2.
+    expect(judged(6, "That was the third loss in a row.")).toEqual({
+      claims: [["third loss in a row", "verified", "streak is L3", "streak"]],
+      tagged: "That was the [third loss in a row]{ev=streak}.",
+    });
+    expect(judged(6, "That was the fourth loss in a row.").claims).toEqual([
+      ["fourth loss in a row", "wrong", "streak is L3", undefined],
+    ]);
+    expect(judged(7, "That was a second win in a row.")).toEqual({
+      claims: [["second win in a row", "verified", "streak is W2", "streak"]],
+      tagged: "That was a [second win in a row]{ev=streak}.",
+    });
+    expect(judged(7, "That was a 3rd win in a row.").claims).toEqual([
+      ["3rd win in a row", "wrong", "streak is W2", undefined],
+    ]);
+    // In a comma clause after a result against Gus Bus (W1), it's still the
+    // section's team's streak.
+    const afterResult = (n: string) =>
+      judged(
+        6,
+        `Pete lost to Gus Bus by 55, the ${n} loss in a row, and sits at 3-5.`,
+      ).claims.filter((c) => c[0] === `${n} loss in a row`);
+    expect(afterResult("third")).toEqual([
+      ["third loss in a row", "verified", "streak is L3", "streak"],
+    ]);
+    expect(afterResult("fourth")).toEqual([
+      ["fourth loss in a row", "wrong", "streak is L3", undefined],
+    ]);
+    // The forms read before this wording keep their results.
+    expect(judged(6, "That was a third straight loss.").claims).toEqual([
+      ["third straight loss", "verified", "streak is L3", "streak"],
+    ]);
+    expect(judged(6, "That was a 3rd straight loss.").claims).toEqual([
+      ["3rd straight loss", "verified", "streak is L3", "streak"],
+    ]);
+    expect(judged(6, "That makes it three losses in a row.").claims).toEqual([
+      ["three losses in a row", "verified", "streak is L3", "streak"],
+    ]);
+    expect(judged(7, "That was a second straight win.").claims).toEqual([
+      ["second straight win", "verified", "streak is W2", "streak"],
+    ]);
+    expect(judged(7, "That was the third straight win.").claims).toEqual([
+      ["third straight win", "wrong", "streak is W2", undefined],
+    ]);
+    // "in a row" after anything but a loss or win isn't a streak.
+    expect(
+      judged(6, "Bottom half for the second year in a row.").claims,
+    ).toEqual([]);
+  });
+
   test("a claim's team: the team a result is against doesn't lend its stats", () => {
     const judged = (text: string) =>
       validate(blurb(6, text)).claims.map((c) => [

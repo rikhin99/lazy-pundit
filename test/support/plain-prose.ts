@@ -21,6 +21,9 @@ export const PLAIN_PROSE = [
   // odd phrasing found in review (#41)
   "They've won 7 games.",
   "Second straight week at the top.",
+  "Bottom half for the second year in a row.",
+  "The second time in a row the bench outscored the starters.",
+  "Nobody saw that kind of loss in a row coming.",
   "Up 3 on the year.",
   "Seven wins, one loss.",
   "Three weeks ago this looked like a contender.",
@@ -128,6 +131,16 @@ export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
     6,
     "Gus Bus have won one straight, while Pete has lost three straight.",
     ["sleeper:1/streak", "streak"],
+  ],
+  [
+    6,
+    "Pete lost to Gus Bus by 55, the third loss in a row, and sits at 3-5.",
+    ["w8.result", "w8.margin", "streak", "record"],
+  ],
+  [
+    7,
+    "Kim Possible Kicks beat Red Zone Rascals for a 2nd win in a row.",
+    ["w8.result", "streak"],
   ],
   [
     6,
