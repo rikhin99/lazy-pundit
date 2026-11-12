@@ -16,3 +16,6 @@ fixtures/denylist.txt
 
 # Private documents (signed agreements and the like): never pushed
 private/
+
+# Scratch runs that need the test helpers (docs/agents/ticket-workflow.md step 2)
+test/scratch-*
