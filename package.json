@@ -32,6 +32,7 @@
     "fixture:workspace": "node scripts/fixture-workspace.ts",
     "drive:wizard": "expect scripts/drive-wizard.exp",
     "drive:wizard:all": "bash scripts/drive-wizard-all.sh",
+    "drive:wizard:plain": "bash scripts/drive-wizard-plain.sh",
     "outline": "node scripts/outline.ts",
     "mutate": "node scripts/mutate.ts",
     "trace": "node scripts/trace-context.ts",
