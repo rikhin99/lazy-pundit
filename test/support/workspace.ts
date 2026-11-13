@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -13,10 +13,12 @@ import {
   normalizeSleeper,
   type Problem,
   publish,
+  readManifest,
   readSnapshot,
   type Transport,
 } from "../../src/index.ts";
 import { SLEEPER_API } from "../../src/sleeper/api.ts";
+import { listSnapshots } from "../../src/snapshot.ts";
 import { noLlm } from "./llm.ts";
 
 export const FIXTURES = join(
@@ -163,6 +165,41 @@ export function failingOn(deps: Deps, url: string): Deps {
           : deps.transport.request(req),
     },
   };
+}
+
+/**
+ * Deletes the blob of `id`'s snapshot in `dir`'s workspace that no other
+ * snapshot there lists, as a hand deletion would, and gives its path.
+ */
+export async function deleteOwnBlob(dir: string, id: string): Promise<string> {
+  const snapshots = join(dir, ".snapshots");
+  const others = new Set<string>();
+  for (const other of await listSnapshots(snapshots)) {
+    if (other.id === id) continue;
+    for (const r of other.manifest.requests) others.add(r.sha256);
+  }
+  const { requests } = await readManifest(snapshots, id);
+  const own = requests.find((r) => !others.has(r.sha256));
+  if (!own) throw new Error(`snapshot ${id} has no blob of its own`);
+  const path = join(snapshots, "blobs", `${own.sha256}.json.gz`);
+  await rm(path);
+  return path;
+}
+
+/**
+ * Writes a snapshot of week 10, fetched 2025-11-05, into `dir`'s workspace,
+ * newer than any a week-8 draft makes and named by nothing, and gives its ID.
+ */
+export async function newerSnapshot(dir: string, deps: Deps): Promise<string> {
+  const d = atWeek(deps, 10);
+  const { id } = await fetchSleeperSnapshot({
+    transport: d.transport,
+    clock: fixedClock("2025-11-05T15:00:00.000Z"),
+    snapshotsDir: join(dir, ".snapshots"),
+    cacheDir: d.cacheDir,
+    leagueId: FEAR_THE_TURTLE_ID,
+  });
+  return id;
 }
 
 /**

@@ -161,7 +161,7 @@ A fetch of every week: the first fetch, any fetch more than 2 weeks after the la
 Which snapshots are kept: every snapshot a draft or frozen copy names, as its snapshot or one of its earlier snapshots, and the latest of each season. Others older than 14 days are deleted, along with stored payloads no kept snapshot uses.
 
 **Last complete snapshot**:
-The newest snapshot of the season in the league workspace. When a fetch fails or comes back partial, the command writes nothing and continues from it, saying its data as of and the command to run once fetching works. With none, the command stops, writing nothing, and its error ends with the fix for what failed.
+The newest snapshot of the season in the league workspace whose data all reads: one with a stored payload gone or damaged is skipped, and left as it is. When a fetch fails or comes back partial, the command writes nothing and continues from it, saying its data as of and the command to run once fetching works. With none, the command stops, writing nothing, and its error ends with the fix for what failed.
 _Avoid_: Fallback snapshot (a fallback is the LLM's)
 
 ## Setup and cost

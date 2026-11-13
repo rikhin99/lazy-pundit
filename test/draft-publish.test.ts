@@ -17,11 +17,13 @@ import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { scriptedLlm } from "./support/llm.ts";
 import {
   atWeek,
+  deleteOwnBlob,
   FEAR_THE_TURTLE_ID,
   failingOn,
   fearTheTurtle,
   fixedClock,
   frontMatter,
+  newerSnapshot,
   onStandings,
   patchingTransport,
   published,
@@ -57,6 +59,39 @@ describe("draft: a failed fetch", () => {
         reason: `couldn't fetch: GET ${WEEK_10} failed. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
       }),
     );
+  });
+
+  test("skips a newer snapshot missing a blob, continuing from the older complete one", async () => {
+    const { dir, deps } = await onStandings(8);
+    const first = await draft(dir, deps);
+    await rm(first.path);
+    await deleteOwnBlob(dir, await newerSnapshot(dir, deps));
+    const snapshots = await readdir(join(dir, ".snapshots"));
+
+    const result = await draft(dir, failingOn(atWeek(deps, 10), WEEK_10));
+
+    expect(result.week).toBe(8);
+    expect(result.snapshot).toBe(first.snapshot);
+    expect(await readdir(join(dir, ".snapshots"))).toEqual(snapshots);
+    expect(result.problems).toContainEqual(
+      expect.objectContaining({
+        kind: "failed-fetch",
+        reason: `couldn't fetch: GET ${WEEK_10} failed. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
+      }),
+    );
+  });
+
+  test("skips a newer snapshot with a damaged blob too", async () => {
+    const { dir, deps } = await onStandings(8);
+    const first = await draft(dir, deps);
+    await rm(first.path);
+    const blob = await deleteOwnBlob(dir, await newerSnapshot(dir, deps));
+    await writeFile(blob, "not gzip");
+
+    const result = await draft(dir, failingOn(atWeek(deps, 10), WEEK_10));
+
+    expect(result.snapshot).toBe(first.snapshot);
+    expect(result.problems.map((p) => p.kind)).toContain("failed-fetch");
   });
 
   test("a request that runs out of time continues from the last complete snapshot, with the failed-fetch item", async () => {
@@ -121,6 +156,26 @@ describe("draft: a failed fetch", () => {
         throw new Error(`not a FetchError: ${err}`);
       return err;
     }
+
+    test("the season's only snapshot missing a blob gives the same stop, writing nothing", async () => {
+      const { dir, deps } = await onStandings(8);
+      const first = await draft(dir, deps);
+      await rm(first.path);
+      await deleteOwnBlob(dir, first.snapshot);
+      const snapshots = await readdir(join(dir, ".snapshots"));
+
+      const err = await draft(
+        dir,
+        failingOn(atWeek(deps, 10), `${LEAGUE}/matchups/10`),
+      ).catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(FetchError);
+      expect((err as FetchError).message).toBe(
+        `GET ${LEAGUE}/matchups/10 failed. Once fetching works, run the command again.`,
+      );
+      expect(await readdir(rankingsDir(dir))).toEqual([]);
+      expect(await readdir(join(dir, ".snapshots"))).toEqual(snapshots);
+    });
 
     test("a failed request says to run the command again, not refresh", async () => {
       const WEEK_8 = `${LEAGUE}/matchups/8`;

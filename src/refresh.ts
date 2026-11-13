@@ -24,6 +24,8 @@ import {
   type FetchFix,
   listSnapshots,
   readSnapshot,
+  type Snapshot,
+  SnapshotDamagedError,
 } from "./snapshot.ts";
 import { triggerWinnerChanges } from "./stakes.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
@@ -270,9 +272,10 @@ export interface FetchedOrContinued extends FetchedSleeper {
 
 /**
  * `fetchFresh`, except that a failed or partial fetch continues from the last
- * complete snapshot: the season's newest, whose `write` writes nothing and
- * gives it back. With no snapshot to continue from, it stops with the fetch's
- * error, its message ending with the fix for what failed.
+ * complete snapshot: the season's newest whose data all reads, whose `write`
+ * writes nothing and gives it back. With no snapshot to continue from, it
+ * stops with the fetch's error, its message ending with the fix for what
+ * failed.
  */
 export async function fetchOrContinue(
   ws: Workspace,
@@ -284,25 +287,45 @@ export async function fetchOrContinue(
   } catch (err) {
     if (!(err instanceof FetchError)) throw err;
     const dir = snapshotsDir(ws);
-    const last = (await listSnapshots(dir))
-      .filter(
-        ({ manifest: m }) =>
-          m.platform === ws.season.platform &&
-          m.league_id === ws.season.leagueId &&
-          m.season === ws.season.year,
-      )
-      .at(-1);
-    if (!last) {
-      throw new FetchError(`${err.message}. ${FETCH_FIXES[err.fix].stopping}`, {
-        cause: err,
-        fix: err.fix,
-      });
+    const seasonSnapshots = (await listSnapshots(dir)).filter(
+      ({ manifest: m }) =>
+        m.platform === ws.season.platform &&
+        m.league_id === ws.season.leagueId &&
+        m.season === ws.season.year,
+    );
+    for (const candidate of seasonSnapshots.reverse()) {
+      const snapshot = await readIfComplete(dir, candidate.id);
+      if (!snapshot) continue;
+      return {
+        league: normalizeSleeper(snapshot),
+        write: async () => candidate,
+        failedFetch: failedFetchItem(err, candidate.manifest.fetched_at),
+      };
     }
-    return {
-      league: normalizeSleeper(await readSnapshot(dir, last.id)),
-      write: async () => last,
-      failedFetch: failedFetchItem(err, last.manifest.fetched_at),
-    };
+    throw new FetchError(`${err.message}. ${FETCH_FIXES[err.fix].stopping}`, {
+      cause: err,
+      fix: err.fix,
+    });
+  }
+}
+
+/**
+ * The snapshot, or nothing when its manifest or a blob it lists is gone or
+ * damaged: skipped silently, neither deleted nor repaired.
+ */
+async function readIfComplete(
+  dir: string,
+  id: string,
+): Promise<Snapshot | undefined> {
+  try {
+    return await readSnapshot(dir, id);
+  } catch (err) {
+    if (
+      (err as NodeJS.ErrnoException).code === "ENOENT" ||
+      err instanceof SnapshotDamagedError
+    )
+      return undefined;
+    throw err;
   }
 }
 

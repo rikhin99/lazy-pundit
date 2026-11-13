@@ -15,11 +15,13 @@ import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { scriptedLlm } from "./support/llm.ts";
 import {
   atWeek,
+  deleteOwnBlob,
   FEAR_THE_TURTLE_ID,
   failingOn,
   fixedClock,
   frontMatter,
   type Json,
+  newerSnapshot,
   onStandings,
   type Patch,
   patchingTransport,
@@ -470,6 +472,26 @@ describe("refresh", () => {
       kind: "failed-fetch",
       reason: `couldn't fetch: GET ${WEEK_8} failed. Continuing from the last complete snapshot, data as of ${data_as_of}. Once fetching works, run: lazy-pundit refresh`,
     });
+  });
+
+  test("a failed fetch skips a newer snapshot missing a blob, continuing from the draft's own", async () => {
+    const { dir, deps, read, snapshots } = await drafted();
+    const text = await read();
+    await deleteOwnBlob(dir, await newerSnapshot(dir, deps));
+    const before = await snapshots();
+
+    const result = await refresh(dir, failingOn(later(deps), WEEK_8));
+
+    expect(await read()).toBe(text);
+    expect(await snapshots()).toEqual(before);
+    expect(result.changes).toEqual([]);
+    expect(result.fromLastComplete).toBe(true);
+    expect(result.problems).toContainEqual(
+      expect.objectContaining({
+        kind: "failed-fetch",
+        reason: `couldn't fetch: GET ${WEEK_8} failed. Continuing from the last complete snapshot, data as of 2025-10-28T15:00:00.000Z. Once fetching works, run: lazy-pundit refresh`,
+      }),
+    );
   });
 
   test("a league the platform doesn't know gives the league ID to check, not refresh", async () => {
