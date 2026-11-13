@@ -155,10 +155,12 @@ export {
 } from "./ranking-weeks.ts";
 export { type RefreshResult, refresh } from "./refresh.ts";
 export {
+  editsWorkspace,
   type HandEdit,
   isRerunStep,
   linkedHandles,
   type RerunStep,
+  refuseUneditableWorkspace,
   rerunLeague,
   rerunPreselections,
   rerunStep,

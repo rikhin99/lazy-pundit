@@ -1,6 +1,6 @@
-import { chmod, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { configPath, loadCredentials, readConfig } from "../src/config.ts";
 import {
   COMMON_HOUSE_RULES,
@@ -8,10 +8,12 @@ import {
   type Deps,
   draft,
   type HandEdit,
+  type LeagueCheck,
   linkedHandles,
   proposedHandles,
   proposedNicknames,
   publish,
+  refuseUneditableWorkspace,
   rerunLeague,
   rerunPreselections,
   rerunStep,
@@ -21,6 +23,7 @@ import {
   setUpWorkspace,
   setupChecklist,
   spendCapNote,
+  WorkspaceFileError,
 } from "../src/index.ts";
 import { leagueFilePath, loadLeagueFile } from "../src/league-file.ts";
 import { loadLore } from "../src/lore.ts";
@@ -31,7 +34,13 @@ import {
 } from "../src/pundit-settings.ts";
 import { UNRECORDED } from "../src/stakes.ts";
 import { readWorkspace } from "../src/workspace.ts";
-import { atWeek, FEAR_THE_TURTLE_ID, operator } from "./support/workspace.ts";
+import {
+  atWeek,
+  FEAR_THE_TURTLE_ID,
+  frontMatter,
+  operator,
+  withFrontMatter,
+} from "./support/workspace.ts";
 
 async function setUp(
   extra: Partial<Parameters<typeof setUpWorkspace>[1]> = {},
@@ -433,4 +442,127 @@ test("setup stops at steps it can't re-run, and at a name that's no step", () =>
   expect(rerunStop("league")).toMatch(
     /handles, lore, stakes, method, key, cap, persona/,
   );
+});
+
+describe("a workspace.md whose front matter setup can't edit", () => {
+  const MESSAGE =
+    "workspace.md: put each front-matter key at the start of its line, with no indent and no braces around the keys";
+
+  const SHAPES = [
+    [
+      "every key indented",
+      (text: string) =>
+        withFrontMatter(text, (lines) => lines.map((line) => `  ${line}`)),
+    ],
+    [
+      "a flow map",
+      (text: string) =>
+        withFrontMatter(text, () => [JSON.stringify(frontMatter(text))]),
+    ],
+  ] as const;
+
+  /** Every file under `dir`, by its path, with its text. */
+  async function filesIn(dir: string): Promise<Record<string, string>> {
+    const files: Record<string, string> = {};
+    for (const entry of await readdir(dir, {
+      recursive: true,
+      withFileTypes: true,
+    })) {
+      if (!entry.isFile()) continue;
+      const path = join(entry.parentPath, entry.name);
+      files[path] = await readFile(path, "utf8");
+    }
+    return files;
+  }
+
+  async function reshaped(shape: (text: string) => string) {
+    const setUpOnce = await setUp();
+    const path = join(setUpOnce.dir, "workspace.md");
+    await writeFile(path, shape(await readFile(path, "utf8")));
+    return setUpOnce;
+  }
+
+  describe.each(SHAPES)("as %s", (_, shape) => {
+    const STEPS: [string, (league: LeagueCheck) => StepRerun][] = [
+      [
+        "handles",
+        (league) => ({
+          step: "handles",
+          league,
+          handles: proposedHandles(league),
+        }),
+      ],
+      [
+        "lore",
+        (league) => ({
+          step: "lore",
+          league,
+          lore: { type: "work", nicknames: proposedNicknames(league, []) },
+        }),
+      ],
+      [
+        "stakes",
+        () => ({
+          step: "stakes",
+          stakes: { familyLeague: false, stakes: "none" },
+        }),
+      ],
+      ["method", () => ({ step: "method", method: "standings" })],
+      ["persona", () => ({ step: "persona", persona: "roast" })],
+    ];
+
+    test.each(STEPS)(
+      "setup %s refuses it by name, writing no file",
+      async (_step, answers) => {
+        const { deps, dir, league } = await reshaped(shape);
+        const before = await filesIn(dir);
+
+        await expect(rerun(deps, dir, answers(league))).rejects.toThrow(
+          new WorkspaceFileError(MESSAGE),
+        );
+
+        expect(await filesIn(dir)).toEqual(before);
+      },
+    );
+
+    test("setup key and setup cap still work", async () => {
+      const { deps, dir } = await reshaped(shape);
+
+      await rerun(deps, dir, { step: "key", key: "sk-ant-new" });
+      await rerun(deps, dir, { step: "cap", spendCap: 12 });
+
+      expect((await loadCredentials(deps)).anthropicApiKey?.value).toBe(
+        "sk-ant-new",
+      );
+      expect((await readConfig(deps))?.spend_cap_usd).toBe(12);
+    });
+  });
+
+  test("the refusal holds for a workspace.md with no handles key, where linking one used to say it isn't valid YAML", async () => {
+    const { dir } = await reshaped(SHAPES[0][1]);
+    const text = await readFile(join(dir, "workspace.md"), "utf8");
+
+    // `handles` only as the setup step's status, a level deeper.
+    expect(text).not.toMatch(/^ {2}handles:/m);
+    expect(text).toMatch(/^ {2}setup:/m);
+    await expect(refuseUneditableWorkspace(dir, "handles")).rejects.toThrow(
+      MESSAGE,
+    );
+    await expect(
+      refuseUneditableWorkspace(dir, "key"),
+    ).resolves.toBeUndefined();
+  });
+
+  test("front matter that isn't valid YAML keeps its own refusal, with the indent fix", async () => {
+    const { dir } = await reshaped((text) =>
+      withFrontMatter(text, (lines) =>
+        lines.map((line) => (line.startsWith("pundit:") ? `  ${line}` : line)),
+      ),
+    );
+
+    // As the CLI calls it, before reading the workspace for the questions.
+    await expect(refuseUneditableWorkspace(dir, "method")).rejects.toThrow(
+      /isn't valid YAML; check each key's indent/,
+    );
+  });
 });

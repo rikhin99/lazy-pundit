@@ -4,6 +4,7 @@ import { saveCredentials, setSpendCap } from "./config.ts";
 import type { Deps } from "./deps.ts";
 import {
   readFrontMatter,
+  refuseUneditableFrontMatter,
   setFrontMatterValue,
   type VersionKey,
   WorkspaceFileError,
@@ -85,6 +86,29 @@ export function rerunStop(step: string): string | undefined {
   return `No setup step is called ${step}. lazy-pundit setup re-runs one of: ${RERUN_STEPS.join(", ")}.`;
 }
 
+/** Whether `setup <step>` edits `workspace.md`: key and cap write only the operator's files. */
+export function editsWorkspace(step: RerunStep): boolean {
+  return step !== "key" && step !== "cap";
+}
+
+/**
+ * Refuses a `workspace.md` whose front matter `setup <step>` couldn't edit
+ * (indented keys or a `{...}` flow map), for a step that edits it, so the
+ * pundit hears it before answering the step's questions.
+ */
+export async function refuseUneditableWorkspace(
+  dir: string,
+  step: RerunStep,
+): Promise<void> {
+  if (!editsWorkspace(step)) return;
+  // Front matter that isn't valid YAML gets readWorkspace's refusal, with its fix.
+  await readWorkspace(dir);
+  refuseUneditableFrontMatter(
+    "workspace.md",
+    await readFile(join(dir, "workspace.md"), "utf8"),
+  );
+}
+
 /**
  * Re-runs one setup step. A file the step writes in the workspace is
  * overwritten only through `confirm`, shown the diff, unless it's missing,
@@ -99,6 +123,7 @@ export async function rerunStep(
   confirm: (edit: HandEdit) => Promise<boolean>,
 ): Promise<{ written: boolean; warnings: string[] }> {
   const ws = await readWorkspace(dir);
+  await refuseUneditableWorkspace(dir, rerun.step);
   switch (rerun.step) {
     case "key":
       if (rerun.key === undefined) return { written: false, warnings: [] };

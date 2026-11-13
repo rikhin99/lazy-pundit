@@ -69,6 +69,26 @@ test("setup with a step asks questions, so it refuses to run outside a terminal,
   expect(await readdir(home)).toEqual([]);
 });
 
+test("setup method on an indented workspace.md refuses it in one line before asking anything; setup key still gets to its terminal check", async () => {
+  const { dir } = await fearTheTurtle(8);
+  const path = join(dir, "workspace.md");
+  const indented = withFrontMatter(await readFile(path, "utf8"), (lines) =>
+    lines.map((line) => `  ${line}`),
+  );
+  await writeFile(path, indented);
+
+  const method = await cli(dir, ["setup", "method"]);
+  const key = await cli(dir, ["setup", "key"]);
+
+  expect(method.code).toBe(1);
+  expect(method.stdout).toBe("");
+  expect(method.stderr).toBe(
+    "workspace.md: put each front-matter key at the start of its line, with no indent and no braces around the keys\n",
+  );
+  expect(key.stderr).toMatch(/setup key asks questions.*terminal/);
+  expect(await readFile(path, "utf8")).toBe(indented);
+});
+
 test("outside a workspace, publish prints the library's message and fails", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "lazy-pundit-cli-"));
 

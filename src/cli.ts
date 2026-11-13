@@ -31,6 +31,7 @@ import {
   deleteTranscripts,
   doctor,
   draft,
+  editsWorkspace,
   FetchError,
   familyLeagueDefault,
   familyLeagueLowers,
@@ -69,6 +70,7 @@ import {
   type RerunStep,
   refresh,
   refuseLeagueSetUp,
+  refuseUneditableWorkspace,
   renderStatsTable,
   rerunLeague,
   rerunPreselections,
@@ -886,6 +888,11 @@ program
     }
     if (!isRerunStep(step)) {
       throw new SetupRefusal(rerunStop(step) ?? `No setup step ${step}.`);
+    }
+    // Before any question, so none is answered for nothing. A step that
+    // doesn't edit workspace.md doesn't look for one here.
+    if (editsWorkspace(step)) {
+      await refuseUneditableWorkspace(await workspace(deps), step);
     }
     if (!process.stdin.isTTY) {
       throw new SetupRefusal(
