@@ -52,6 +52,55 @@ test("the module map's Tests section names every helper test/support/ exports", 
   ).toEqual([]);
 });
 
+/** The names `src/index.ts` exports, values and types. */
+async function indexExports(): Promise<Set<string>> {
+  const text = await readFile(join(ROOT, "src", "index.ts"), "utf8");
+  const names = new Set<string>();
+  for (const m of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+    for (const part of (m[1] as string).split(",")) {
+      const name = part
+        .trim()
+        .replace(/^type\s+/, "")
+        .split(/\s+as\s+/)
+        .pop();
+      if (name) names.add(name);
+    }
+  }
+  for (const m of text.matchAll(
+    /export\s+(?:async\s+)?(?:function|const|class|type|interface)\s+(\w+)/g,
+  )) {
+    names.add(m[1] as string);
+  }
+  return names;
+}
+
+// In #92 the standards review's one hard finding was a test importing
+// `WorkspaceFileError` from front-matter.ts, which index.ts exports.
+test("tests import from a src/ module only what index.ts doesn't export (Direct imports)", async () => {
+  const exported = await indexExports();
+  const dir = join(ROOT, "test");
+  const direct: string[] = [];
+  for (const file of await readdir(dir, { recursive: true })) {
+    if (!file.endsWith(".ts")) continue;
+    const text = await readFile(join(dir, file), "utf8");
+    for (const m of text.matchAll(
+      /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"((?:\.\.\/)+src\/[^"]+)"/g,
+    )) {
+      if ((m[2] as string).endsWith("/index.ts")) continue;
+      for (const part of (m[1] as string).split(",")) {
+        const name = part
+          .trim()
+          .replace(/^type\s+/, "")
+          .split(/\s+as\s+/)[0];
+        if (name && exported.has(name)) direct.push(`${file}: ${name}`);
+      }
+    }
+  }
+
+  // Import these from ../src/index.ts instead.
+  expect(direct).toEqual([]);
+});
+
 test("the module map names every source module, and only those", async () => {
   const [actual, named] = await Promise.all([modules(), mapped()]);
 

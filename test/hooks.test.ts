@@ -122,6 +122,20 @@ describe("the repo's hooks", () => {
     expect(runHook("denylist-gh.sh", command).status).toBe(status);
   });
 
+  // In #92 a 138-line test append went through `cat >> test/… <<'EOF'`,
+  // carrying a garbled line.
+  test.each([
+    ["cat >> test/rerun.test.ts <<'EOF'\nx\nEOF", 2],
+    ["printf x > src/cli.ts", 2],
+    [`printf x > "${ROOT}/test/a.ts"`, 2],
+    ["echo x | tee -a test/a.ts", 2],
+    ["npx vitest run test/rerun.test.ts 2>&1 | tail -5", 0],
+    ["npm run -s outline -- src/cli.ts > /tmp/outline.txt", 0],
+    ["cat src/cli.ts >> scratch/out.txt", 0],
+  ])("edit-with-edit.sh on %s exits %i", (command, status) => {
+    expect(runHook("edit-with-edit.sh", command).status).toBe(status);
+  });
+
   // A commit message here is one long line: in #100's retro, `git log
   // --oneline -3` printed about 3k.
   test.each([

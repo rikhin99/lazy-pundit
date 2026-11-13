@@ -1,7 +1,7 @@
 import { chmod, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { configPath, loadCredentials, readConfig } from "../src/config.ts";
+import { configPath } from "../src/config.ts";
 import {
   COMMON_HOUSE_RULES,
   checkLeague,
@@ -10,9 +10,12 @@ import {
   type HandEdit,
   type LeagueCheck,
   linkedHandles,
+  loadCredentials,
+  loadPunditSettings,
   proposedHandles,
   proposedNicknames,
   publish,
+  readConfig,
   refuseUneditableWorkspace,
   rerunLeague,
   rerunPreselections,
@@ -28,10 +31,7 @@ import {
 import { leagueFilePath, loadLeagueFile } from "../src/league-file.ts";
 import { loadLore } from "../src/lore.ts";
 import { personaPath } from "../src/persona.ts";
-import {
-  loadPunditSettings,
-  punditSettingsPath,
-} from "../src/pundit-settings.ts";
+import { punditSettingsPath } from "../src/pundit-settings.ts";
 import { UNRECORDED } from "../src/stakes.ts";
 import { readWorkspace } from "../src/workspace.ts";
 import {

@@ -8,18 +8,20 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { loadCredentials } from "../src/config.ts";
 import {
   buyInProblem,
   COMMON_HOUSE_RULES,
   checkKey,
   checkLeague,
+  DEFAULT_SETTINGS,
   type Deps,
   draft,
   familyLeagueDefault,
   familyLeagueLowers,
   handleProblem,
   KEY_CHECK_WAIT_MS,
+  loadCredentials,
+  loadPunditSettings,
   METHOD_CHOICES,
   nicknamesOf,
   nicknamesProblem,
@@ -43,11 +45,7 @@ import {
 import { loadLore, refuseLocal } from "../src/lore.ts";
 import { loadPersona, personaPath } from "../src/persona.ts";
 import { powerScoreMethodSchema } from "../src/power-score.ts";
-import {
-  DEFAULT_SETTINGS,
-  loadPunditSettings,
-  punditSettingsPath,
-} from "../src/pundit-settings.ts";
+import { punditSettingsPath } from "../src/pundit-settings.ts";
 import { readWorkspace } from "../src/workspace.ts";
 import { scriptedLlm } from "./support/llm.ts";
 import {

@@ -1,8 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { check, draft, draftData, PRESETS, publish } from "../src/index.ts";
-import { validate } from "../src/validator.ts";
+import {
+  check,
+  draft,
+  draftData,
+  PRESETS,
+  publish,
+  validate,
+} from "../src/index.ts";
 import { scriptedLlm } from "./support/llm.ts";
 import { blurb } from "./support/week8-evidence.ts";
 import {

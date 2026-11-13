@@ -5,7 +5,10 @@
 # newlines, never on ; or |, which a sed script may hold), so a vitest run of
 # a test/ file beside a sed -i of scripts/ passes; and a python script that
 # writes and names a quoted path starting at src/ or test/ (bare, ./ or the
-# repo's absolute path).
+# repo's absolute path); and a redirect or tee into a path starting at src/ or
+# test/ (bare, ./ or the repo's absolute path, quoted or not), such as #92's
+# `cat >> test/... <<'EOF'`. A redirect elsewhere, `2>&1` beside a test/ file
+# or `> /tmp/x` after reading src/, runs.
 # A python script that only reads, or writes elsewhere (docs, scripts, the
 # scratchpad), runs, even when the text it writes quotes a src/ path, such as
 # "$repo/src/cli.ts" in scripts/drive-wizard.exp.
@@ -18,6 +21,11 @@ if printf '%s\n' "$cmd" | awk '{ gsub(/&&|\|\|/, "\n"); print }' |
   exit 2
 fi
 repo=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].[*^$\\]/\\&/g')
+if printf '%s' "$cmd" |
+  grep -Eq "(>>?|tee( +-a)?) *[\"']?(\./|$repo/)?(src|test)/"; then
+  echo "$msg" >&2
+  exit 2
+fi
 if printf '%s' "$cmd" | grep -Eq 'python3? +(-c|-) ' &&
   printf '%s' "$cmd" | grep -Eq '\.write\(|write_text\(|write_bytes\(' &&
   printf '%s' "$cmd" | grep -Eq "[\"'](\./|$repo/)?(src|test)/[^\"']*[\"']"; then

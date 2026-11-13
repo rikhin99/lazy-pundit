@@ -7,7 +7,7 @@ import {
   credentialsSchema,
   spendSchema,
 } from "../src/config.ts";
-import { FORMAT } from "../src/front-matter.ts";
+import { FORMAT } from "../src/index.ts";
 import { leagueFileSchema } from "../src/league-file.ts";
 import { llmProseFileSchema } from "../src/llm-prose-file.ts";
 import { loreSchema } from "../src/lore.ts";
