@@ -240,6 +240,30 @@ test("the README and CHANGELOG use glossary terms, not their Avoid terms", async
   expect(offences).toEqual([]);
 });
 
+/**
+ * Words for what the code handles that no pundit sees, each with what pundit
+ * prose says instead. Comments and code spans may use them.
+ */
+const CODE_ONLY: Record<string, string> = {
+  blob: "stored payload",
+  enoent: "what's missing, in words",
+};
+
+test("the README, CHANGELOG and glossary keep code-only words in code spans", async () => {
+  const offences: string[] = [];
+  for (const doc of [...PUNDIT_DOCS, "GLOSSARY.md"]) {
+    const prose = (await readFile(join(ROOT, doc), "utf8"))
+      .replace(/^```[\s\S]*?^```/gm, " ")
+      .replace(/`[^`\n]*`/g, " ")
+      .toLowerCase();
+    for (const [word, instead] of Object.entries(CODE_ONLY)) {
+      const hit = prose.match(wordPattern(word));
+      if (hit) offences.push(`${doc}: "${hit[0]}", say ${instead}`);
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
 test("every glossary Avoid term is enforced or left to the reviewer", async () => {
   const glossary = [...(await glossaryAvoidTerms()).keys()];
   const sorted = [...ENFORCED, ...REVIEWED];
