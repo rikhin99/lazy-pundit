@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs every drive-wizard.exp scenario, read from that script's own list, and
 # fails when any one exits with another code than it should (9 when it timed
-# out, 8 when the wizard ended early): 1 for one in that script's `cancelled`
+# out, 8 when the wizard ended early, 7 when its workspace isn't where that
+# script's `writes` list says): 1 for one in that script's `cancelled`
 # list, which ends with Ctrl-C, and 0 for every other. `folder` gets a new temp
 # folder. Run it with `npm run -s drive:wizard:all`; CI runs it too.
 set -uo pipefail

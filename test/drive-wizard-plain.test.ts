@@ -37,6 +37,7 @@ test("the plain filter keeps answered prompts, every line of a log line, success
     "◆  Workspace folder",
     "│  _",
     "└  Done.",
+    "WROTE lazy-pundit/fear-the-turtle",
     "HOME /tmp/home",
     "EXIT 0",
   ]
@@ -53,6 +54,7 @@ test("the plain filter keeps answered prompts, every line of a log line, success
       "▲  lore.md differs from what this step writes:",
       "│  -## Running jokes",
       "└  Done.",
+      "WROTE lazy-pundit/fear-the-turtle",
       "HOME /tmp/home",
       "EXIT 0",
       "",

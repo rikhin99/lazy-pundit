@@ -28,8 +28,9 @@
 #                   then setup stakes paying $20, whose changed-outcome warning
 #                   shows before the confirm
 #
-# It prints the wizard's output, then `HOME <path>` and `EXIT <code>`, and exits
-# with the wizard's code. Look in that home for what the wizard wrote. A new
+# It prints the wizard's output, then `WROTE <folders>` (each folder holding a
+# workspace.md under the home, relative to it, or "nothing"), `HOME <path>` and
+# `EXIT <code>`, and exits with the wizard's code. Look in that home for what the wizard wrote. A new
 # wizard step needs its prompt and answer added at the bottom of this file.
 # Wait for the prompt's own line, "\u25c6  <label>": a label alone also matches
 # the explanation and earlier redraws, so the answer can arrive before the
@@ -75,6 +76,29 @@ set stty_init "cols 120 rows 40"
 encoding system utf-8
 set timeout 15
 
+# The folders under the home holding a workspace.md, relative to it, so a
+# scenario shows where init put the workspace.
+proc wrote {home} {
+  set found [lsort [split [string trim [exec find $home -name workspace.md -not -path "$home/.*"]] "\n"]]
+  set dirs {}
+  foreach f $found {
+    if {$f ne ""} { lappend dirs [string range [file dirname $f] [string length "$home/"] end] }
+  }
+  if {$dirs eq {}} { return "nothing" }
+  return [join $dirs " "]
+}
+
+# Where these scenarios' workspace should land; any other WROTE exits 7, which
+# drive-wizard-all.sh counts as a failure.
+array set writes {
+  full lazy-pundit/fear-the-turtle
+  relative lazy-pundit/fear-the-turtle
+  dot ws
+  dot-keep ws.
+  next-to elsewhere/fear-the-turtle
+  cancel-folder nothing
+}
+
 proc finish {} {
   global home
   expect {
@@ -82,7 +106,14 @@ proc finish {} {
     timeout { puts "\nHUNG"; exec kill -9 [exp_pid]; exit 9 }
   }
   lassign [wait] pid spawnid oserror code
-  puts "\nHOME $home\nEXIT $code"
+  global scenario writes
+  set wrote [wrote $home]
+  puts "\nWROTE $wrote"
+  if {[info exists writes($scenario)] && $wrote ne $writes($scenario)} {
+    puts "WRONG FOLDER: should be $writes($scenario)"
+    set code 7
+  }
+  puts "HOME $home\nEXIT $code"
   exit $code
 }
 
@@ -216,16 +247,6 @@ need "Which persona"
 send "\r"
 
 need "Set up another"
-# The dot scenarios' workspace is in the folder picked, and only there.
-if {$scenario in {dot dot-keep}} {
-  set made [expr {$scenario eq "dot" ? "$home/ws" : "$home/ws."}]
-  set unmade [expr {$scenario eq "dot" ? "$home/ws." : "$home/ws"}]
-  if {![file exists "$made/workspace.md"] || [file exists $unmade]} {
-    puts "\nWRONG FOLDER: $made should hold the workspace, $unmade shouldn't exist"
-    exec kill -9 [exp_pid]
-    exit 7
-  }
-}
 if {$scenario eq "another"} {
   send "y"; after 200; send "\r"
   need "pundit name"

@@ -2,7 +2,7 @@
 # `npm run -s drive:wizard:plain -- <scenario>`: drive-wizard.exp with only the
 # lines a reader needs: each answered prompt (◇) and its answer, each log line
 # (● info, ◆ success, ▲ warning, ■ error or cancel) with its later lines, the
-# closing message, HOME and EXIT. The raw run is about five times longer, a
+# closing message, WROTE (and any WRONG FOLDER), HOME and EXIT. The raw run is about five times longer, a
 # redraw per keystroke; use `npm run -s drive:wizard` for it when debugging a
 # scenario's timing. Exits with the scenario's code.
 #

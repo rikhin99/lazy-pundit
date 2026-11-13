@@ -30,6 +30,8 @@ While building, run `npm run -s format` (it fixes formatting itself and fails on
 
 A flaw you'd hand the reviews as a known issue: fix it before launching them when the fix fits the ticket. In #98, "Fetching the league… prints before the refusal" went to review as cosmetic, and both reviews' fixes moved the refusal out of `checkLeague`.
 
+To check a scenario you added, pipe `npm run -s drive:wizard:plain -- <scenario>` through `grep -E '<its prompts>|WROTE|EXIT'`; its `WROTE` line names each workspace folder made under the temp home. Read the whole run only when that shows something wrong. In #99, four new scenarios read whole cost about 5k, where their folder lines, `WROTE` and `EXIT` take under 1k.
+
 A change to a wizard prompt (`cli.ts`) or a setup step (`init.ts`): run `npm run -s drive:wizard:all` (about a minute) before committing, since CI runs it only after the push and the pre-commit hook doesn't.
 
 A change to `package.json`'s `bin`, `files`, `dependencies` or `scripts`, to `src/cli.ts`'s entry, or to `scripts/release.ts`: run `npm run -s install:smoke` (about 20s) before committing, for the same reason.
