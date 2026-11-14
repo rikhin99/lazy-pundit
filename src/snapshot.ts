@@ -387,10 +387,10 @@ async function snapshotFolders(snapshotsDir: string): Promise<string[]> {
 export interface Snapshot {
   id: string;
   manifest: Manifest;
-  /** Whether the snapshot holds a payload for this parameterless URL. */
-  has(url: string): boolean;
-  /** The parsed JSON payload for this parameterless URL. */
-  json(url: string): unknown;
+  /** Whether the snapshot holds a payload for this URL and its params (none by default). */
+  has(url: string, params?: Record<string, string>): boolean;
+  /** The parsed JSON payload for this URL and its params (none by default). */
+  json(url: string, params?: Record<string, string>): unknown;
 }
 
 /** Reads a whole snapshot: its manifest plus every payload it lists. */
@@ -412,13 +412,14 @@ function inMemorySnapshot(
   manifest: Manifest,
   payloads: Map<string, unknown>,
 ): Snapshot {
-  const key = (url: string) => requestKey({ url, params: {} });
+  const key = (url: string, params: Record<string, string> = {}) =>
+    requestKey({ url, params });
   return {
     id,
     manifest,
-    has: (url) => payloads.has(key(url)),
-    json(url) {
-      const k = key(url);
+    has: (url, params) => payloads.has(key(url, params)),
+    json(url, params) {
+      const k = key(url, params);
       if (!payloads.has(k)) {
         throw new Error(`Snapshot ${id} has no payload for ${url}`);
       }

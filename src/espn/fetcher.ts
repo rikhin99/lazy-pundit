@@ -1,18 +1,19 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Clock } from "../clock.ts";
 import type { Credentials } from "../config.ts";
+import { dataHash } from "../data-hash.ts";
+import type { League } from "../league.ts";
 import {
   FetchError,
   lastSnapshotReader,
   type Manifest,
   platformRequest,
-  requestKey,
   type Snapshot,
   SnapshotRecorder,
 } from "../snapshot.ts";
 import { requestUrl, type Transport } from "../transport.ts";
 import { ESPN_VIEWS, espnLeagueUrl, espnViewUrl } from "./api.ts";
+import { lastScoredWeekOf, normalizeEspn } from "./normalizer.ts";
 
 /** Only the league fields the fetcher needs to decide what else to fetch. */
 const leagueSchema = z.object({
@@ -51,6 +52,7 @@ export interface FetchEspnOptions {
 /** A complete fetch held in memory: nothing is on disk until `write`. */
 export interface FetchedEspn {
   snapshot: Snapshot;
+  league: League;
   /** Writes the fetch as a snapshot. */
   write(): Promise<{ id: string; manifest: Manifest }>;
 }
@@ -130,7 +132,7 @@ export async function fetchEspn(opts: FetchEspnOptions): Promise<FetchedEspn> {
     ? undefined
     : await keptWeeks(
         { snapshotsDir: opts.snapshotsDir, leagueId, season, scheduleUrl },
-        lastScoredWeek(schedule.data),
+        lastScoredWeekOf(schedule.data),
         opts.clock.now(),
       );
   // ESPN answers a transactions request with one week's only, so like box
@@ -152,8 +154,10 @@ export async function fetchEspn(opts: FetchEspnOptions): Promise<FetchedEspn> {
   ]);
 
   const snapshot = recorder.snapshot({ platform: "espn", leagueId, season });
+  const normalized = normalizeEspn(snapshot);
   return {
     snapshot,
+    league: normalized,
     write: () =>
       recorder.write({
         snapshotsDir: opts.snapshotsDir,
@@ -161,8 +165,7 @@ export async function fetchEspn(opts: FetchEspnOptions): Promise<FetchedEspn> {
         platform: "espn",
         leagueId,
         season,
-        // Until the ESPN normalizer gives a data hash: the payloads' hash.
-        idHash: payloadsHash(snapshot.manifest),
+        idHash: dataHash(normalized, normalized.lastScoredWeek),
       }),
   };
 }
@@ -178,24 +181,6 @@ function rejectedCookie(opts: FetchEspnOptions): string {
       ? `saved ${cookie.savedAt}`
       : "from LAZY_PUNDIT_ESPN_S2";
   return `ESPN cookie rejected (${which})`;
-}
-
-/**
- * The last week whose head-to-head matchups all have a winner, counting from
- * week 1. ESPN has no finality field, and a bye (home only) never gets one.
- */
-function lastScoredWeek(schedule: z.infer<typeof scheduleSchema>): number {
-  const decided = new Map<number, boolean>();
-  for (const m of schedule.schedule) {
-    if (m.away === undefined) continue;
-    decided.set(
-      m.matchupPeriodId,
-      (decided.get(m.matchupPeriodId) ?? true) && m.winner !== "UNDECIDED",
-    );
-  }
-  let week = 0;
-  while (decided.get(week + 1)) week++;
-  return week;
 }
 
 /**
@@ -235,16 +220,10 @@ async function keptWeeks(
   if (!lastSchedule.success) return undefined;
   const firstFetched = Math.min(
     scored - 1,
-    lastScoredWeek(lastSchedule.data) + 1,
+    lastScoredWeekOf(lastSchedule.data) + 1,
   );
   return async (week, url, params) =>
     week < firstFetched ? read(url, params) : undefined;
-}
-
-/** A stand-in for the data hash: the hash of every payload, in request order. */
-function payloadsHash(manifest: Manifest): string {
-  const shas = manifest.requests.map((r) => `${requestKey(r)} ${r.sha256}`);
-  return createHash("sha256").update(shas.sort().join("\n")).digest("hex");
 }
 
 function parseJson(body: Uint8Array): unknown {

@@ -45,6 +45,7 @@ export {
   fetchEspn,
   fetchEspnSnapshot,
 } from "./espn/fetcher.ts";
+export { normalizeEspn } from "./espn/normalizer.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 export {

@@ -10,6 +10,8 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 - `init`'s folder question names the folder an empty answer gives. For a second league that's a new folder next to the last workspace set up, and `init` says so, where before it was always one in `~/lazy-pundit/`. A folder typed as `~/…` is in the home folder. A folder ending in `.`, likely a typo, asks whether to drop the dot before anything is made.
 - The README says what the folder answer is (the workspace folder itself, by its full path or `~/…`), that each league needs its own folder, and how to move a workspace. Its Windows line says Lazy Pundit works inside WSL, and is still untried outside it.
 
+- ESPN leagues read through `draft`, `check`, `publish` and `refresh` (experimental, NFL, read-only): a `workspace.md` may name `platform: espn`, which a v0.1.0 workspace never did, so older files stay valid. The ESPN normalizer reads only players' actual points (never projections), numbers playoff rounds from the first playoff week, treats a playoff bye as a bye, and refuses a league whose playoff rounds last more than a week. `init` and `doctor` don't set up or check ESPN yet, so write `workspace.md` by hand and give the cookie in `LAZY_PUNDIT_ESPN_S2`.
+
 ### Fixed
 
 - A folder `init` refuses (a relative path, a folder in use, one whose workspace holds the league) asks for the folder again, keeping the answers before it. Before, it ended `init`.

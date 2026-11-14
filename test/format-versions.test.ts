@@ -29,7 +29,9 @@ import { workspaceSchema } from "../src/workspace.ts";
  */
 const RECORDED = {
   FORMAT: {
-    1: "aa1d3655c5b50ea6129f8d6900ab7b0d092728e4edcb0f1094d91d73129be34e",
+    // Replaced after v0.1.0 (#63 part b): workspace.md's `platform` also takes
+    // `espn`, so every v0.1.0 file is still valid under it.
+    1: "de23d3ed3552b284ed0916f5d0cf0de6e01f0656e24b27056336e551ba23401c",
   } as Record<number, string>,
   SNAPSHOT_FORMAT: {
     1: "12433ddcbaaed4fcea883fea30927bac312c0ec35c823167a93c480e8e79fd42",

@@ -23,6 +23,7 @@ import {
   moveOf,
   orderEvidence,
 } from "./movement.ts";
+import { normalizeSnapshot } from "./normalize.ts";
 import { isSmallSample } from "./power-score.ts";
 import {
   checkOrder,
@@ -30,7 +31,6 @@ import {
   parseRanking,
   type RankingFile,
 } from "./ranking-file.ts";
-import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import {
   readSnapshot,
   type Snapshot,
@@ -175,7 +175,7 @@ export async function checkDraft(
   const ranking = parseRanking(name, written);
   // publish and refresh edit the front matter, so refuse what they can't edit.
   refuseUneditableFrontMatter(name, written);
-  const league = normalizeSleeper(
+  const league = normalizeSnapshot(
     await readDraftSnapshot(snapshotsDir(ws), ranking.meta.snapshot, name),
   );
   checkOrder(name, ranking, league);
@@ -302,7 +302,9 @@ async function earlierEvidence(
   const packs: EvidencePack[] = [];
   for (const id of (ranking.meta.earlier_snapshots ?? []).toReversed()) {
     try {
-      const league = normalizeSleeper(await readSnapshot(snapshotsDir(ws), id));
+      const league = normalizeSnapshot(
+        await readSnapshot(snapshotsDir(ws), id),
+      );
       const { week, in_progress_week } = ranking.meta;
       packs.push(draftData(league, week, stakes, in_progress_week).evidence);
     } catch {

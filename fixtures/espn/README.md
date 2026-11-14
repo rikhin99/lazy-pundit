@@ -36,7 +36,7 @@ Each team's acquisitions by week, and the league's transaction period, stop at w
 
 In season, ESPN's answer for a week also holds the next week's waivers once they run, and some with period 0. A finished season's answers, as here, hold their own week only.
 
-The snapshot IDs end with a hash of the payloads until the ESPN normalizer gives a data hash (#63 part b), so they will change then.
+The snapshot IDs end with the data hash of the normalized league, as Sleeper's do. Changing what the normalizer reads, or the data hash, changes them: re-run `npm run scrub:espn`.
 
 ## Trimmed
 

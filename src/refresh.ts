@@ -7,18 +7,20 @@ import {
   type Problem,
   withLeagueItem,
 } from "./check.ts";
+import { loadCredentials } from "./config.ts";
 import { type DataChange, diff } from "./data-diff.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
+import { fetchEspn } from "./espn/fetcher.ts";
 import { list } from "./evidence-pack.ts";
 import { type FrontMatterValue, setFrontMatterValue } from "./front-matter.ts";
 import type { League, TeamId } from "./league.ts";
 import { freshClashWarning, validatorNames } from "./lore.ts";
+import { normalizeSnapshot } from "./normalize.ts";
 import { startingOrder } from "./power-score.ts";
 import { loadPunditSettings, methodForWeek } from "./pundit-settings.ts";
 import { applyRetention } from "./retention.ts";
 import { type FetchedSleeper, fetchSleeper } from "./sleeper/fetcher.ts";
-import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import {
   FetchError,
   type FetchFix,
@@ -244,14 +246,29 @@ export async function fetchFresh(
   deps: Deps,
   opts: { full?: boolean } = {},
 ): Promise<FetchedSleeper> {
-  const fetched = await fetchSleeper({
-    transport: deps.transport,
-    clock: deps.clock,
-    snapshotsDir: snapshotsDir(ws),
-    cacheDir: deps.cacheDir,
-    leagueId: ws.season.leagueId,
-    full: opts.full ?? false,
-  });
+  const cookie =
+    ws.season.platform === "espn"
+      ? (await loadCredentials(deps)).espnS2
+      : undefined;
+  const fetched =
+    ws.season.platform === "espn"
+      ? await fetchEspn({
+          transport: deps.transport,
+          clock: deps.clock,
+          snapshotsDir: snapshotsDir(ws),
+          leagueId: ws.season.leagueId,
+          season: ws.season.year,
+          ...(cookie ? { cookie } : {}),
+          full: opts.full ?? false,
+        })
+      : await fetchSleeper({
+          transport: deps.transport,
+          clock: deps.clock,
+          snapshotsDir: snapshotsDir(ws),
+          cacheDir: deps.cacheDir,
+          leagueId: ws.season.leagueId,
+          full: opts.full ?? false,
+        });
   return {
     league: fetched.league,
     async write() {
@@ -297,7 +314,7 @@ export async function fetchOrContinue(
       const snapshot = await readIfComplete(dir, candidate.id);
       if (!snapshot) continue;
       return {
-        league: normalizeSleeper(snapshot),
+        league: normalizeSnapshot(snapshot),
         write: async () => candidate,
         failedFetch: failedFetchItem(err, candidate.manifest.fetched_at),
       };

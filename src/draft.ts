@@ -39,6 +39,7 @@ import {
   type ValidatorNames,
   validatorNames,
 } from "./lore.ts";
+import { normalizeSnapshot } from "./normalize.ts";
 import { loadPersona, type Persona, personaRecord } from "./persona.ts";
 import { startingOrder } from "./power-score.ts";
 import {
@@ -57,7 +58,6 @@ import {
   renderDraft,
 } from "./ranking-file.ts";
 import { dataChangedWarning, fetchOrContinue } from "./refresh.ts";
-import { normalizeSleeper } from "./sleeper/normalizer.ts";
 import { readSnapshot } from "./snapshot.ts";
 import {
   houseRuleOutcomes,
@@ -149,7 +149,7 @@ export async function draft(
 
   const { id } = await fetched.write();
   const snapshot = await readSnapshot(snapshotsDir(ws), id);
-  const league = normalizeSleeper(snapshot);
+  const league = normalizeSnapshot(snapshot);
   const method = methodForWeek(settings, league, week);
   const order = startingOrder(league, week, method);
   const inProgress = league.weeks.find((w) => !w.scored && w.week > week)?.week;

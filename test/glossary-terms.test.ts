@@ -141,7 +141,7 @@ function wordPattern(term: string): RegExp {
 const PROSE_FILES = ["prompt.ts"];
 
 /** Platform adapters may name a platform's own fields, such as `owner_id`. */
-const PLATFORM_DIRS = ["sleeper"];
+const PLATFORM_DIRS = ["sleeper", "espn"];
 
 /** Splits `closeGameCount` or `CLOSE_GAME` into "close game count". */
 function words(identifier: string): string {

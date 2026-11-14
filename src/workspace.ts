@@ -16,7 +16,7 @@ export const workspaceSchema = z.object({
     .record(
       z.string().regex(/^\d{4}$/, "a season is its four-digit year"),
       z.object({
-        platform: z.literal("sleeper"),
+        platform: z.enum(["sleeper", "espn"]),
         league_id: z.string({
           error: "quote the league ID so it isn't read as a number",
         }),
@@ -57,7 +57,7 @@ export interface Workspace {
   dir: string;
   pundit: string;
   /** The latest season the workspace names. */
-  season: { year: string; platform: "sleeper"; leagueId: string };
+  season: { year: string; platform: "sleeper" | "espn"; leagueId: string };
   /** Each manager handle's linked platform accounts. */
   handles: Record<string, string[]>;
   /** How each league-level setup step went. A step it doesn't name wasn't recorded. */
@@ -83,7 +83,7 @@ export async function readWorkspace(dir: string): Promise<Workspace> {
   const years = Object.keys(parsed.data.seasons).sort();
   const year = years[years.length - 1] as string;
   const season = parsed.data.seasons[year] as {
-    platform: "sleeper";
+    platform: "sleeper" | "espn";
     league_id: string;
   };
   return {
