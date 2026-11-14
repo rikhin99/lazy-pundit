@@ -23,8 +23,11 @@ if printf '%s' "$cmd" | grep -Eq '(^|[;&|(] *)(for|while) ' &&
   echo "$brief" >&2
   exit 2
 fi
-# Two or more different tickets viewed in one command.
-count=$(printf '%s' "$cmd" | grep -Eo 'gh +issue +view +[0-9]+' | grep -Eo '[0-9]+$' | sort -u | wc -l | tr -d ' ')
+# Two or more different tickets printed in one command. A view whose output
+# goes to a file (`> file`, not `2>`) isn't read here, so it doesn't count.
+count=$(printf '%s' "$cmd" | grep -Eo 'gh +issue +view +[0-9]+[^;&|]*' |
+  grep -Ev '(^|[^0-9])>' | grep -Eo '^gh +issue +view +[0-9]+' |
+  grep -Eo '[0-9]+$' | sort -u | wc -l | tr -d ' ')
 if [ "$count" -gt 1 ]; then
   echo "$brief" >&2
   exit 2

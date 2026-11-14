@@ -109,6 +109,27 @@ describe("the repo's hooks", () => {
     expect(runHook("read-by-outline.sh", command).status).toBe(status);
   });
 
+  // In #63(a)'s retro, saving two ticket bodies to edit was refused, and three
+  // one-line edits cost a 42k subagent; a body saved to a file isn't read here.
+  test.each([
+    [
+      "gh issue view 66 --json body > /tmp/66.md && gh issue view 64 > /tmp/64.md",
+      0,
+    ],
+    [
+      "gh issue view 66 --json body --jq .body > a.md; gh issue view 64 >b.md",
+      0,
+    ],
+    [
+      "gh issue view 66 > a.md && gh issue view 64 --json body && gh issue view 63",
+      2,
+    ],
+    ["gh issue view 66 --json body && gh issue view 64 --json body", 2],
+    ["gh issue view 66 2>&1 > /tmp/66.md && gh issue view 64 2>&1", 2],
+  ])("ticket-brief.sh on %s exits %i", (command, status) => {
+    expect(runHook("ticket-brief.sh", command).status).toBe(status);
+  });
+
   // In #96 a tester's name turned up in issue edit history and main's history.
   test.each([
     [`gh issue comment 96 --body-file ${BODY}`, 2],

@@ -4,7 +4,8 @@
  * file, prints which tests went red with each one's first failure line (or
  * "survived"), and puts the file back,
  * Ctrl-C included. `<old>` must occur exactly once in the file. Exits 0 when
- * the mutation goes red, 1 when it survives, 2 on a usage problem.
+ * the mutation goes red, 1 when it survives, 2 on a usage problem, 3 when the
+ * test file didn't load (nothing was tested).
  *
  *   npm run -s mutate -- src/sleeper/fetcher.ts '<old>' '<new>' test/fetch-sleeper.test.ts
  */
@@ -12,19 +13,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-interface Report {
-  testResults: {
-    name: string;
-    status: string;
-    message?: string;
-    assertionResults: {
-      fullName: string;
-      status: string;
-      failureMessages?: string[];
-    }[];
-  }[];
-}
+import { type Report, verdict } from "./mutate-verdict.ts";
 
 function stop(message: string): never {
   console.error(message);
@@ -91,25 +80,6 @@ if (report === undefined) {
   stop("vitest wrote no report; run the test file by hand to see why");
 }
 
-const results = report.testResults.flatMap((r) => r.assertionResults);
-const failed = results.filter((a) => a.status === "failed");
-const unloaded = report.testResults.filter(
-  (r) => r.status === "failed" && r.assertionResults.length === 0,
-);
-if (unloaded.length > 0) {
-  console.log("red: the test file failed to load");
-  for (const r of unloaded) {
-    console.log(`  ${(r.message ?? "").split("\n")[0]}`);
-  }
-} else if (failed.length > 0) {
-  console.log(`red: ${failed.length} of ${results.length} failed`);
-  // The first line of each failure, so a red from the mutation itself (a
-  // ReferenceError, a syntax error) reads apart from a red on the behaviour.
-  for (const a of failed) {
-    console.log(`  × ${a.fullName}`);
-    console.log(`    ${(a.failureMessages?.[0] ?? "").split("\n")[0]}`);
-  }
-} else {
-  console.log(`survived: all ${results.length} passed`);
-  process.exit(1);
-}
+const { lines, code } = verdict(report);
+for (const line of lines) console.log(line);
+process.exit(code);
