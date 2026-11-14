@@ -39,6 +39,12 @@ export {
   draft,
 } from "./draft.ts";
 export { type DraftData, draftData, type StatSet } from "./draft-data.ts";
+export {
+  type FetchEspnOptions,
+  type FetchedEspn,
+  fetchEspn,
+  fetchEspnSnapshot,
+} from "./espn/fetcher.ts";
 export { fileTransport } from "./file-transport.ts";
 export { FORMAT, WorkspaceFileError } from "./front-matter.ts";
 export {
@@ -179,6 +185,7 @@ export {
   readBlob,
   readManifest,
   readSnapshot,
+  requestKey,
   type Snapshot,
   SnapshotDamagedError,
 } from "./snapshot.ts";

@@ -55,9 +55,17 @@ export type Platform = Manifest["platform"];
  * What the pundit can do about a failed fetch: `refresh` once fetching works
  * again, check the `league_id` in `workspace.md` when the platform doesn't
  * know the league, or `update` when the platform answers in a shape this
- * version can't read. A throw that passes none gets `refresh`.
+ * version can't read, `setup_espn` for a fresh ESPN cookie when ESPN rejects
+ * the stored one (or a private league got none), or `espn_env` when it
+ * rejects the one `LAZY_PUNDIT_ESPN_S2` gives, which overrides a stored one.
+ * A throw that passes none gets `refresh`.
  */
-export type FetchFix = "refresh" | "league_id" | "update";
+export type FetchFix =
+  | "refresh"
+  | "league_id"
+  | "update"
+  | "setup_espn"
+  | "espn_env";
 
 export class FetchError extends Error {
   override name = "FetchError";
@@ -278,6 +286,50 @@ export async function listSnapshots(
     }
   }
   return listed;
+}
+
+/** A fetch this long after the season's last snapshot is a full fetch. */
+const FULL_FETCH_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** Reads one payload of a snapshot by its request, or nothing if it has none. */
+export type PayloadReader = (
+  url: string,
+  params?: Record<string, string>,
+) => Promise<Uint8Array | undefined>;
+
+/**
+ * The season's last snapshot, for a routine fetch to keep older weeks from:
+ * a reader of its payloads, or nothing (a full fetch) when there's no snapshot
+ * of this platform, league and season, or the last is more than 2 weeks old.
+ * A fetch that wrote no snapshot doesn't count as the last, which can only
+ * make a fetch full sooner. A payload gone from the blob store reads as none.
+ */
+export async function lastSnapshotReader(
+  snapshotsDir: string,
+  season: { platform: Platform; leagueId: string; season: string },
+  now: Date,
+): Promise<PayloadReader | undefined> {
+  const last = (await listSnapshots(snapshotsDir))
+    .filter(
+      ({ manifest: m }) =>
+        m.platform === season.platform &&
+        m.league_id === season.leagueId &&
+        m.season === season.season,
+    )
+    .at(-1)?.manifest;
+  if (
+    !last ||
+    now.getTime() - new Date(last.fetched_at).getTime() > FULL_FETCH_GAP_MS
+  ) {
+    return undefined;
+  }
+  const shas = new Map(last.requests.map((r) => [requestKey(r), r.sha256]));
+  return async (url, params = {}) => {
+    const sha = shas.get(requestKey({ url, params }));
+    return sha === undefined
+      ? undefined
+      : readBlob(snapshotsDir, sha).catch(() => undefined);
+  };
 }
 
 /**

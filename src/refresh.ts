@@ -333,6 +333,10 @@ const LEAGUE_ID_FIX =
   "The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.";
 const UPDATE_FIX =
   "This version can't read what the platform answered: check for a newer Lazy Pundit.";
+const SETUP_ESPN_FIX =
+  "Copy a fresh espn_s2 from your browser, then run: lazy-pundit setup espn";
+const ESPN_ENV_FIX =
+  "Set LAZY_PUNDIT_ESPN_S2 to a fresh espn_s2 from your browser, or unset it to use the stored cookie.";
 
 /**
  * What the pundit is told to do, for each kind of failure: `continuing` ends
@@ -347,6 +351,8 @@ const FETCH_FIXES: Record<FetchFix, { continuing: string; stopping: string }> =
     },
     league_id: { continuing: LEAGUE_ID_FIX, stopping: LEAGUE_ID_FIX },
     update: { continuing: UPDATE_FIX, stopping: UPDATE_FIX },
+    setup_espn: { continuing: SETUP_ESPN_FIX, stopping: SETUP_ESPN_FIX },
+    espn_env: { continuing: ESPN_ENV_FIX, stopping: ESPN_ENV_FIX },
   };
 
 /** The failed-fetch item: a soft league item with the fix for what failed. */

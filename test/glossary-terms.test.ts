@@ -58,9 +58,12 @@ const ENFORCED = [
  * _Avoid_ terms that also carry a meaning we use, so the reviewer judges each
  * use: "player" (an NFL player), "ranking" (its own entry), "export" (the
  * keyword), a platform's "league id", the HTTP "header", "revision" (its own
- * entry, avoided only for an edition) and a file's FORMAT "version".
+ * entry, avoided only for an edition), a file's FORMAT "version", an LLM
+ * call's "token" and ESPN's other cookie, "swid", which code and comments name.
  */
 const REVIEWED = [
+  "token",
+  "swid",
   "league id",
   "league name",
   "user",

@@ -188,6 +188,10 @@ The league data step's list of a platform account's leagues this season, to choo
 **Credentials**:
 The operator's secrets: the Anthropic key and the ESPN cookie. They belong to the operator, never to a league workspace, so a workspace can be shared or backed up without them.
 
+**ESPN cookie**:
+The browser cookie that lets the tool read an ESPN league as the operator. It's stored with the date it was saved, or given for one shell session in the environment. A **rejected cookie** is one ESPN refuses: fetching stops, and the fix is to run `lazy-pundit setup espn` with a fresh one.
+_Avoid_: Token, SWID
+
 **Spend**:
 What the operator's LLM calls cost, as estimated from the price table, counted by calendar month across all their leagues.
 _Avoid_: Usage, cost (on its own), billing

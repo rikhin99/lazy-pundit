@@ -5,9 +5,8 @@ import { dataHash } from "../data-hash.ts";
 import type { League } from "../league.ts";
 import {
   FetchError,
-  listSnapshots,
+  lastSnapshotReader,
   type Manifest,
-  readBlob,
   SnapshotRecorder,
 } from "../snapshot.ts";
 import type { Transport } from "../transport.ts";
@@ -19,8 +18,6 @@ const LAST_NFL_WEEK = 18;
 
 const PLAYERS_CACHE = "sleeper/players_nfl.json";
 const PLAYERS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-/** A fetch this long after the season's last snapshot is a full fetch. */
-const FULL_FETCH_GAP_MS = 14 * 24 * 60 * 60 * 1000;
 
 /** Only the league fields the fetcher needs to decide what else to fetch. */
 const leagueSchema = z.object({
@@ -148,9 +145,7 @@ export async function fetchSleeper(
  * payload from the season's last snapshot, or nothing when the path must be
  * fetched. Fetched are the last 2 scored weeks, every week after them, and any
  * week the last snapshot didn't hold as scored. Nothing is reused (a full
- * fetch) without a last snapshot of this league and season, or when it's more
- * than 2 weeks old. A fetch that wrote no snapshot doesn't count as the last,
- * which can only make a fetch full sooner.
+ * fetch) when `lastSnapshotReader` finds no recent snapshot.
  */
 async function keptWeeks(
   opts: FetchSleeperOptions,
@@ -158,27 +153,12 @@ async function keptWeeks(
   league: z.infer<typeof leagueSchema>,
   now: Date,
 ): Promise<((path: string) => Promise<Uint8Array | undefined>) | undefined> {
-  const last = (await listSnapshots(opts.snapshotsDir))
-    .filter(
-      ({ manifest: m }) =>
-        m.platform === "sleeper" &&
-        m.league_id === league.league_id &&
-        m.season === league.season,
-    )
-    .at(-1)?.manifest;
-  if (
-    !last ||
-    now.getTime() - new Date(last.fetched_at).getTime() > FULL_FETCH_GAP_MS
-  ) {
-    return undefined;
-  }
-  const shas = new Map(last.requests.map((r) => [r.url, r.sha256]));
-  const read = async (url: string) => {
-    const sha = shas.get(url);
-    return sha === undefined
-      ? undefined
-      : readBlob(opts.snapshotsDir, sha).catch(() => undefined);
-  };
+  const read = await lastSnapshotReader(
+    opts.snapshotsDir,
+    { platform: "sleeper", leagueId: league.league_id, season: league.season },
+    now,
+  );
+  if (!read) return undefined;
   const lastBase = await read(base);
   const lastLeague = leagueSchema.safeParse(lastBase && parseJson(lastBase));
   if (!lastLeague.success) return undefined;
