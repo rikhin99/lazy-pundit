@@ -24,7 +24,7 @@
     "prepare": "npm run build && husky",
     "typecheck": "tsc --noEmit",
     "lint": "biome check --error-on-warnings .",
-    "format": "biome check --write .",
+    "format": "biome check --write --error-on-warnings .",
     "test": "vitest run",
     "scrub:sleeper": "node scripts/scrub-sleeper.ts",
     "scrub:espn": "node scripts/scrub-espn.ts",
