@@ -128,10 +128,10 @@ describe("fetching an ESPN league season", () => {
     expect(views.slice(2).sort()).toEqual(
       [
         "mRoster",
-        "mTransactions2",
-        ...[1, 2, 3, 4, 5, 6, 7, 8].map(
-          (w) => `mMatchupScore+mScoreboard ${w}`,
-        ),
+        ...[1, 2, 3, 4, 5, 6, 7, 8].flatMap((w) => [
+          `mMatchupScore+mScoreboard ${w}`,
+          `mTransactions2 ${w}`,
+        ]),
       ].sort(),
     );
     expect(snapshot.manifest).toMatchObject({
@@ -226,7 +226,10 @@ describe("fetching an ESPN league season", () => {
 });
 
 describe("which weeks an ESPN fetch asks for", () => {
-  /** Fetches the committed `week` into `dir` at `iso`, returning the box-score weeks asked for. */
+  /**
+   * Fetches the committed `week` into `dir` at `iso`, returning the weeks asked
+   * for, after checking that box scores and transactions were asked for the same weeks.
+   */
   async function boxScoreWeeks(
     dir: string,
     week: number,
@@ -241,10 +244,15 @@ describe("which weeks an ESPN fetch asks for", () => {
       clock: at(iso),
       full,
     });
-    return transport.requests
-      .map((r) => Number(r.params?.scoringPeriodId))
-      .filter((w) => w > 0)
-      .sort((a, b) => a - b);
+    const weeksOf = (view: string) =>
+      transport.requests
+        .filter((r) => new URL(r.url).searchParams.get("view") === view)
+        .map((r) => Number(r.params?.scoringPeriodId))
+        .filter((w) => w > 0)
+        .sort((a, b) => a - b);
+    const weeks = weeksOf("mMatchupScore");
+    expect(weeksOf("mTransactions2")).toEqual(weeks);
+    return weeks;
   }
 
   test("the first fetch asks for every week", async () => {
@@ -264,7 +272,7 @@ describe("which weeks an ESPN fetch asks for", () => {
     const manifest = await readManifest(dir, latest);
     expect(
       manifest.requests.filter((r) => r.params.scoringPeriodId),
-    ).toHaveLength(8);
+    ).toHaveLength(16);
   });
 
   test("`full` asks for every week", async () => {

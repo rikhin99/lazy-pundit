@@ -167,6 +167,29 @@ describe("committed ESPN fixtures", () => {
     ]);
   });
 
+  test("hold each week's transactions, as ESPN answers one week at a time", async () => {
+    for (const set of SETS) {
+      const counts: number[] = [];
+      for (let w = 1; w <= 14; w++) {
+        const { transactions } = await payload(
+          set,
+          14,
+          ESPN_VIEWS.transactions,
+          w,
+        );
+        expect(
+          new Set(transactions.map((t: Json) => t.scoringPeriodId)),
+          `${set.leagueId} week ${w}`,
+        ).toEqual(new Set(transactions.length ? [w] : []));
+        counts.push(transactions.length);
+      }
+      expect(
+        counts.every((n) => n > 0),
+        set.leagueId,
+      ).toBe(true);
+    }
+  });
+
   test("keep projections only in week 1's box scores", async () => {
     const sources = (p: Json) =>
       new Set(

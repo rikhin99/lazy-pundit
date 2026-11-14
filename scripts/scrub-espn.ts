@@ -89,7 +89,8 @@ interface Raw {
   league: Obj;
   schedule: Obj;
   rosters: Obj;
-  transactions: Obj;
+  /** Each week's transactions, asked for week by week as the fetcher does. */
+  transactions: Map<number, Obj>;
   boxscores: Map<number, Obj>;
 }
 
@@ -128,17 +129,20 @@ export async function scrubEspnFixtures(opts: {
 async function readRaw(dir: string): Promise<Raw> {
   const read = async (f: string) =>
     JSON.parse(await readFile(join(dir, f), "utf8")) as Obj;
-  const boxscores = new Map<number, Obj>();
-  for (const f of (await readdir(join(dir, "boxscores"))).sort()) {
-    const week = Number(f.match(/^week-(\d+)\.json$/)?.[1]);
-    if (week) boxscores.set(week, await read(`boxscores/${f}`));
-  }
+  const byWeek = async (folder: string) => {
+    const weeks = new Map<number, Obj>();
+    for (const f of (await readdir(join(dir, folder))).sort()) {
+      const week = Number(f.match(/^week-(\d+)\.json$/)?.[1]);
+      if (week) weeks.set(week, await read(`${folder}/${f}`));
+    }
+    return weeks;
+  };
   return {
     league: await read("league.json"),
     schedule: await read("schedule.json"),
     rosters: await read("rosters.json"),
-    transactions: await read("transactions.json"),
-    boxscores,
+    transactions: await byWeek("transactions"),
+    boxscores: await byWeek("boxscores"),
   };
 }
 
@@ -202,7 +206,18 @@ function scrubIdentities(raw: Raw, leagueId: string): Raw {
     league: { ...payload(raw.league), members },
     schedule: payload(raw.schedule),
     rosters: payload(raw.rosters),
-    transactions: payload(raw.transactions),
+    transactions: new Map(
+      [...raw.transactions].map(([w, t]) => [
+        w,
+        {
+          ...payload(t),
+          transactions: ((t.transactions ?? []) as Obj[]).map((x) => ({
+            ...x,
+            memberId: fakeMember(x.memberId ?? null),
+          })),
+        },
+      ]),
+    ),
     boxscores: new Map([...raw.boxscores].map(([w, b]) => [w, payload(b)])),
   };
 }
@@ -222,7 +237,7 @@ function trimmed(raw: Raw): Raw {
     league: trim(raw.league),
     schedule: trim(raw.schedule),
     rosters: trim(raw.rosters),
-    transactions: trim(raw.transactions),
+    transactions: new Map([...raw.transactions].map(([w, t]) => [w, trim(t)])),
     boxscores,
   };
 }
@@ -465,9 +480,15 @@ function asOfWeek(raw: Raw, week: number, leagueId: string): Map<string, Json> {
     [key(ESPN_VIEWS.league), league],
     [key(ESPN_VIEWS.schedule), schedule],
     [key(ESPN_VIEWS.rosters), asOf(raw.rosters, week)],
-    [key(ESPN_VIEWS.transactions), asOf(raw.transactions, week)],
   ]);
   for (let w = 1; w <= week; w++) {
+    const t = raw.transactions.get(w);
+    if (t) {
+      payloads.set(
+        key(ESPN_VIEWS.transactions, { scoringPeriodId: String(w) }),
+        asOf(t, w),
+      );
+    }
     const b = raw.boxscores.get(w);
     if (!b) continue;
     payloads.set(key(ESPN_VIEWS.boxscores, { scoringPeriodId: String(w) }), {

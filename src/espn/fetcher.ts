@@ -133,17 +133,22 @@ export async function fetchEspn(opts: FetchEspnOptions): Promise<FetchedEspn> {
         lastScoredWeek(schedule.data),
         opts.clock.now(),
       );
-  const boxscoresUrl = espnViewUrl(base, ESPN_VIEWS.boxscores);
+  // ESPN answers a transactions request with one week's only, so like box
+  // scores they're asked for week by week.
+  const weekly = [ESPN_VIEWS.boxscores, ESPN_VIEWS.transactions].map((views) =>
+    espnViewUrl(base, views),
+  );
   await Promise.all([
     recorder.get(espnViewUrl(base, ESPN_VIEWS.rosters)),
-    recorder.get(espnViewUrl(base, ESPN_VIEWS.transactions)),
-    ...Array.from({ length: weeks }, async (_, i) => {
-      const params = { scoringPeriodId: String(i + 1) };
-      const body = await kept?.(i + 1, boxscoresUrl, params);
-      if (!body) return recorder.get(boxscoresUrl, params);
-      recorder.put(boxscoresUrl, body, params);
-      return body;
-    }),
+    ...weekly.flatMap((url) =>
+      Array.from({ length: weeks }, async (_, i) => {
+        const params = { scoringPeriodId: String(i + 1) };
+        const body = await kept?.(i + 1, url, params);
+        if (!body) return recorder.get(url, params);
+        recorder.put(url, body, params);
+        return body;
+      }),
+    ),
   ]);
 
   const snapshot = recorder.snapshot({ platform: "espn", leagueId, season });
@@ -194,8 +199,8 @@ function lastScoredWeek(schedule: z.infer<typeof scheduleSchema>): number {
 }
 
 /**
- * A routine fetch's reuse: for a week's box scores, the payload from the
- * season's last snapshot, or nothing when the week must be fetched. Fetched
+ * A routine fetch's reuse: for a week's box scores or transactions, the payload
+ * from the season's last snapshot, or nothing when the week must be fetched. Fetched
  * are the last 2 scored weeks, every week after them, and any week the last
  * snapshot didn't hold as scored. Nothing is reused (a full fetch) when
  * `lastSnapshotReader` finds no recent snapshot.

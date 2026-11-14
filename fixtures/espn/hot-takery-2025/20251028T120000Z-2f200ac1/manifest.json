@@ -1,0 +1,136 @@
+{
+  "format": 1,
+  "platform": "espn",
+  "league_id": "900000001",
+  "season": "2025",
+  "fetched_at": "2025-10-28T12:00:00.000Z",
+  "requests": [
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchup",
+      "params": {},
+      "sha256": "ec09806e136cb9b0a857b2fef75b1633fbcda65b97b3295a8d834a9aad336f1e"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "1"
+      },
+      "sha256": "4565ed881f54d869bdd66b1f76e1d94e7ab30bf62fefab0c85dd169f81451cc4"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "2"
+      },
+      "sha256": "5577f4f62cee5ec78ff6a44c677d2f21dca4351feb13c6e2b3a33e9a63d6f598"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "3"
+      },
+      "sha256": "5a635ea9d15e696e8e8d7f280dba2729806220963fc90b9ef2669e14ab4edce7"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "4"
+      },
+      "sha256": "5aeefc02b303406ce9a5075d892ba06ac5be2367436420ec15183fef14d6d4a9"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "5"
+      },
+      "sha256": "faf6ef798b8a66d3668911092dae01cf5b0c35807b8f0f83776433240abebb69"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "6"
+      },
+      "sha256": "952f330960a201489ffd01d4157d235103e8603127e6ad14a278fa679200c9df"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "7"
+      },
+      "sha256": "956d4cedb81c5ff73a766d05093bd5b3d5e1b48e2f279bc86e0ca1edac65bd20"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mMatchupScore&view=mScoreboard",
+      "params": {
+        "scoringPeriodId": "8"
+      },
+      "sha256": "ba1c68e225f22c00862640231a9e599b6beda6daa23d31fd9a7d5d83f7b6e57c"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mRoster",
+      "params": {},
+      "sha256": "fe8780d923fcb84a2d29a056c472ea2e12b8a67a5a62e1228e4d03d983574e4c"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mSettings&view=mTeam&view=mStatus&view=mNav",
+      "params": {},
+      "sha256": "062a6b556161d0f1dd7bfe411bff1b56546a10d71dbd0f95cd988c534dd111ad"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "1"
+      },
+      "sha256": "3e6389157a5fb1797538af13010b170420ab0abc268c278e3e2075cfe714f204"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "2"
+      },
+      "sha256": "e41cdf0264b0eb97e785c37b6f12a098a24333ac02534625fcce9af60e074063"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "3"
+      },
+      "sha256": "ddd6d40d60bee52026b54327d07f1181797455d6feaf306e57a04ffa2688f9fb"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "4"
+      },
+      "sha256": "f57b817951a09723164abb634876b7ce53423758e6459611d6aa3ccd34f5649c"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "5"
+      },
+      "sha256": "a431544b93db51104be8223b19c97ab2eb07d925edad1f5d0e84638012678806"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "6"
+      },
+      "sha256": "c75cddc0d4663ec61fd5a9f61d8a15c7cf78733f64801cd53eb40106d31bccf1"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "7"
+      },
+      "sha256": "67f667ac1d0719c485aefd09a23f97cc2a944454e8ca0e0277b6b2b956691a5d"
+    },
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/900000001?view=mTransactions2",
+      "params": {
+        "scoringPeriodId": "8"
+      },
+      "sha256": "220a3e5178875f3c4be1045ce02a977c4df0afac499f51c9936bd68e752cf6dd"
+    }
+  ]
+}
