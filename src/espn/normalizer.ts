@@ -49,6 +49,7 @@ const leagueSchema = z.object({
       playoffTeamCount: z.number().int().nonnegative(),
       playoffMatchupPeriodLength: z.number().int().default(1),
       consolationLadderDisabled: z.boolean().default(false),
+      playoffSeedingRule: z.string().nullish(),
       divisions: z.array(z.object({ id: z.number().int() })).default([]),
     }),
   }),
@@ -299,6 +300,14 @@ export function normalizeEspn(snapshot: Snapshot): League {
   if (sched.playoffMatchupPeriodLength !== 1) {
     throw fail(
       `its playoff rounds last ${sched.playoffMatchupPeriodLength} weeks, and this version reads one-week rounds only`,
+    );
+  }
+  // The standings order (win percentage, then points for) is the one rule
+  // confirmed against ESPN's own seeds, so any other would put teams in the wrong seats.
+  const seeding = sched.playoffSeedingRule;
+  if (seeding != null && seeding !== "TOTAL_POINTS_SCORED") {
+    throw fail(
+      `it seeds by ${seeding}, and this version reads total points scored as the tiebreak only`,
     );
   }
   const members = new Map(league.members.map((m) => [m.id, m]));

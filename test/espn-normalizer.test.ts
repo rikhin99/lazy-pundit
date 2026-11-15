@@ -428,6 +428,24 @@ describe("the ESPN normalizer with changed payloads", () => {
     expect(() => normalizeEspn(snapshot)).toThrow(/one-week rounds/);
   });
 
+  test("a league that breaks seeding ties head to head is refused, since the standings order would be wrong", async () => {
+    const snapshot = patched(await hot(), LEAGUE("900000001"), (json) => {
+      json.settings.scheduleSettings.playoffSeedingRule = "H2H_RECORD";
+    });
+    expect(() => normalizeEspn(snapshot)).toThrow(
+      /H2H_RECORD.*total points scored/s,
+    );
+  });
+
+  test("a league with no seeding rule named is read as the committed ones are", async () => {
+    const league = normalizeEspn(
+      patched(await hot(), LEAGUE("900000001"), (json) => {
+        delete json.settings.scheduleSettings.playoffSeedingRule;
+      }),
+    );
+    expect(league.settings.playoffTeams).toBe(8);
+  });
+
   test("a playoff tier this version doesn't read is refused, not read as the winners bracket", async () => {
     const snapshot = patched(
       await snapshotOf(HOT_TAKERY, 15),
