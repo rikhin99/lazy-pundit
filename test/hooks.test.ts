@@ -105,6 +105,12 @@ describe("the repo's hooks", () => {
     ["grep -n -E '.*|logKey' src/stakes.ts", 2],
     ["grep -n -E 'logKey|lastPublished' src/stakes.ts || true", 0],
     ["grep -n -E '^export|^function' src/stakes.ts", 0],
+    // In #106, a module-map row's literal pipe read as an alternative.
+    ["grep -n '^| `lineup.ts`' docs/agents/module-map.md", 0],
+    ["grep -n -F -e '| `lineup.ts`' docs/agents/module-map.md", 0],
+    ["grep -nF '||' src/stakes.ts", 0],
+    ["grep -n 'logKey\\|^' src/stakes.ts", 2],
+    ["grep -n -iE 'logKey|^' src/stakes.ts", 2],
   ])("read-by-outline.sh on %s exits %i", (command, status) => {
     expect(runHook("read-by-outline.sh", command).status).toBe(status);
   });

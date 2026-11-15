@@ -37,8 +37,19 @@ Bash)
   cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
   # A grep pattern with an alternative that matches any line (empty, ^, $,
   # .*) prints the whole file: in #76, `'logKey|^'` printed stakes.ts (4.8k).
-  for p in $(printf '%s' "$cmd" | grep -Eo "grep( +-[A-Za-z0-9]+)* +'[^']*\|[^']*'" | sed -E "s/^[^']*'//; s/'$//" | tr ' ' '\001'); do
-    if printf '|%s|' "$p" | tr '\001' ' ' | sed 's/\\|/|/g' | grep -Eq '\|(\^?(\.\*)?\$?)\|'; then
+  # -F has no alternatives, -E splits on `|`, and a basic pattern only on
+  # `\|`: in #106 a module-map row's literal `^| ` was refused.
+  for m in $(printf '%s' "$cmd" | grep -Eo "grep( +-[A-Za-z0-9]+)* +'[^']*\|[^']*'" | tr ' ' '\001'); do
+    m=$(printf '%s' "$m" | tr '\001' ' ')
+    flags=${m%%\'*}
+    p=$(printf '%s' "$m" | sed -E "s/^[^']*'//; s/'$//")
+    if printf '%s' "$flags" | grep -Eq ' -[A-Za-z0-9]*F'; then continue; fi
+    if printf '%s' "$flags" | grep -Eq ' -[A-Za-z0-9]*E'; then
+      alts=$(printf '%s' "$p" | sed 's/\\|/@LITERAL@/g')
+    else
+      alts=$(printf '%s' "$p" | sed 's/\\|/@ALT@/g; s/|/@LITERAL@/g; s/@ALT@/|/g')
+    fi
+    if printf '|%s|' "$alts" | grep -Eq '\|(\^?(\.\*)?\$?)\|'; then
       echo "This grep pattern has an alternative that matches every line (empty, ^, \$ or .*), so it prints the whole file. Drop that alternative, or use \`npm run outline -- <file>\` and a range." >&2
       exit 2
     fi
