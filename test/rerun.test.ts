@@ -437,10 +437,10 @@ test("the cap step says this month's spend, the cap and one draft's ceiling", as
 test("setup stops at steps it can't re-run, and at a name that's no step", () => {
   expect(rerunStop("lore")).toBeUndefined();
   expect(rerunStop("cap")).toBeUndefined();
-  expect(rerunStop("espn")).toMatch(/later release/);
+  expect(rerunStop("espn")).toBeUndefined();
   expect(rerunStop("pundit name")).toMatch(/init/);
   expect(rerunStop("league")).toMatch(
-    /handles, lore, stakes, method, key, cap, persona/,
+    /espn, handles, lore, stakes, method, key, cap, persona/,
   );
 });
 

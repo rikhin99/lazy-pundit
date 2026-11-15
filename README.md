@@ -1,7 +1,7 @@
 # lazy-pundit
 Weekly power rankings for your fantasy football league, drafted for you with the stats behind them and written in the persona you choose. You put the teams in your order and edit the words. Every claim in the intro and blurbs is checked against the league's data before you publish. It runs on your machine, from the command line.
 
-It works with [Sleeper](https://docs.sleeper.com/) leagues. ESPN comes in a later release. Lazy Pundit isn't affiliated with Sleeper or ESPN.
+It works with [Sleeper](https://docs.sleeper.com/) leagues, and experimentally with ESPN leagues scored by head-to-head points. Lazy Pundit isn't affiliated with Sleeper or ESPN.
 
 ## Before you install
 
@@ -40,8 +40,10 @@ Install from a release (`#semver:^0` or a tag such as `#v0.1.0`), not from `#mai
 Run `lazy-pundit init`. It asks:
 
 1. **Your name**, as it goes on your rankings.
-2. **Which platform the league is on.** Pick Sleeper; ESPN and Yahoo stop there for now.
-3. **Your Sleeper league.** When it asks for your Sleeper account, type your account name on Sleeper (not the email or phone number you sign in with), and pick the league from that account's leagues this season. If you're not sure of the name, leave it empty and type the league ID instead: the number in the league's URL on sleeper.com. Every Sleeper league can be read this way, with no login. An account name Sleeper doesn't know gives "Sleeper has no account named …", and init asks again. An account with no leagues this season says so, and init asks for a league ID.
+2. **Which platform the league is on.** Pick Sleeper or ESPN (experimental); Yahoo stops there for now.
+3. **Your league.** For ESPN, open the league on espn.com and copy the number after `leagueId=` in its URL. Init reads the league straight away: a public league needs nothing more, and a private one needs your `espn_s2` cookie, which init shows how to copy from your browser and asks for at a masked prompt. It's saved in `credentials.yaml`, never in the workspace, and `doctor` warns when it's about to go stale; renew it with `lazy-pundit setup espn`. A cookie ESPN rejects and a league ID it doesn't know each get their own message, and init asks again.
+
+   For Sleeper, when it asks for your Sleeper account, type your account name on Sleeper (not the email or phone number you sign in with), and pick the league from that account's leagues this season. If you're not sure of the name, leave it empty and type the league ID instead: the number in the league's URL on sleeper.com. Every Sleeper league can be read this way, with no login. An account name Sleeper doesn't know gives "Sleeper has no account named …", and init asks again. An account with no leagues this season says so, and init asks for a league ID.
 4. **The workspace folder**: the folder itself, not one to make it in. Type its full path (`/Users/you/leagues/fear-the-turtle`, say) or start it with `~/` (`~/leagues/fear-the-turtle`); init refuses any other path and asks again. Leave it empty for the folder the question names: for your first league, a new folder in `~/lazy-pundit/` named after the league (`~/lazy-pundit/fear-the-turtle`); after that, a new folder next to the last workspace you set up. A path ending in `.` is likely a typo, so init asks whether to use it without the dot.
 5. **The setup steps**: manager handles, lore and nicknames, stakes and house rules (with whether it's a family league, read by people of any age, which keeps every persona clean), the power-score method, your Anthropic key and spend cap, and the persona. Each one but the spend cap can be skipped (the cap is passed over when you skip the key), with "Skip the rest" for all that are left, and answered later with `lazy-pundit setup <step>`.
 
@@ -105,7 +107,7 @@ A hard problem (✗) would put something false in front of the league: fix it, a
 
 - `lazy-pundit refresh` refetches the league after stat corrections or late scoring and moves the draft onto the new data, leaving your order and words. `--full` refetches every week.
 - `lazy-pundit stats` prints a summary of your published weeks (time to publish, teams moved, how much LLM text you kept) to paste to the builder. Nothing is sent anywhere.
-- `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`.
+- `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `espn` (a fresh cookie, for an ESPN league), `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`.
 - `lazy-pundit doctor` checks Node, your config and credentials, and each workspace.
 - `lazy-pundit transcripts delete` removes the workspace's LLM transcripts.
 
@@ -131,7 +133,7 @@ workspaces:
   fear-the-turtle: /Users/you/lazy-pundit/fear-the-turtle
 ```
 
-`spend.yaml` counts LLM spend by local calendar month, across every league. `credentials.yaml` holds the Anthropic key (and, for ESPN once it's supported, the `espn_s2` cookie) at mode 0600; the tool warns if others can read it.
+`spend.yaml` counts LLM spend by local calendar month, across every league. `credentials.yaml` holds the Anthropic key and the `espn_s2` cookie at mode 0600; the tool warns if others can read it.
 
 Environment variables:
 

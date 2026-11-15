@@ -45,7 +45,10 @@ const leagueSchema = z.object({
       lineupSlotCounts: z.record(z.string(), z.number().int()),
     }),
     scoringSettings: z
-      .object({ playoffHomeTeamBonus: z.number().default(0) })
+      .object({
+        playoffHomeTeamBonus: z.number().default(0),
+        scoringType: z.string().nullish(),
+      })
       .default({ playoffHomeTeamBonus: 0 }),
     scheduleSettings: z.object({
       matchupPeriodCount: z.number().int().positive(),
@@ -300,6 +303,13 @@ export function normalizeEspn(snapshot: Snapshot): League {
   const league = payload(leagueUrl, leagueSchema);
   const schedule = payload(scheduleUrl, scheduleSchema);
   const sched = league.settings.scheduleSettings;
+  // A categories or roto league has no matchup scores to rank by.
+  const scoring = league.settings.scoringSettings.scoringType;
+  if (scoring != null && scoring !== "H2H_POINTS") {
+    throw fail(
+      `it's scored by ${scoring}, and Lazy Pundit ranks only head-to-head points leagues`,
+    );
+  }
   if (sched.playoffMatchupPeriodLength !== 1) {
     throw fail(
       `its playoff rounds last ${sched.playoffMatchupPeriodLength} weeks, and this version reads one-week rounds only`,

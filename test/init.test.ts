@@ -328,16 +328,25 @@ test("a league already set up is refused before the live fetch", async () => {
   await expect(
     refuseLeagueSetUp(deps, {
       punditName: " Rikhin ",
+      platform: "sleeper",
       leagueId: FEAR_THE_TURTLE_ID,
     }),
   ).rejects.toThrow(`This league is already set up in ${dir}.`);
   await expect(
-    refuseLeagueSetUp(deps, { punditName: "Bo", leagueId: FEAR_THE_TURTLE_ID }),
+    refuseLeagueSetUp(deps, {
+      punditName: "Bo",
+      platform: "sleeper",
+      leagueId: FEAR_THE_TURTLE_ID,
+    }),
   ).rejects.toThrow(
     `This league's workspace in ${dir} belongs to rikhin, and multi-pundit is a later stage.`,
   );
   await expect(
-    refuseLeagueSetUp(deps, { punditName: "Rikhin", leagueId: "2" }),
+    refuseLeagueSetUp(deps, {
+      punditName: "Rikhin",
+      platform: "sleeper",
+      leagueId: "2",
+    }),
   ).resolves.toBeUndefined();
 });
 
@@ -349,7 +358,7 @@ test("init says how to change each answer after setup, naming every step setup r
     league,
   });
 
-  expect(changeAnswersNote(deps, { slug, dir })).toBe(
+  expect(changeAnswersNote(deps, { slug, dir, platform: "sleeper" })).toBe(
     `To change an answer after setup, run lazy-pundit --league fear-the-turtle setup <step>, with <step> one of: handles, lore, stakes, method, key, cap, persona.\nTo change the pundit name, platform, league or folder, delete ${dir} and the fear-the-turtle: line under workspaces: in ${join(deps.configDir, "config.yaml")}, then run lazy-pundit init again.`,
   );
 });
@@ -381,6 +390,7 @@ test("a league whose folder and config.yaml line were deleted, as the note says,
   await expect(
     refuseLeagueSetUp(deps, {
       punditName: "Rikhin",
+      platform: "sleeper",
       leagueId: FEAR_THE_TURTLE_ID,
     }),
   ).resolves.toBeUndefined();
@@ -603,9 +613,9 @@ test("a config.yaml that can't be listed in leaves no workspace behind", async (
   expect(await readdir(deps.workspacesDir).catch(() => [])).toEqual([]);
 });
 
-test("Yahoo and ESPN stop setup with a message, and Sleeper goes on", () => {
+test("Yahoo stops setup with a message, and Sleeper and ESPN go on", () => {
   expect(platformStop("yahoo")).toBe("Yahoo support comes in a later release.");
-  expect(platformStop("espn")).toBe("ESPN support comes in a later release.");
+  expect(platformStop("espn")).toBeUndefined();
   expect(platformStop("sleeper")).toBeUndefined();
 });
 

@@ -40,6 +40,15 @@ export interface Environment {
   noColor?: true;
 }
 
+/** A clock stopped at `iso`, for a scripted run of a replay. */
+function fixedAt(iso: string): Clock {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) {
+    throw new Error(`LAZY_PUNDIT_NOW is ${iso}, not an ISO time.`);
+  }
+  return { now: () => new Date(at) };
+}
+
 /**
  * The real network, system time and system clipboard, with folders and
  * overrides read from the environment. This is the only place that reads
@@ -55,6 +64,9 @@ export interface Environment {
  *   LAZY_PUNDIT_REPLAY     a snapshot's folder: every request replays it, not
  *                          the network, so scripted runs stay offline; one it
  *                          didn't record, such as the key check, gets a 404
+ *   LAZY_PUNDIT_NOW        with LAZY_PUNDIT_REPLAY, an ISO time the clock
+ *                          reads instead of the system's, so a scripted run
+ *                          asks for the replay's season
  */
 export function systemDeps(): Deps {
   const env = process.env;
@@ -68,7 +80,10 @@ export function systemDeps(): Deps {
         )
       : http,
     llm: anthropicLlm(http),
-    clock: systemClock,
+    clock:
+      env.LAZY_PUNDIT_REPLAY && env.LAZY_PUNDIT_NOW
+        ? fixedAt(env.LAZY_PUNDIT_NOW)
+        : systemClock,
     clipboard:
       env.LAZY_PUNDIT_CLIPBOARD === "off" ? noClipboard : systemClipboard,
     cacheDir: join(env.XDG_CACHE_HOME || join(home, ".cache"), "lazy-pundit"),

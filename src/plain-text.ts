@@ -3,7 +3,8 @@ import { type MovementBaseline, movementMark } from "./movement.ts";
 import type { RankingFile } from "./ranking-file.ts";
 import { type OrderEvidence, stripTags } from "./validator.ts";
 
-const PLATFORM_NAMES: Record<League["platform"], string> = {
+/** Each platform's name as the pundit reads it. */
+export const PLATFORM_NAMES: Record<League["platform"], string> = {
   sleeper: "Sleeper",
   espn: "ESPN",
 };

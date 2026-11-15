@@ -10,6 +10,7 @@ import {
   WorkspaceFileError,
 } from "./front-matter.ts";
 import {
+  checkEspnLeague,
   checkLeague,
   handleProblem,
   type LeagueCheck,
@@ -31,6 +32,7 @@ import {
 import { familyLeague, leagueFilePath, readLeagueFile } from "./league-file.ts";
 import { type LeagueType, loadLore } from "./lore.ts";
 import { type PresetName, personaPath } from "./persona.ts";
+import { PLATFORM_NAMES } from "./plain-text.ts";
 import type { PowerScoreMethod } from "./power-score.ts";
 import { punditSettingsPath } from "./pundit-settings.ts";
 import { lastPublishedMeta } from "./ranking-file.ts";
@@ -56,6 +58,7 @@ export type StepRerun =
   | { step: "lore"; league: LeagueCheck; lore?: LoreAnswers }
   | { step: "stakes"; stakes?: StakesAnswers }
   | { step: "method"; method?: PowerScoreMethod }
+  | { step: "espn"; cookie?: string }
   | { step: "key"; key?: string }
   | { step: "cap"; spendCap: number }
   | { step: "persona"; persona?: PresetName };
@@ -77,18 +80,32 @@ export function isRerunStep(step: string): step is RerunStep {
 /** Why `setup <step>` can't re-run `step`, or undefined if it can. */
 export function rerunStop(step: string): string | undefined {
   if (isRerunStep(step)) return undefined;
-  if (step === "espn") {
-    return "Reading ESPN leagues comes in a later release, and lazy-pundit setup espn with it.";
-  }
   if (step === "pundit name" || step === "league data") {
     return `The ${step} makes the workspace, so only lazy-pundit init sets it: run init for a new workspace.`;
   }
   return `No setup step is called ${step}. lazy-pundit setup re-runs one of: ${RERUN_STEPS.join(", ")}.`;
 }
 
-/** Whether `setup <step>` edits `workspace.md`: key and cap write only the operator's files. */
+/** Whether `setup <step>` edits `workspace.md`: espn, key and cap write only the operator's files. */
 export function editsWorkspace(step: RerunStep): boolean {
-  return step !== "key" && step !== "cap";
+  return step !== "espn" && step !== "key" && step !== "cap";
+}
+
+/**
+ * The ESPN league `setup espn` checks a cookie against: the workspace's league
+ * in its own season. A league on another platform needs no cookie, so it's
+ * refused before anything is asked.
+ */
+export async function espnWorkspaceLeague(
+  dir: string,
+): Promise<{ leagueId: string; season: string }> {
+  const { season } = await readWorkspace(dir);
+  if (season.platform !== "espn") {
+    throw new SetupRefusal(
+      `This workspace's league is on ${PLATFORM_NAMES[season.platform]}, which needs no ESPN cookie: run lazy-pundit setup espn in an ESPN league's workspace.`,
+    );
+  }
+  return { leagueId: season.leagueId, season: season.year };
 }
 
 /**
@@ -125,6 +142,11 @@ export async function rerunStep(
   const ws = await readWorkspace(dir);
   await refuseUneditableWorkspace(dir, rerun.step);
   switch (rerun.step) {
+    case "espn":
+      await espnWorkspaceLeague(dir);
+      if (rerun.cookie === undefined) return { written: false, warnings: [] };
+      await saveCredentials(deps, { espnS2: rerun.cookie });
+      return { written: true, warnings: [] };
     case "key":
       if (rerun.key === undefined) return { written: false, warnings: [] };
       await saveCredentials(deps, { anthropicApiKey: rerun.key });
@@ -195,7 +217,12 @@ export async function rerunLeague(
   proposed: ManagerHandle[];
 }> {
   const ws = await readWorkspace(dir);
-  const league = await checkLeague(deps, ws.season.leagueId);
+  const league =
+    ws.season.platform === "espn"
+      ? await checkEspnLeague(deps, ws.season.leagueId, {
+          season: ws.season.year,
+        })
+      : await checkLeague(deps, ws.season.leagueId);
   const linked = linkedHandles(ws, league);
   const proposed = proposedHandles(league).map(
     (p) => linked.find((l) => l.account === p.account) ?? p,

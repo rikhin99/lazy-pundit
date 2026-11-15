@@ -18,8 +18,10 @@ import {
   type ChecklistItem,
   COMMON_HOUSE_RULES,
   ConfigFileError,
+  CookieRefusal,
   changeAnswersNote,
   check,
+  checkEspnLeague,
   checkKey,
   checkLeague,
   checkWorkspace,
@@ -31,7 +33,10 @@ import {
   deleteTranscripts,
   doctor,
   draft,
+  ESPN_COOKIE_HELP,
+  ESPN_LEAGUE_ID_PROMPT,
   editsWorkspace,
+  espnWorkspaceLeague,
   FetchError,
   familyLeagueDefault,
   familyLeagueLowers,
@@ -428,19 +433,93 @@ async function askLeagueId(deps: Deps): Promise<string> {
   ).trim();
 }
 
-/** Asks for a league until one isn't set up yet and passes the live fetch. */
-async function askLeague(deps: Deps, punditName: string): Promise<LeagueCheck> {
+/**
+ * Asks for a league until one isn't set up yet and passes the live fetch,
+ * with the ESPN cookie typed for it, if one was.
+ */
+async function askLeague(
+  deps: Deps,
+  punditName: string,
+  platform: "sleeper" | "espn",
+): Promise<{ league: LeagueCheck; cookie?: string }> {
   for (;;) {
     try {
+      if (platform === "espn") return await askEspnLeague(deps, punditName);
       const leagueId = await askLeagueId(deps);
-      await refuseLeagueSetUp(deps, { punditName, leagueId });
+      await refuseLeagueSetUp(deps, { punditName, platform, leagueId });
       log.info("Fetching the league from Sleeper…");
-      return await checkLeague(deps, leagueId);
+      return { league: await checkLeague(deps, leagueId) };
     } catch (err) {
       if (!(err instanceof SetupRefusal)) throw err;
       log.error(err.message);
     }
   }
+}
+
+/**
+ * An ESPN league by its typed ID, read with the cookie held or none, then
+ * with a typed one for as long as ESPN asks for one, unless the pundit
+ * chooses to type the ID again: a mistyped ID can be another private league.
+ */
+async function askEspnLeague(
+  deps: Deps,
+  punditName: string,
+): Promise<{ league: LeagueCheck; cookie?: string }> {
+  for (;;) {
+    const leagueId = answered(
+      await text({
+        message: ESPN_LEAGUE_ID_PROMPT,
+        validate: (v) => (v?.trim() ? undefined : "Enter the league ID."),
+      }),
+    ).trim();
+    await refuseLeagueSetUp(deps, { punditName, platform: "espn", leagueId });
+    const read = await readEspnLeague(deps, leagueId);
+    if (read) return read;
+  }
+}
+
+/** The league read, or undefined when the pundit chose to type its ID again. */
+async function readEspnLeague(
+  deps: Deps,
+  leagueId: string,
+): Promise<{ league: LeagueCheck; cookie?: string } | undefined> {
+  let cookie: string | undefined;
+  for (;;) {
+    log.info("Fetching the league from ESPN…");
+    try {
+      const league = await checkEspnLeague(
+        deps,
+        leagueId,
+        cookie === undefined ? {} : { cookie },
+      );
+      return cookie === undefined ? { league } : { league, cookie };
+    } catch (err) {
+      if (!(err instanceof CookieRefusal)) throw err;
+      log.warn(err.message);
+      const next = answered(
+        await select({
+          message: "Next?",
+          options: [
+            { value: "cookie", label: "Paste the espn_s2 cookie" },
+            { value: "id", label: "Type the league ID again" },
+          ],
+        }),
+      );
+      if (next === "id") return undefined;
+      cookie = await askCookie();
+    }
+  }
+}
+
+/** The ESPN cookie, after how to copy it, at a masked prompt. */
+async function askCookie(): Promise<string> {
+  log.info(ESPN_COOKIE_HELP);
+  return answered(
+    await password({
+      message: "espn_s2 cookie",
+      validate: (v) => (v?.trim() ? undefined : "Paste the cookie, or Esc."),
+    }),
+  ).trim();
 }
 
 const SKIP = "skip";
@@ -803,15 +882,16 @@ async function setUpLeague(deps: Deps): Promise<boolean> {
     }),
   );
   const stop = platformStop(platform);
-  if (stop) {
-    log.warn(stop);
+  // Yahoo always stops; its check narrows the platform for askLeague.
+  if (stop !== undefined || platform === "yahoo") {
+    if (stop !== undefined) log.warn(stop);
     return false;
   }
-  const league = await askLeague(deps, punditName);
+  const { league, cookie } = await askLeague(deps, punditName, platform);
   log.success(`${league.name}, ${league.season}: ${league.teams} teams.`);
   for (const warning of league.warnings) log.warn(warning);
   const folder = await askFolder(deps, punditName, league);
-  log.info(changeAnswersNote(deps, folder));
+  log.info(changeAnswersNote(deps, { ...folder, platform: league.platform }));
   const where = { punditName, league, dir: folder.dir };
   const handles = await askHandles(league);
   const lore = handles.skipRest
@@ -833,6 +913,7 @@ async function setUpLeague(deps: Deps): Promise<boolean> {
     ...("method" in method && method.method ? { method: method.method } : {}),
     ...person,
     ...(persona ? { persona } : {}),
+    ...(cookie ? { cookie } : {}),
   });
   leaguesReady++;
   log.success(
@@ -894,6 +975,7 @@ program
     if (editsWorkspace(step)) {
       await refuseUneditableWorkspace(await workspace(deps), step);
     }
+    if (step === "espn") await espnWorkspaceLeague(await workspace(deps));
     if (!process.stdin.isTTY) {
       throw new SetupRefusal(
         `setup ${step} asks questions, so run it in a terminal.`,
@@ -940,6 +1022,8 @@ async function askRerun(
       const { method } = await askMethod(RERUN_SKIPS);
       return { step, ...(method ? { method } : {}) };
     }
+    case "espn":
+      return { step, ...(await askNewCookie(deps, dir)) };
     case "key": {
       const { key } = await askKey(deps, RERUN_SKIPS);
       return { step, ...(key ? { key } : {}) };
@@ -952,6 +1036,40 @@ async function askRerun(
     case "persona": {
       const persona = await askPersona(type, familyLeague);
       return { step, ...(persona ? { persona } : {}) };
+    }
+  }
+}
+
+/**
+ * `setup espn`: a new cookie, asked until ESPN reads the workspace's league
+ * with it, or nothing when skipped, which keeps the stored one.
+ */
+async function askNewCookie(
+  deps: Deps,
+  dir: string,
+): Promise<{ cookie?: string }> {
+  const { leagueId, season } = await espnWorkspaceLeague(dir);
+  if (deps.env.espnS2 !== undefined) {
+    log.warn(
+      "LAZY_PUNDIT_ESPN_S2 is set, so ESPN gets it instead of the stored cookie until it's unset.",
+    );
+  }
+  for (;;) {
+    const picked = answered(
+      await select({
+        message: "Save a new espn_s2 cookie?",
+        options: [{ value: "cookie", label: "Paste a cookie" }, ...RERUN_SKIPS],
+      }),
+    );
+    if (picked !== "cookie") return {};
+    const cookie = await askCookie();
+    log.info("Checking the cookie with ESPN…");
+    try {
+      await checkEspnLeague(deps, leagueId, { cookie, season });
+      return { cookie };
+    } catch (err) {
+      if (!(err instanceof CookieRefusal)) throw err;
+      log.error(err.message);
     }
   }
 }

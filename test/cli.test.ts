@@ -55,18 +55,27 @@ test("init with no terminal says so, fails and writes nothing", async () => {
   expect(await readdir(home)).toEqual([]);
 });
 
-test("setup with a step asks questions, so it refuses to run outside a terminal, and setup espn comes later", async () => {
+test("setup with a step asks questions, so it refuses to run outside a terminal", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "lazy-pundit-cli-"));
   const home = await mkdtemp(join(tmpdir(), "lazy-pundit-home-"));
 
   const key = await cli(cwd, ["setup", "key"], "", home);
-  const espn = await cli(cwd, ["setup", "espn"], "", home);
 
   expect(key.code).toBe(1);
   expect(key.stderr).toMatch(/setup key asks questions.*terminal/);
-  expect(espn.code).toBe(1);
-  expect(espn.stderr).toMatch(/later release/);
   expect(await readdir(home)).toEqual([]);
+});
+
+test("setup espn in a Sleeper league's workspace is refused before its terminal check", async () => {
+  const { dir } = await fearTheTurtle(8);
+
+  const espn = await cli(dir, ["setup", "espn"]);
+
+  expect(espn.code).toBe(1);
+  expect(espn.stderr).toMatch(
+    /^This workspace's league is on Sleeper, which needs no ESPN cookie/,
+  );
+  expect(espn.stderr).not.toMatch(/terminal/);
 });
 
 test("setup method on an indented workspace.md refuses it in one line before asking anything; setup key still gets to its terminal check", async () => {

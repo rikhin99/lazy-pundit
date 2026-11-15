@@ -10,7 +10,12 @@
 #   next-to         config.yaml already lists a workspace at <home>/elsewhere/league-a,
 #                   so the folder left empty is <home>/elsewhere/fear-the-turtle
 #   bad-id          an unknown league ID, re-asked, then Ctrl-C
-#   yahoo, espn     pick a platform that stops the wizard
+#   yahoo           pick a platform that stops the wizard
+#   espn            ESPN, replaying Hot Takery's week 8 (read as a public league, so no
+#                   cookie is asked), every default into <home>/ws, then setup espn
+#                   with LAZY_PUNDIT_ESPN_S2 set (warned) and a pasted cookie, which
+#                   the replay accepts
+#   espn-bad-id     ESPN with an unknown league ID, re-asked, then Ctrl-C
 #   cancel          Ctrl-C at the first prompt
 #   cancel-folder   Ctrl-C at the folder prompt
 #   rename          rename the first handle to "gus", pick standings
@@ -38,12 +43,12 @@
 
 # The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
 # setup does. drive-wizard-all.sh reads this line.
-set cancelled {bad-id cancel cancel-folder another again}
+set cancelled {bad-id espn-bad-id cancel cancel-folder another again}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
+if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|espn-bad-id|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -67,8 +72,16 @@ set env(LAZY_PUNDIT_CLIPBOARD) off
 # symbol, such as the one the key scenario waits for, never matches.
 set env(NO_COLOR) 1
 catch {unset env(FORCE_COLOR)}
-set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/sleeper/fear-the-turtle-2025/20251028T120000Z-c4a2c21d"
+set espn [expr {[string match "espn*" $scenario]}]
+if {$espn} {
+  set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/espn/hot-takery-2025/20251028T120000Z-a095861f"
+  # ESPN's URLs name the season, which setup takes from the clock.
+  set env(LAZY_PUNDIT_NOW) "2025-10-28T15:00:00.000Z"
+} else {
+  set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/sleeper/fear-the-turtle-2025/20251028T120000Z-c4a2c21d"
+}
 catch {unset env(ANTHROPIC_API_KEY)}
+catch {unset env(LAZY_PUNDIT_ESPN_S2)}
 
 # A real width: a terminal of width 0 makes clack wrap one character per line.
 set stty_init "cols 120 rows 40"
@@ -97,6 +110,8 @@ array set writes {
   dot-keep ws.
   next-to elsewhere/fear-the-turtle
   cancel-folder nothing
+  espn ws
+  espn-bad-id nothing
 }
 
 proc finish {} {
@@ -143,21 +158,32 @@ if {$scenario eq "cancel"} { send $CTRL_C; finish }
 send "Rikhin\r"
 
 need "Which platform"
-if {$scenario eq "espn"} { send "$DOWN"; after 200; send "\r"; finish }
 if {$scenario eq "yahoo"} { send "$DOWN"; after 200; send "$DOWN"; after 200; send "\r"; finish }
-send "\r"
-
-need "username"
-send "\r"
-need "number in the"
-if {$scenario eq "bad-id"} {
-  send "123\r"
-  need "no league"
+if {$espn} {
+  send "$DOWN"; after 200; send "\r"
+  need "◆  ESPN league ID"
+  if {$scenario eq "espn-bad-id"} {
+    send "123\r"
+    need "ESPN has no league 123"
+    need "◆  ESPN league ID"
+    send $CTRL_C
+    finish
+  }
+  send "900000001\r"
+} else {
+  send "\r"
   need "username"
-  send $CTRL_C
-  finish
+  send "\r"
+  need "number in the"
+  if {$scenario eq "bad-id"} {
+    send "123\r"
+    need "no league"
+    need "username"
+    send $CTRL_C
+    finish
+  }
+  send "900000000000000001\r"
 }
-send "900000000000000001\r"
 
 if {$scenario eq "next-to"} { need "next to your last one" }
 need "Workspace folder"
@@ -174,7 +200,7 @@ if {$scenario eq "folder"} {
   need "ends in a dot"
   if {$scenario eq "dot-keep"} { send $DOWN; after 200 }
   send "\r"
-} elseif {$scenario in {setup-lore setup-stakes}} {
+} elseif {$scenario in {setup-lore setup-stakes espn}} {
   send "$home/ws\r"
 } else {
   send "\r"
@@ -269,10 +295,23 @@ if {$scenario eq "again"} {
   finish
 }
 send "\r"
-if {$scenario ni {setup-lore setup-stakes}} { finish }
+if {$scenario ni {setup-lore setup-stakes espn}} { finish }
 
 expect eof
 wait
+if {$scenario eq "espn"} {
+  cd "$home/ws"
+  # A cookie in the environment wins over the stored one, which setup espn says.
+  set env(LAZY_PUNDIT_ESPN_S2) "AEB%2Fenv"
+  spawn node "$repo/src/cli.ts" setup espn
+  need "LAZY_PUNDIT_ESPN_S2 is set"
+  need "Save a new espn_s2"
+  send "\r"
+  need "◆  espn_s2 cookie"
+  send "AEB%2Fdriven\r"
+  need "espn set"
+  finish
+}
 if {$scenario eq "setup-stakes"} {
   cd "$home/ws"
   exec node "$repo/src/cli.ts" draft 2>@1

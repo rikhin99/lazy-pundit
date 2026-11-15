@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import { join } from "node:path";
 import { checkAnthropicKey } from "./anthropic.ts";
 import {
   type Config,
@@ -15,6 +16,8 @@ import {
   spendSchema,
 } from "./config.ts";
 import type { Deps } from "./deps.ts";
+import { checkEspnCookie } from "./espn/fetcher.ts";
+import { ESPN_ENV_FIX, SETUP_ESPN_FIX } from "./refresh.ts";
 import { readWorkspace } from "./workspace.ts";
 
 export interface DoctorCheck {
@@ -72,7 +75,7 @@ export async function doctor(deps: Deps): Promise<DoctorResult> {
   const credentials = await credentialsCheck(deps, checks);
   checks.push(await spendCheck(deps));
   checks.push(await anthropicCheck(deps, credentials));
-  checks.push(espnCheck(deps, credentials));
+  checks.push(await espnCheck(deps, credentials, config));
   if (config) checks.push(...(await workspaceChecks(deps, config)));
   checks.push(await clipboardCheck(deps));
 
@@ -180,24 +183,70 @@ async function anthropicCheck(
 }
 
 /**
- * The cookie's age. It's checked live against an ESPN league once ESPN
- * leagues can be set up; until then only its age is checked.
+ * The cookie, or its absence, checked live with one request for the first
+ * listed workspace's league on ESPN, if there is one, and then by its age.
+ * A public league reads with any cookie or none, so it proves only that the
+ * league can be read.
  */
-function espnCheck(deps: Deps, credentials: Credentials): DoctorCheck {
+async function espnCheck(
+  deps: Deps,
+  credentials: Credentials,
+  config: Config | undefined,
+): Promise<DoctorCheck> {
   const subject = "ESPN cookie";
   const cookie = credentials.espnS2;
+  const fromEnv = cookie?.from === "env";
+  const which = !cookie
+    ? "no cookie"
+    : fromEnv
+      ? "LAZY_PUNDIT_ESPN_S2"
+      : "the stored cookie";
+  const league = config && (await firstEspnLeague(config));
+  let accepted: string | undefined;
+  if (league) {
+    const answer = await checkEspnCookie(deps.transport, cookie?.value, league);
+    if (answer === "rejected") {
+      return {
+        subject,
+        status: "fail",
+        message: !cookie
+          ? `ESPN league ${league.leagueId} is private, and no cookie is stored.`
+          : `ESPN rejected ${which}${fromEnv ? "" : ` (saved ${cookie.savedAt})`} for league ${league.leagueId}.`,
+        fix: fromEnv ? ESPN_ENV_FIX : SETUP_ESPN_FIX,
+      };
+    }
+    if (answer === "no league") {
+      return {
+        subject,
+        status: "warn",
+        message: `Couldn't check ${which}: ESPN has no league ${league.leagueId} in ${league.season}.`,
+        fix: `Check league_id in ${join(league.dir, "workspace.md")} against the league's URL.`,
+      };
+    }
+    if (answer !== "ok") {
+      return {
+        subject,
+        status: "warn",
+        message: `Couldn't check ${which}: ${answer.unreachable}.`,
+        fix: "Check your connection and run lazy-pundit doctor again.",
+      };
+    }
+    accepted = !cookie
+      ? `ESPN read league ${league.leagueId} with no cookie: it's public.`
+      : `ESPN accepted ${which}${fromEnv ? "" : ` (saved ${cookie.savedAt})`} for league ${league.leagueId}.`;
+  }
   if (!cookie) {
     return {
       subject,
       status: "ok",
-      message: "None stored; only private ESPN leagues need one.",
+      message: accepted ?? "None stored; only private ESPN leagues need one.",
     };
   }
   if (cookie.savedAt === undefined) {
     return {
       subject,
       status: "ok",
-      message: "From LAZY_PUNDIT_ESPN_S2.",
+      message: accepted ?? "From LAZY_PUNDIT_ESPN_S2.",
     };
   }
   const [y, m, d] = cookie.savedAt.split("-").map(Number) as [
@@ -211,10 +260,27 @@ function espnCheck(deps: Deps, credentials: Credentials): DoctorCheck {
       subject,
       status: "warn",
       message: `The espn_s2 cookie was saved ${cookie.savedAt}, over ${COOKIE_MONTHS} months ago, and may stop working soon.`,
-      fix: "Copy a fresh espn_s2 from your browser, then run: lazy-pundit setup espn",
+      fix: SETUP_ESPN_FIX,
     };
   }
-  return { subject, status: "ok", message: `Saved ${cookie.savedAt}.` };
+  return {
+    subject,
+    status: "ok",
+    message: accepted ?? `Saved ${cookie.savedAt}.`,
+  };
+}
+
+/** The first listed workspace's league on ESPN; one that can't be read is skipped. */
+async function firstEspnLeague(
+  config: Config,
+): Promise<{ leagueId: string; season: string; dir: string } | undefined> {
+  for (const dir of Object.values(config.workspaces)) {
+    const ws = await readWorkspace(dir).catch(() => undefined);
+    if (ws?.season.platform === "espn") {
+      return { leagueId: ws.season.leagueId, season: ws.season.year, dir };
+    }
+  }
+  return undefined;
 }
 
 /**

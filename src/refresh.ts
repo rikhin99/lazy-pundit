@@ -350,9 +350,11 @@ const LEAGUE_ID_FIX =
   "The platform doesn't know this league: check league_id in workspace.md, or run lazy-pundit init for a new workspace.";
 const UPDATE_FIX =
   "This version can't read what the platform answered: check for a newer Lazy Pundit.";
-const SETUP_ESPN_FIX =
+/** A rejected stored cookie's fix, which `doctor` gives too. */
+export const SETUP_ESPN_FIX =
   "Copy a fresh espn_s2 from your browser, then run: lazy-pundit setup espn";
-const ESPN_ENV_FIX =
+/** A rejected `LAZY_PUNDIT_ESPN_S2`'s fix, which `doctor` gives too. */
+export const ESPN_ENV_FIX =
   "Set LAZY_PUNDIT_ESPN_S2 to a fresh espn_s2 from your browser, or unset it to use the stored cookie.";
 
 /**

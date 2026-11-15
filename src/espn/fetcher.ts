@@ -170,6 +170,35 @@ export async function fetchEspn(opts: FetchEspnOptions): Promise<FetchedEspn> {
   };
 }
 
+/**
+ * Checks a cookie, or none, live with one request for an ESPN league's own
+ * payload, as `doctor` does: read, rejected (401), a league ESPN doesn't
+ * know (404), or why it couldn't be checked.
+ */
+export async function checkEspnCookie(
+  transport: Transport,
+  cookie: string | undefined,
+  league: { leagueId: string; season: string },
+): Promise<"ok" | "rejected" | "no league" | { unreachable: string }> {
+  const url = espnViewUrl(
+    espnLeagueUrl(league.season, league.leagueId),
+    ESPN_VIEWS.league,
+  );
+  try {
+    const res = await platformRequest(transport, {
+      url,
+      params: {},
+      headers: cookie === undefined ? {} : { Cookie: `espn_s2=${cookie}` },
+    });
+    if (res.status === 401) return "rejected";
+    if (res.status === 404) return "no league";
+    if (res.status >= 200 && res.status < 300) return "ok";
+    return { unreachable: `GET ${requestUrl({ url })} returned ${res.status}` };
+  } catch (err) {
+    return { unreachable: (err as Error).message };
+  }
+}
+
 /** The 401's message: which cookie ESPN refused, or that none was sent. */
 function rejectedCookie(opts: FetchEspnOptions): string {
   const cookie = opts.cookie;

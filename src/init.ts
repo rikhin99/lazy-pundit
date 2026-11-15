@@ -13,8 +13,9 @@ import {
   spendMonth,
 } from "./config.ts";
 import type { Deps } from "./deps.ts";
+import { fetchEspn } from "./espn/fetcher.ts";
 import { FORMAT, WorkspaceFileError } from "./front-matter.ts";
-import type { LeagueSettings, TeamId } from "./league.ts";
+import type { League, LeagueSettings, TeamId } from "./league.ts";
 import { leagueFilePath } from "./league-file.ts";
 import { MAX_TOKENS } from "./llm-call.ts";
 import { GATE_RETRIES } from "./llm-gate.ts";
@@ -82,14 +83,40 @@ export class SetupRefusal extends Error {
   override name = "SetupRefusal";
 }
 
+/** An ESPN league that can't be read without a cookie, or a new one: the pundit answers with one. */
+export class CookieRefusal extends SetupRefusal {
+  override name = "CookieRefusal";
+}
+
 export type PlatformChoice = "sleeper" | "espn" | "yahoo";
 
 /** Why setup stops at this platform, or undefined if it can go on. */
 export function platformStop(platform: PlatformChoice): string | undefined {
   if (platform === "yahoo") return "Yahoo support comes in a later release.";
-  if (platform === "espn") return "ESPN support comes in a later release.";
   return undefined;
 }
+
+/** Where an ESPN league's ID is, said at its prompt. */
+export const ESPN_LEAGUE_ID_PROMPT =
+  "ESPN league ID (the number after leagueId= in the league's URL)";
+
+/**
+ * How to copy the ESPN cookie, said before its masked prompt, with a sketch of
+ * the browser's cookie table.
+ */
+export const ESPN_COOKIE_HELP = `To copy your espn_s2 cookie:
+  1. In Chrome, Edge or Firefox, sign in at espn.com as a member of the league, and open the league.
+  2. Open the developer tools: F12, or Cmd+Option+I on a Mac.
+  3. Chrome or Edge: Application tab, then Cookies, then https://fantasy.espn.com
+     Firefox: Storage tab, then Cookies, then https://fantasy.espn.com
+  4. Find the row named espn_s2 and copy its whole Value:
+
+     ┌ Cookies › https://fantasy.espn.com ──────────────────────┐
+     │ Name        Value                                        │
+     │ espn_s2     AEBx9%2F…%3D   ← double-click, copy it all   │
+     └──────────────────────────────────────────────────────────┘
+
+It's kept in credentials.yaml on this computer, never in a workspace, and sent only to ESPN.`;
 
 /** What this version doesn't model about a league it still accepts. */
 function leagueWarnings(settings: LeagueSettings): string[] {
@@ -144,6 +171,11 @@ export async function checkLeague(
       { cause: err },
     );
   });
+  return leagueCheckOf(league);
+}
+
+/** A league fetched live, as the league data step accepts it. */
+function leagueCheckOf(league: League): LeagueCheck {
   const teamList = league.teams.map((t) => ({
     id: t.id,
     name: t.name,
@@ -162,6 +194,65 @@ export async function checkLeague(
     managers: teamList.flatMap((t) => t.managers),
     teamList,
   };
+}
+
+/**
+ * The league data step's live fetch for an ESPN league, this season's unless
+ * `season` names one, with the typed cookie, or else the one held, or none. A
+ * league that needs a cookie, or a new one, is a `CookieRefusal`; a league
+ * ESPN doesn't know is a `SetupRefusal`. A rejected cookie from
+ * `LAZY_PUNDIT_ESPN_S2`, which no typed cookie can replace, is a
+ * `FetchError`. Nothing is written.
+ */
+export async function checkEspnLeague(
+  deps: Deps,
+  leagueId: string,
+  opts: { cookie?: string; season?: string } = {},
+): Promise<LeagueCheck> {
+  const typedCookie = opts.cookie;
+  const cookie =
+    typedCookie === undefined
+      ? (await loadCredentials(deps)).espnS2
+      : { value: typedCookie, from: "file" as const };
+  const season = opts.season ?? seasonAt(deps.clock.now());
+  const fetched = await fetchEspn({
+    transport: deps.transport,
+    clock: deps.clock,
+    // Never written: this fetch's `write` isn't called.
+    snapshotsDir: join(deps.cacheDir, "unused"),
+    leagueId,
+    season,
+    ...(cookie ? { cookie } : {}),
+  }).catch((err: unknown) => {
+    if (!(err instanceof FetchError)) {
+      throw new SetupRefusal(
+        `Can't read ESPN league ${leagueId}: ${(err as Error).message}`,
+        { cause: err },
+      );
+    }
+    if (err.fix === "league_id") {
+      throw new SetupRefusal(
+        `ESPN has no league ${leagueId} in ${season}. Check the number after leagueId= in the league's URL.`,
+        { cause: err },
+      );
+    }
+    if (err.fix === "espn_env") {
+      throw new FetchError(
+        "ESPN rejected the cookie in LAZY_PUNDIT_ESPN_S2. Set it to a fresh espn_s2 from your browser, or unset it, then run lazy-pundit init again.",
+        { cause: err, fix: "espn_env" },
+      );
+    }
+    if (err.fix !== "setup_espn") throw err;
+    throw new CookieRefusal(
+      cookie === undefined
+        ? `ESPN league ${leagueId} is private, so reading it needs your espn_s2 cookie.`
+        : typedCookie === undefined
+          ? `ESPN rejected the stored espn_s2 cookie (saved ${cookie.savedAt}) for league ${leagueId}. Copy a fresh one from your browser.`
+          : `ESPN rejected that cookie for league ${leagueId}. Copy espn_s2 again, signed in to an ESPN account in the league, or check the league ID: a mistyped one can be someone else's private league.`,
+      { cause: err },
+    );
+  });
+  return leagueCheckOf(fetched.league);
 }
 
 /**
@@ -603,7 +694,10 @@ export async function sleeperLeagues(
   const dirs = await listedWorkspaceDirs(deps);
   return Promise.all(
     leagues.map(async (league) => {
-      const holder = await workspaceHolding(dirs, league.leagueId);
+      const holder = await workspaceHolding(dirs, {
+        platform: "sleeper",
+        leagueId: league.leagueId,
+      });
       return holder === undefined ? league : { ...league, setUpIn: holder.dir };
     }),
   );
@@ -615,11 +709,11 @@ export async function sleeperLeagues(
  */
 export async function refuseLeagueSetUp(
   deps: Pick<Deps, "configDir">,
-  answers: { punditName: string; leagueId: string },
+  answers: { punditName: string } & HeldLeague,
 ): Promise<void> {
   await refuseLeagueInWorkspace(
     await listedWorkspaceDirs(deps),
-    answers.leagueId,
+    answers,
     slugOf(answers.punditName.trim()),
   );
 }
@@ -638,10 +732,16 @@ async function listedWorkspaceDirs(
   return Object.values((await readConfig(deps))?.workspaces ?? {});
 }
 
+/** A league as a workspace names it: two platforms can give one ID. */
+interface HeldLeague {
+  platform: Platform;
+  leagueId: string;
+}
+
 /** The first of these folders whose workspace holds the league, with its pundit. */
 async function workspaceHolding(
   dirs: string[],
-  leagueId: string,
+  league: HeldLeague,
 ): Promise<{ dir: string; pundit: string } | undefined> {
   for (const dir of dirs) {
     // A listed workspace that can't be read is `doctor`'s to report.
@@ -649,7 +749,12 @@ async function workspaceHolding(
       if (err instanceof WorkspaceFileError) return undefined;
       throw err;
     });
-    if (ws?.season.leagueId === leagueId) return { dir, pundit: ws.pundit };
+    if (
+      ws?.season.platform === league.platform &&
+      ws.season.leagueId === league.leagueId
+    ) {
+      return { dir, pundit: ws.pundit };
+    }
   }
   return undefined;
 }
@@ -657,10 +762,10 @@ async function workspaceHolding(
 /** Refuses a league one of these folders already holds a workspace for. */
 async function refuseLeagueInWorkspace(
   dirs: string[],
-  leagueId: string,
+  league: HeldLeague,
   pundit: string,
 ): Promise<void> {
-  const holder = await workspaceHolding(dirs, leagueId);
+  const holder = await workspaceHolding(dirs, league);
   if (holder === undefined) return;
   throw new SetupRefusal(
     holder.pundit === pundit
@@ -932,7 +1037,7 @@ export async function checkWorkspace(
   const dir = chosen ?? defaultFolder(deps, listed, slug).dir;
   await refuseLeagueInWorkspace(
     [...Object.values(listed), dir],
-    league.leagueId,
+    league,
     slugOf(name),
   );
   await refuseFolderInUse(dir);
@@ -945,6 +1050,7 @@ export async function checkWorkspace(
  * them.
  */
 export const RERUN_STEPS = [
+  "espn",
   "handles",
   "lore",
   "stakes",
@@ -960,9 +1066,13 @@ export const RERUN_STEPS = [
  */
 export function changeAnswersNote(
   deps: Pick<Deps, "configDir">,
-  workspace: { slug: string; dir: string },
+  workspace: { slug: string; dir: string; platform: Platform },
 ): string {
-  return `To change an answer after setup, run lazy-pundit --league ${workspace.slug} setup <step>, with <step> one of: ${RERUN_STEPS.join(", ")}.\nTo change the pundit name, platform, league or folder, delete ${workspace.dir} and the ${workspace.slug}: line under workspaces: in ${configPath(deps)}, then run lazy-pundit init again.`;
+  // Only an ESPN league has a cookie to renew.
+  const steps = RERUN_STEPS.filter(
+    (s) => s !== "espn" || workspace.platform === "espn",
+  );
+  return `To change an answer after setup, run lazy-pundit --league ${workspace.slug} setup <step>, with <step> one of: ${steps.join(", ")}.\nTo change the pundit name, platform, league or folder, delete ${workspace.dir} and the ${workspace.slug}: line under workspaces: in ${configPath(deps)}, then run lazy-pundit init again.`;
 }
 
 /** What the key and cap step still has to ask this operator. */
@@ -1112,6 +1222,8 @@ export async function setUpWorkspace(
     key?: string;
     /** The spend cap; left out when it's skipped or already held. */
     spendCap?: number;
+    /** An ESPN cookie typed at the league data step, which read the league. */
+    cookie?: string;
   },
 ): Promise<{ slug: string; dir: string }> {
   const { league } = answers;
@@ -1142,9 +1254,9 @@ export async function setUpWorkspace(
     );
   }
   const { slug, dir } = await checkWorkspace(deps, answers);
-  // A credentials file that can't be read would refuse the key after the
-  // listing, so it stops here, before anything is written.
-  if (answers.key) await loadCredentials(deps);
+  // A credentials file that can't be read would refuse the key or cookie
+  // after the listing, so it stops here, before anything is written.
+  if (answers.key || answers.cookie) await loadCredentials(deps);
   const name = answers.punditName.trim();
   const pundit = slugOf(name);
   const setup: Required<Workspace["setup"]> = {
@@ -1169,7 +1281,7 @@ format: ${FORMAT}
 pundit: ${pundit}
 seasons:
   ${league.season}:
-    platform: sleeper
+    platform: ${league.platform}
     league_id: "${league.leagueId}"
 ${
   handles.length === 0
@@ -1205,11 +1317,15 @@ ${
     }
     throw err;
   }
-  // The key is the operator's, not the workspace's, so it's saved once the
-  // workspace is listed. Saved first, a listing that failed would keep the key
-  // and lose the cap: the next `init` asks the cap only with a key to come.
-  if (answers.key) {
-    await saveCredentials(deps, { anthropicApiKey: answers.key });
+  // The key and cookie are the operator's, not the workspace's, so they're
+  // saved once the workspace is listed. Saved first, a listing that failed
+  // would keep the key and lose the cap (the next `init` asks the cap only
+  // with a key to come), and keep a cookie for a league never set up.
+  if (answers.key || answers.cookie) {
+    await saveCredentials(deps, {
+      ...(answers.key ? { anthropicApiKey: answers.key } : {}),
+      ...(answers.cookie ? { espnS2: answers.cookie } : {}),
+    });
   }
   return { slug, dir };
 }
