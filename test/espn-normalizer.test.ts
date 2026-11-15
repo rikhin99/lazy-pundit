@@ -3,12 +3,15 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ESPN_VIEWS, espnLeagueUrl, espnViewUrl } from "../src/espn/api.ts";
 import {
+  bestLineupPoints,
+  draftData,
   type League,
   normalizeEspn,
   readSnapshot,
   type Snapshot,
   standingsThrough,
 } from "../src/index.ts";
+import type { Stakes } from "../src/stakes.ts";
 import type { Json } from "./support/workspace.ts";
 
 const FIXTURES = join(import.meta.dirname, "..", "fixtures", "espn");
@@ -56,6 +59,9 @@ function raw(snapshot: Snapshot, url: string, params?: Record<string, string>) {
 }
 
 const HOT_WEEKS = [1, 7, 8, 9, 10, 14, 15];
+const HOT_TAKERY_ID = "900000001";
+/** ESPN's lineup slot for injured reserve. */
+const IR_SLOT = 21;
 const FAMILY_WEEKS = [14, 15];
 
 describe("the ESPN normalizer on Hot Takery 2025", () => {
@@ -248,7 +254,7 @@ describe("the ESPN normalizer on Hot Takery 2025", () => {
     const ir = rawBox.schedule
       .flatMap((g: Json) => [g.home, g.away])
       .flatMap((s: Json) => s.rosterForCurrentScoringPeriod.entries)
-      .filter((e: Json) => e.lineupSlotId === 21);
+      .filter((e: Json) => e.lineupSlotId === IR_SLOT);
     expect(ir.length).toBeGreaterThan(0);
     const lineups = league.weeks
       .find((w) => w.week === 15)
@@ -292,7 +298,176 @@ describe("the ESPN normalizer on Hot Takery 2025", () => {
       ).toEqual(ranked.map((_, i) => i + 1));
     }
   });
+
+  test("the playoff home bonus is no override, and a commissioner override still is", async () => {
+    const snapshot = await snapshotOf(HOT_TAKERY, 15);
+    const homeSides = ["espn:2", "espn:8", "espn:9", "espn:1", "espn:10"];
+    const teams = draftData(normalizeEspn(snapshot), 15).evidence.teams;
+    for (const team of [...homeSides, "espn:4"]) {
+      expect(teams[team as `espn:${string}`]?.["w15.override"], team).toBe(
+        undefined,
+      );
+    }
+    // Team 2's 107 is 106 from its starters plus the bonus of 1.
+    const corrected = patched(
+      snapshot,
+      BOX(HOT_TAKERY_ID),
+      (json) => {
+        const g = json.schedule.find((g: Json) => g.home?.teamId === 2);
+        g.home.totalPoints = 109.5;
+      },
+      { scoringPeriodId: "15" },
+    );
+    expect(
+      draftData(normalizeEspn(corrected), 15).evidence.teams["espn:2"]?.[
+        "w15.override"
+      ],
+    ).toBe(2.5);
+  });
+
+  test("an IR-slot player's points are not left on the bench, and a bench player's are", async () => {
+    const league = await committed(HOT_TAKERY, 15);
+    const side = league.weeks
+      .find((w) => w.week === 15)
+      ?.matchups.flatMap((m) => m.sides)
+      .find((s) => s.team === "espn:10");
+    const lineup = side?.lineup ?? [];
+    // The IR wide receiver's 19.2 is out; the bench one's 15.6 takes the WR slot.
+    expect(
+      bestLineupPoints(lineup, league.settings.lineupSlots, league.players),
+    ).toBe(153.54);
+    const teams = draftData(league, 15).evidence.teams;
+    expect(teams["espn:10"]?.["w15.left_on_bench"]).toBe(7.26);
+    expect(teams["espn:10"]?.["w15.benchmiss"]).toBe("Jaxson Dart");
+    // Nor is the IR player the bench miss when they outscore the bench.
+    const irBig = patched(
+      await snapshotOf(HOT_TAKERY, 15),
+      BOX(HOT_TAKERY_ID),
+      (json) => {
+        const g = json.schedule.find((g: Json) => g.home?.teamId === 10);
+        for (const e of g.home.rosterForCurrentScoringPeriod.entries) {
+          if (e.lineupSlotId !== IR_SLOT) continue;
+          for (const s of e.playerPoolEntry.player.stats) {
+            if (s.scoringPeriodId === 15 && s.statSourceId === 0) {
+              s.appliedTotal = 40;
+            }
+          }
+        }
+      },
+      { scoringPeriodId: "15" },
+    );
+    const irTeams = draftData(normalizeEspn(irBig), 15).evidence.teams;
+    expect(irTeams["espn:10"]?.["w15.benchmiss"]).toBe("Jaxson Dart");
+    expect(irTeams["espn:10"]?.["w15.left_on_bench"]).toBe(7.26);
+    // As Sleeper gives it, with no IR slot to tell apart, every non-starter counts.
+    const sleeperStyle = lineup.map(({ ir: _, ...e }) => e);
+    expect(
+      bestLineupPoints(
+        sleeperStyle,
+        league.settings.lineupSlots,
+        league.players,
+      ),
+    ).toBe(157.14);
+  });
+
+  test("a patched round 2 and final knock teams out and crown the champion", async () => {
+    const snapshot = withLaterRounds(await snapshotOf(HOT_TAKERY, 15), [
+      { week: 16, home: 3, away: 5, winner: "HOME" },
+      { week: 16, home: 1, away: 12, winner: "AWAY" },
+      { week: 17, home: 3, away: 12, winner: "HOME" },
+    ]);
+    const league = normalizeEspn(snapshot);
+    expect(league.lastScoredWeek).toBe(17);
+    const champion: Stakes = {
+      kind: "recorded",
+      payouts: [],
+      lastPlace: "standings",
+      houseRules: [
+        {
+          id: "champ",
+          name: "Champion",
+          trigger: { kind: "champion", per: "season" },
+          outcome: { kind: "text", text: "The trophy" },
+        },
+      ],
+      rivalryWeeks: [],
+      sections: [],
+      log: [],
+    };
+    const wk16 = draftData(league, 16, champion).evidence;
+    expect(wk16.teams["espn:5"]?.knocked_out).toBe(2);
+    expect(wk16.teams["espn:1"]?.knocked_out).toBe(2);
+    expect(wk16.teams["espn:3"]?.knocked_out).toBe(undefined);
+    expect(wk16.league["wk.rule.champ"]).toBe(undefined);
+    const wk17 = draftData(league, 17, champion).evidence;
+    expect(wk17.league["wk.rule.champ"]).toBe("espn:3");
+    expect(wk17.teams["espn:12"]?.knocked_out).toBe(3);
+    // Team 3 was away in week 15 and home after: the bonus is no override either way.
+    expect(wk16.teams["espn:3"]?.["w16.override"]).toBe(undefined);
+    expect(wk17.teams["espn:3"]?.["w17.override"]).toBe(undefined);
+  });
 });
+
+/**
+ * The week-15 snapshot with winners-bracket games added after it, in the
+ * schedule and as box scores: each side is the team's week-15 side, its
+ * players' week-15 lines moved to the new week and the home bonus moved
+ * with home.
+ */
+function withLaterRounds(
+  snapshot: Snapshot,
+  games: { week: number; home: number; away: number; winner: string }[],
+): Snapshot {
+  const id = HOT_TAKERY_ID;
+  const SCHEDULE = espnViewUrl(base(id), ESPN_VIEWS.schedule);
+  const week15 = raw(snapshot, BOX(id), { scoringPeriodId: "15" });
+  // Hot Takery's playoff home bonus, in or out of the score as the side changes ends.
+  const BONUS = 1;
+  const wasHome = (team: number) =>
+    week15.schedule.some((g: Json) => g.home.teamId === team);
+  const sideOf = (team: number, week: number, home: boolean) => {
+    const side = structuredClone(
+      week15.schedule
+        .flatMap((g: Json) => [g.home, g.away])
+        .find((s: Json) => s.teamId === team),
+    );
+    side.totalPoints += (home ? BONUS : 0) - (wasHome(team) ? BONUS : 0);
+    for (const e of side.rosterForCurrentScoringPeriod.entries) {
+      for (const s of e.playerPoolEntry.player.stats) {
+        if (s.scoringPeriodId === 15) s.scoringPeriodId = week;
+      }
+    }
+    return side;
+  };
+  const gamesIn = (week: number) =>
+    games
+      .filter((g) => g.week === week)
+      .map((g, i) => ({
+        id: 900 + week * 10 + i,
+        matchupPeriodId: week,
+        playoffTierType: "WINNERS_BRACKET",
+        winner: g.winner,
+        home: sideOf(g.home, week, true),
+        away: sideOf(g.away, week, false),
+      }));
+  const weeks = [...new Set(games.map((g) => g.week))];
+  const isBox = (u: string, p?: Record<string, string>) =>
+    u === BOX(id) && weeks.includes(Number(p?.scoringPeriodId));
+  const schedule = patched(snapshot, SCHEDULE, (json) => {
+    json.schedule = [
+      ...json.schedule.filter((g: Json) => g.matchupPeriodId < 16),
+      ...weeks.flatMap(gamesIn),
+    ];
+  });
+  return {
+    ...schedule,
+    has: (u, p) => isBox(u, p) || snapshot.has(u, p),
+    json: (u, p) =>
+      isBox(u, p)
+        ? { ...week15, schedule: gamesIn(Number(p?.scoringPeriodId)) }
+        : schedule.json(u, p),
+  };
+}
 
 describe("the ESPN normalizer on the Family League 2025", () => {
   test("keeps ESPN's team IDs, with their gaps", async () => {

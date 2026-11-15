@@ -44,6 +44,9 @@ const leagueSchema = z.object({
     rosterSettings: z.object({
       lineupSlotCounts: z.record(z.string(), z.number().int()),
     }),
+    scoringSettings: z
+      .object({ playoffHomeTeamBonus: z.number().default(0) })
+      .default({ playoffHomeTeamBonus: 0 }),
     scheduleSettings: z.object({
       matchupPeriodCount: z.number().int().positive(),
       playoffTeamCount: z.number().int().nonnegative(),
@@ -330,6 +333,7 @@ export function normalizeEspn(snapshot: Snapshot): League {
     const slot = SLOTS[id];
     return slot ? lineupSlots.indexOf(slot) : -1;
   };
+  const playoffHomeBonus = league.settings.scoringSettings.playoffHomeTeamBonus;
   const budget = league.settings.acquisitionSettings;
   const draft = league.settings.draftSettings;
   const settings: LeagueSettings = {
@@ -437,6 +441,9 @@ export function normalizeEspn(snapshot: Snapshot): League {
       const matchup: Matchup = { kind, sides: [a, b] };
       if (kind !== "regular") {
         matchup.round = week - settings.regularSeasonWeeks;
+        // `a` is the home side, whose `totalPoints` includes the playoff
+        // home bonus, in every bracket.
+        if (playoffHomeBonus !== 0) a.homeBonus = playoffHomeBonus;
       }
       if (scored && g.winner !== "UNDECIDED") {
         const results: [Result, Result] =
@@ -513,6 +520,7 @@ export function normalizeEspn(snapshot: Snapshot): League {
               s.statSplitTypeId === 1,
           )?.appliedTotal ?? 0,
       };
+      if (e.lineupSlotId === IR_SLOT) entry.ir = true;
       return { entry, order: starting ? slotOrder(e.lineupSlotId) : Infinity };
     });
     return made.sort((a, b) => a.order - b.order).map((m) => m.entry);

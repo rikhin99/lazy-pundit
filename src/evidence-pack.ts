@@ -72,7 +72,9 @@ export function buildEvidencePack(
     const last = weeks.at(-1);
     if (last) weekStats(league, last, ev);
     for (const g of weeks) {
-      const override = round(g.side.score - g.playersPoints);
+      const override = round(
+        g.side.score - (g.side.homeBonus ?? 0) - g.playersPoints,
+      );
       if (override !== 0) ev[`w${g.week}.override`] = override;
     }
     injuries(league, team.id, ev);
@@ -292,7 +294,7 @@ function weekStats(
   const zeros = g.side.lineup.filter((e) => isStarter(e) && e.points === 0);
   if (zeros.length > 0) ev[`${w}.zeros`] = list(zeros.map(name));
   const bench = g.side.lineup
-    .filter((e) => !isStarter(e))
+    .filter((e) => !isStarter(e) && !e.ir)
     .sort((a, b) => b.points - a.points)[0];
   if (bench && g.best > g.playersPoints) {
     ev[`${w}.benchmiss`] = name(bench);

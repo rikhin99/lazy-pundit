@@ -3,9 +3,10 @@ import type { LineupEntry, LineupSlot, NflPlayer } from "./league.ts";
 /**
  * The points of the best possible lineup a team could have started from its
  * week's roster: every starting slot filled by an eligible player, each
- * player used once. A player is eligible by any of their positions in
- * `players` (the league's `players`), or by their lineup position. Exact,
- * not greedy, so multi-position players and flex slots can't mislead it.
+ * player used once, and no player from the IR slot. A player is eligible by
+ * any of their positions in `players` (the league's `players`), or by their
+ * lineup position. Exact, not greedy, so multi-position players and flex
+ * slots can't mislead it.
  */
 export function bestLineupPoints(
   lineup: LineupEntry[],
@@ -23,7 +24,7 @@ export function bestLineupPoints(
   const candidates = ordered.map((slot) =>
     lineup
       .map((e, i) => ({ i, cents: Math.round(e.points * 100), e }))
-      .filter(({ e }) => eligible(e, slot))
+      .filter(({ e }) => !e.ir && eligible(e, slot))
       .sort((a, b) => b.cents - a.cents),
   );
   // An upper bound on what the slots from `k` on can still add.

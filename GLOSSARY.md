@@ -113,6 +113,12 @@ The points a team is credited with in a matchup, including any home bonus or com
 **Players' points**:
 The sum of a team's starters' points in a week, before any bonus or override. Lineup stats use it.
 
+**Home bonus**:
+Points a league's settings add to the home team's matchup score, such as ESPN's playoff home bonus. It is part of the matchup score but not of players' points, and it isn't an override.
+
+**IR slot**:
+The injured-reserve place on a team's roster. A player in it didn't start and couldn't have, so their points are never points left on the bench. Sleeper's matchups don't say who was in it.
+
 **Bye**:
 A week in which a team has no matchup. The team still scores points, but it gets no result.
 

@@ -124,6 +124,8 @@ export interface MatchupSide {
   team: TeamId;
   /** The matchup score: the points the team is credited with. */
   score: number;
+  /** The home bonus `score` includes, when the league gives this side one. */
+  homeBonus?: number;
   /**
    * Set once the week is scored; in a two-week playoff round, only once the
    * bracket has a winner. A playoff result is the bracket's, not the score's:
@@ -147,6 +149,11 @@ export interface LineupEntry {
    * which non-starters were on IR.
    */
   slot: string;
+  /**
+   * Set for a player in the platform's IR slot, who couldn't have started, so
+   * the best possible lineup leaves them out. Never set on Sleeper.
+   */
+  ir?: true;
   /** The player's points this week, before any bonus or override. */
   points: number;
 }
