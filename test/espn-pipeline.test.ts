@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -13,7 +13,7 @@ import {
   refresh,
   saveCredentials,
 } from "../src/index.ts";
-import { operator, rankingsDir } from "./support/workspace.ts";
+import { fearTheTurtle, operator, rankingsDir } from "./support/workspace.ts";
 
 const HOT_TAKERY = join(
   import.meta.dirname,
@@ -52,6 +52,29 @@ async function atWeek(deps: Deps, week: number): Promise<Deps> {
     await readFile(join(HOT_TAKERY, "weeks.json"), "utf8"),
   );
   return { ...deps, transport: fileTransport(HOT_TAKERY, weeks[String(week)]) };
+}
+
+/**
+ * The same deps, with a stat correction: week 14's first home score a point
+ * higher. By hand, since `patchingTransport` matches the URL alone and every
+ * week's box scores share one, told apart by `scoringPeriodId`.
+ */
+function corrected(deps: Deps): Deps {
+  return {
+    ...deps,
+    transport: {
+      async request(req) {
+        const res = await deps.transport.request(req);
+        if (!req.url.includes("view=mMatchupScore")) return res;
+        if (req.params?.scoringPeriodId !== "14") return res;
+        const box = JSON.parse(new TextDecoder().decode(res.body));
+        box.schedule.find(
+          (g: { matchupPeriodId: number }) => g.matchupPeriodId === 14,
+        ).home.totalPoints += 1;
+        return { ...res, body: new TextEncoder().encode(JSON.stringify(box)) };
+      },
+    },
+  };
 }
 
 /** The same deps, except ESPN rejects the cookie. */
@@ -150,4 +173,80 @@ describe("a rejected ESPN cookie", () => {
       expect(item?.reason).toContain(fix);
     }
   });
+});
+
+describe("a credentials.yaml others can read, on an ESPN workspace", () => {
+  const exposed = (path: string) =>
+    `${path} can be read by other users on this machine (mode 0644). Run: chmod 600 ${path}`;
+  const count = (warnings: string[], warning: string) =>
+    warnings.filter((w) => w === warning).length;
+
+  /** A week-14 draft on a stored cookie, then `credentials.yaml` at `mode`. */
+  async function drafted(mode: number) {
+    const { dir, deps } = await hotTakery(14);
+    const path = await saveCredentials(deps, { espnS2: "cookie" });
+    await draft(dir, deps);
+    await chmod(path, mode);
+    return { dir, deps, path };
+  }
+
+  test("refresh warns once, whether the fetch succeeds or fails", async () => {
+    const { dir, deps, path } = await drafted(0o644);
+    for (const run of [deps, rejecting(deps)]) {
+      const result = await refresh(dir, run);
+      expect(result.changes).toEqual([]);
+      expect(count(result.warnings, exposed(path))).toBe(1);
+    }
+  });
+
+  test("refresh onto changed data warns once", async () => {
+    const { dir, deps, path } = await drafted(0o644);
+    const result = await refresh(dir, corrected(deps));
+    expect(result.changes).not.toEqual([]);
+    expect(count(result.warnings, exposed(path))).toBe(1);
+  });
+
+  test("publish warns once, whether the fetch succeeds or fails", async () => {
+    for (const reject of [false, true]) {
+      const { dir, deps, path } = await drafted(0o644);
+      const warned: string[][] = [];
+      const result = await publish(dir, reject ? rejecting(deps) : deps, {
+        yes: true,
+        onWarnings: (w) => warned.push(w),
+      });
+      expect(count(result.warnings, exposed(path))).toBe(1);
+      expect(count(warned.flat(), exposed(path))).toBe(1);
+    }
+  });
+
+  test("draft warns once, for the fetch and the key together", async () => {
+    const { dir, deps } = await hotTakery(14);
+    const path = await saveCredentials(deps, { espnS2: "cookie" });
+    await chmod(path, 0o644);
+    const warned: string[][] = [];
+    const result = await draft(dir, deps, {
+      onWarnings: (w) => warned.push(w),
+    });
+    expect(count(result.warnings, exposed(path))).toBe(1);
+    expect(count(warned.flat(), exposed(path))).toBe(1);
+  });
+
+  test("at 0600, neither refresh nor publish warns about it", async () => {
+    const { dir, deps } = await drafted(0o600);
+    const about = (warnings: string[]) =>
+      warnings.filter((w) => w.includes("credentials.yaml"));
+    expect(about((await refresh(dir, deps)).warnings)).toEqual([]);
+    expect(about((await publish(dir, deps, { yes: true })).warnings)).toEqual(
+      [],
+    );
+  });
+});
+
+test("a Sleeper workspace's refresh and publish don't read credentials, so don't warn about them", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+  const path = await saveCredentials(deps, { espnS2: "cookie" });
+  await chmod(path, 0o644);
+  expect((await refresh(dir, deps)).warnings).toEqual([]);
+  expect((await publish(dir, deps, { yes: true })).warnings).toEqual([]);
 });

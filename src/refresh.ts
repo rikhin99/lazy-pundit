@@ -7,7 +7,7 @@ import {
   type Problem,
   withLeagueItem,
 } from "./check.ts";
-import { loadCredentials } from "./config.ts";
+import { type Credentials, loadCredentials } from "./config.ts";
 import { type DataChange, diff } from "./data-diff.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
@@ -49,7 +49,10 @@ export interface RefreshResult {
   newlyStale: Problem[];
   /** The whole problems list, hard first, moved teams against the new starting order. */
   problems: Problem[];
-  /** What reading the lore has to say, personal data included. */
+  /**
+   * What reading the credentials for an ESPN fetch and the lore has to say,
+   * personal data included.
+   */
   warnings: string[];
   /** The newest scored week, when it's later than the draft's: time for its own draft. */
   scoredWeek?: number;
@@ -130,7 +133,11 @@ export async function refresh(
       problems: withFailedFetch(problems),
       // The draft stays on its snapshot, so a clash only fresh names have
       // would otherwise go unsaid until the next draft stops on it.
-      warnings: [...warnings, ...freshClashes(checked, fresh.league)],
+      warnings: [
+        ...fresh.warnings,
+        ...warnings,
+        ...freshClashes(checked, fresh.league),
+      ],
       ...outcome,
     };
   }
@@ -161,7 +168,7 @@ export async function refresh(
     // Measured on the new text, so its lines match the problems list.
     newlyStale: claimsGoingStale(refreshed, checked.league, fresh.league),
     problems: withFailedFetch(refreshed.problems),
-    warnings: refreshed.warnings,
+    warnings: [...fresh.warnings, ...refreshed.warnings],
     ...outcome,
   };
 }
@@ -215,13 +222,24 @@ export async function freshDataWarnings(
   checked: CheckedDraft,
   deps: Deps,
 ): Promise<string[]> {
+  // Said whether the fetch succeeds or fails.
+  let credentialWarnings: string[] = [];
   try {
     const ws = await readWorkspace(workspaceDir);
-    const { league } = await fetchFresh(ws, deps);
+    const { cookie, warnings } = await espnCookie(ws, deps);
+    credentialWarnings = warnings;
+    const { league } = await fetchFresh(ws, deps, { cookie });
     const warning = dataChangedWarning(checked, league);
-    return [...(warning ? [warning] : []), ...freshClashes(checked, league)];
+    return [
+      ...credentialWarnings,
+      ...(warning ? [warning] : []),
+      ...freshClashes(checked, league),
+    ];
   } catch (err) {
-    return [`couldn't check for data changes: ${(err as Error).message}`];
+    return [
+      ...credentialWarnings,
+      `couldn't check for data changes: ${(err as Error).message}`,
+    ];
   }
 }
 
@@ -238,18 +256,33 @@ function freshClashes(checked: CheckedDraft, fresh: League): string[] {
 }
 
 /**
- * The workspace's latest season, fetched into memory: no snapshot yet. A
- * routine fetch unless `full`. Writing the snapshot applies retention.
+ * The ESPN cookie a fetch of the workspace sends, with what reading the
+ * credentials had to say, such as a `credentials.yaml` others can read. A
+ * Sleeper workspace reads none. Given `credentials` already read, it reads
+ * nothing and says nothing, since whoever read them says it.
  */
-export async function fetchFresh(
+async function espnCookie(
   ws: Workspace,
   deps: Deps,
-  opts: { full?: boolean } = {},
+  credentials?: Credentials,
+): Promise<{ cookie?: Credentials["espnS2"]; warnings: string[] }> {
+  if (ws.season.platform !== "espn") return { warnings: [] };
+  if (credentials) return { cookie: credentials.espnS2, warnings: [] };
+  const { espnS2, warnings } = await loadCredentials(deps);
+  return { cookie: espnS2, warnings };
+}
+
+/**
+ * The workspace's latest season, fetched into memory with `cookie` on ESPN: no
+ * snapshot yet. A routine fetch unless `full`. Writing the snapshot applies
+ * retention.
+ */
+async function fetchFresh(
+  ws: Workspace,
+  deps: Deps,
+  opts: { full?: boolean; cookie?: Credentials["espnS2"] } = {},
 ): Promise<FetchedSleeper> {
-  const cookie =
-    ws.season.platform === "espn"
-      ? (await loadCredentials(deps)).espnS2
-      : undefined;
+  const { cookie } = opts;
   const fetched =
     ws.season.platform === "espn"
       ? await fetchEspn({
@@ -285,6 +318,11 @@ export async function fetchFresh(
 export interface FetchedOrContinued extends FetchedSleeper {
   /** The failed-fetch item, when this continues from the last complete snapshot. */
   failedFetch?: Problem;
+  /**
+   * What reading the credentials for the ESPN cookie had to say, whether the
+   * fetch succeeded or not; none when given `credentials`.
+   */
+  warnings: string[];
 }
 
 /**
@@ -292,15 +330,20 @@ export interface FetchedOrContinued extends FetchedSleeper {
  * complete snapshot: the season's newest whose data all reads, whose `write`
  * writes nothing and gives it back. With no snapshot to continue from, it
  * stops with the fetch's error, its message ending with the fix for what
- * failed.
+ * failed. It reads the ESPN cookie itself unless given the `credentials`.
  */
 export async function fetchOrContinue(
   ws: Workspace,
   deps: Deps,
-  opts: { full?: boolean } = {},
+  opts: { full?: boolean; credentials?: Credentials } = {},
 ): Promise<FetchedOrContinued> {
+  const { cookie, warnings } = await espnCookie(ws, deps, opts.credentials);
   try {
-    return await fetchFresh(ws, deps, opts);
+    const fetched = await fetchFresh(ws, deps, {
+      full: opts.full ?? false,
+      cookie,
+    });
+    return { ...fetched, warnings };
   } catch (err) {
     if (!(err instanceof FetchError)) throw err;
     const dir = snapshotsDir(ws);
@@ -317,6 +360,7 @@ export async function fetchOrContinue(
         league: normalizeSnapshot(snapshot),
         write: async () => candidate,
         failedFetch: failedFetchItem(err, candidate.manifest.fetched_at),
+        warnings,
       };
     }
     throw new FetchError(`${err.message}. ${FETCH_FIXES[err.fix].stopping}`, {

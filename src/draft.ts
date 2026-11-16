@@ -129,7 +129,11 @@ export async function draft(
   const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
   warn(leagueFileWarnings);
   const settings = await loadPunditSettings(ws);
-  const fetched = await fetchOrContinue(ws, deps);
+  // Read once, for the fetch's ESPN cookie and the key, so their warnings are
+  // said once.
+  const credentials = await loadCredentials(deps);
+  warn(credentials.warnings);
+  const fetched = await fetchOrContinue(ws, deps, { credentials });
   const names = validatorNames(lore, fetched.league, ws.handles, stakes);
   const week = fetched.league.lastScoredWeek;
   const dir = rankingsDir(ws);
@@ -168,14 +172,13 @@ export async function draft(
     ...leagueFileChangeWarnings(stakes, await lastPublishedMeta(dir, week)),
   ]);
   const outcomes = houseRuleOutcomes(stakes);
-  const { anthropicApiKey, warnings: credentialWarnings } =
-    await loadCredentials(deps);
+  const { anthropicApiKey } = credentials;
   const { persona, warnings: personaWarnings } = await loadPersona(
     ws,
     league,
     lore,
   );
-  warn([...credentialWarnings, ...personaWarnings]);
+  warn(personaWarnings);
   const began = deps.clock.now();
   let outcome: ProseOutcome;
   if (anthropicApiKey) {
