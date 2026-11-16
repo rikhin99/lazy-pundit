@@ -281,7 +281,7 @@ The week the platform hasn't finished scoring yet. A routine fetch always asks f
 A change the platform makes to a week's scores after it has been scored.
 
 **Drastic correction**:
-A stat correction that flips a matchup result or changes a trigger winner. It is found by comparing fresh data with the snapshot behind the latest published ranking, so it only covers weeks that a published ranking has already shown. It becomes evidence for the next draft, whichever week that is, and lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
+A stat correction that flips a matchup result or changes a trigger winner. It is found by comparing fresh data with the snapshot behind the latest published ranking, so it only covers weeks that a published ranking has already shown. It becomes evidence for the next draft, whichever week that is, one item per corrected week, and opens that draft's week intro as "Correction from week 7: …", even when the persona turns the intro off. One found later, by `refresh`, is a soft league item naming that line for the pundit to add. It lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
 
 **Draft**:
 The pundit's working copy of a week's ranking. It can be edited freely, before and after publishing, and the league never sees it.
@@ -455,6 +455,9 @@ A problems-list item about the whole league rather than a team or a line of the 
 
 **Failed-fetch item**:
 A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix for what failed: `lazy-pundit refresh` once fetching works; checking `league_id` in `workspace.md` when the platform doesn't know the league; or checking for a newer Lazy Pundit when the platform answers in a shape this version can't read. Only the command that fetched lists it; `check` never does. With no last complete snapshot, the same fix ends the stopping error, except that running the command again once fetching works takes the place of `lazy-pundit refresh`, since there's no draft for it to move.
+
+**Can't-compare item**:
+A soft league item when the snapshot behind the latest published ranking is gone, damaged or no longer reads with this version: "can't compare with `<snapshot id>`", so drastic corrections to that ranking's weeks won't show. The draft carries on without them.
 
 **Correction-timing reminder**:
 A soft league item on a draft of a scored week, since nothing signals when stat corrections stop: "Scored. Corrections may land through Thursday" on Sleeper.

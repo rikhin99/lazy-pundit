@@ -12,9 +12,8 @@ import { type DataChange, diff } from "./data-diff.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
 import { fetchEspn } from "./espn/fetcher.ts";
-import { list } from "./evidence-pack.ts";
 import { type FrontMatterValue, setFrontMatterValue } from "./front-matter.ts";
-import type { League, TeamId } from "./league.ts";
+import type { League } from "./league.ts";
 import { freshClashWarning, validatorNames } from "./lore.ts";
 import { normalizeSnapshot } from "./normalize.ts";
 import { startingOrder } from "./power-score.ts";
@@ -29,7 +28,7 @@ import {
   type Snapshot,
   SnapshotDamagedError,
 } from "./snapshot.ts";
-import { triggerWinnerChanges } from "./stakes.ts";
+import { triggerWinnerChanges, winnersText } from "./stakes.ts";
 import { readWorkspace, snapshotsDir, type Workspace } from "./workspace.ts";
 import { writeWorkspaceFile } from "./workspace-files.ts";
 
@@ -199,10 +198,9 @@ export function dataChangedWarning(
   );
   if (changes.length > 0) {
     const names = new Map(fresh.teams.map((t) => [t.id, t.name]));
-    const who = (teams: TeamId[]) =>
-      teams.length === 0 ? "nobody" : list(teams.map((t) => names.get(t) ?? t));
     const each = changes.map(
-      (c) => `${c.rule.name} in week ${c.week}, ${who(c.from)} → ${who(c.to)}`,
+      (c) =>
+        `${c.rule.name} in week ${c.week}, ${winnersText(c.from, names)} → ${winnersText(c.to, names)}`,
     );
     const count =
       changes.length === 1
@@ -238,7 +236,8 @@ export async function freshDataWarnings(
   } catch (err) {
     return [
       ...credentialWarnings,
-      `couldn't check for data changes: ${(err as Error).message}`,
+      // A new correction is a data change too, so one note covers both.
+      `couldn't check for data changes or corrections: ${(err as Error).message}`,
     ];
   }
 }

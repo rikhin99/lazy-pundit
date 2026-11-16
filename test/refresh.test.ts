@@ -203,7 +203,9 @@ describe("the data-changed warning", () => {
 
     expect(result.published).toBe(true);
     expect(result.warnings).toEqual([
-      expect.stringMatching(/^couldn't check for data changes: GET .* failed$/),
+      expect.stringMatching(
+        /^couldn't check for data changes or corrections: GET .* failed$/,
+      ),
     ]);
   });
 

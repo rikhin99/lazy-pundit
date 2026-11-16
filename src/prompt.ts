@@ -1,5 +1,6 @@
 import { NO_STAKES_REASON, SWEAR_REASON } from "./check.ts";
 import type { DraftContext } from "./draft-context.ts";
+import { list } from "./evidence-pack.ts";
 import type { TeamId } from "./league.ts";
 import type { FailedSection, GateFaults } from "./llm-gate.ts";
 import { type Persona, PRESETS } from "./persona.ts";
@@ -58,6 +59,22 @@ function inProgressBlock(ctx: DraftContext): string {
   ].join("\n");
 }
 
+/**
+ * What the prompt says about the drastic corrections among the league items,
+ * or nothing when there are none: the intro already opens with a line for
+ * each, and a carried blurb may state the result as it was.
+ */
+function correctionsBlock(ctx: DraftContext): string {
+  const ids = Object.keys(ctx.evidence.league).filter((id) =>
+    /^w\d+\.correction$/.test(id),
+  );
+  if (ids.length === 0) return "";
+  return [
+    "## Corrections",
+    `${list(ids)} ${ids.length === 1 ? "is a result" : "are results"} from a week already published that changed since. The intro opens with a line for each, written for you: don't repeat ${ids.length === 1 ? "it" : "them"}. A blurb from an earlier ranking may state the result as it was: don't repeat that.`,
+  ].join("\n");
+}
+
 /** The material for one first draft: the persona, the teams and their evidence. */
 export function firstDraftPrompt(ctx: DraftContext): string {
   const names = new Map(ctx.teams.map((t) => [t.id, t.name]));
@@ -90,11 +107,13 @@ export function firstDraftPrompt(ctx: DraftContext): string {
   const lore = loreBlock(ctx);
   const stakes = stakesBlock(ctx);
   const inProgress = inProgressBlock(ctx);
+  const drastic = correctionsBlock(ctx);
 
   return [
     `League: ${ctx.league}, ${ctx.season} season, after week ${ctx.week}.`,
     "",
     ...(inProgress ? [inProgress, ""] : []),
+    ...(drastic ? [drastic, ""] : []),
     "## Persona",
     personaInstructions(ctx.persona),
     "",

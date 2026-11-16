@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { corrections, uncarriedCorrections } from "./corrections.ts";
 import type { Deps } from "./deps.ts";
 import { draftData } from "./draft-data.ts";
 import {
@@ -81,6 +82,9 @@ export interface Problem {
    * `failed-fetch`: the failed-fetch item, a league item only the command
    * that fetched lists. `provisional`: a provisional claim.
    * `correction-timing`: the correction-timing reminder, a league item.
+   * `cant-compare`: the can't-compare item, a league item.
+   * `correction-missing`: a drastic correction the draft cites nowhere, a
+   * league item naming the intro line to add.
    */
   kind:
     | Exclude<ClaimStatus, "verified">
@@ -91,7 +95,9 @@ export interface Problem {
     | "small-sample"
     | "failed-fetch"
     | "provisional"
-    | "correction-timing";
+    | "correction-timing"
+    | "cant-compare"
+    | "correction-missing";
   /** Why, in words the pundit reads. */
   reason: string;
   /** For a stale claim: what changed since it held. */
@@ -181,11 +187,13 @@ export async function checkDraft(
   checkOrder(name, ranking, league);
 
   const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
+  const found = await corrections(ws, week, league, stakes);
   const { evidence } = draftData(
     league,
     ranking.meta.week,
     stakes,
     ranking.meta.in_progress_week,
+    found.items,
   );
   const baseline = await movementBaseline(dir, week);
   const order = orderEvidence(ranking, baseline);
@@ -222,6 +230,12 @@ export async function checkDraft(
     ...movedTeams(ranking, order, startingOrder, teamNames(league)),
     ...(isSmallSample(week) ? [smallSampleFlag(week)] : []),
     ...(week > 0 ? [correctionTiming(league)] : []),
+    ...(found.cantCompare
+      ? [leagueItem("cant-compare", found.cantCompare)]
+      : []),
+    ...uncarriedCorrections(found.items, written).map((reason) =>
+      leagueItem("correction-missing", reason),
+    ),
   );
   problems.sort(byHardThenLine);
 

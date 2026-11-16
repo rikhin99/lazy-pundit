@@ -406,7 +406,7 @@ test("publish with a failed fetch says the check didn't happen and still publish
   });
 
   expect(code).toBe(0);
-  expect(stderr).toMatch(/^! couldn't check for data changes: /);
+  expect(stderr).toMatch(/^! couldn't check for data changes or corrections: /);
   expect(existsSync(txt)).toBe(true);
 });
 

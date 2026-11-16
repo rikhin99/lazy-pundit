@@ -35,17 +35,19 @@ export interface StatSet {
 
 /**
  * The evidence pack, stat lines and editing-view stats for the ranking week,
- * with the stakes' evidence and this week's triggers when stakes are recorded.
+ * with the stakes' evidence and this week's triggers when stakes are recorded,
+ * and the `w<N>.correction` items of `corrections.ts` among the league items.
  */
 export function draftData(
   league: League,
   week: number,
   stakes: Stakes = UNRECORDED,
   inProgressWeek?: number,
+  corrections: Record<string, string> = {},
 ): DraftData {
   const evidence = buildEvidencePack(league, week, inProgressWeek);
   const fromStakes = stakesEvidence(stakes, league, week);
-  Object.assign(evidence.league, fromStakes.league);
+  Object.assign(evidence.league, fromStakes.league, corrections);
   for (const [team, ev] of Object.entries(fromStakes.teams)) {
     const id = team as TeamId;
     evidence.teams[id] = { ...evidence.teams[id], ...ev };

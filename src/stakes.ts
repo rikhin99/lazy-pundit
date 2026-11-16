@@ -446,6 +446,16 @@ export interface TriggerWinnerChange {
   to: TeamId[];
 }
 
+/** Trigger winners by name, as a correction says them: "A and B", or "nobody". */
+export function winnersText(
+  teams: TeamId[],
+  names: Map<TeamId, string>,
+): string {
+  return teams.length === 0
+    ? "nobody"
+    : list(teams.map((t) => names.get(t) ?? t));
+}
+
 /** The trigger winners that differ from `old` to `next` through `throughWeek`. */
 export function triggerWinnerChanges(
   stakes: Stakes,

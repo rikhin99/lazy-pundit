@@ -142,6 +142,8 @@ const KINDS: Record<Problem["kind"], string> = {
   "failed-fetch": "fetch failed",
   provisional: "provisional",
   "correction-timing": "correction timing",
+  "cant-compare": "can't compare",
+  "correction-missing": "correction not in the draft",
 };
 
 /** The problems list as the library ordered it: one line per item. */

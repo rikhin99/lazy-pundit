@@ -14,6 +14,7 @@ import {
   loadCredentials,
   readConfig,
 } from "./config.ts";
+import { correctionLines, corrections } from "./corrections.ts";
 import { dataHash } from "./data-hash.ts";
 import type { Deps } from "./deps.ts";
 import {
@@ -165,7 +166,8 @@ export async function draft(
         : `week ${inProgress} is in progress, so this is a week ${week} draft without it; \`--include-in-progress\` adds it as provisional`,
     ]);
   }
-  const data = draftData(league, week, stakes, included);
+  const found = await corrections(ws, week, league, stakes);
+  const data = draftData(league, week, stakes, included, found.items);
   warn([
     ...stakesWarnings(stakes, league),
     // As check does: against the newest frozen copy through this week.
@@ -237,7 +239,14 @@ export async function draft(
     },
     league,
     order,
-    prose,
+    {
+      ...prose,
+      // Outside the LLM and the persona's intro setting, so the league hears
+      // of each correction whatever wrote the rest of the intro.
+      intro: [...correctionLines(found.items), prose.intro]
+        .filter(Boolean)
+        .join("\n"),
+    },
   );
   await mkdir(dir, { recursive: true });
   try {
