@@ -13,11 +13,12 @@
 #   yahoo           pick a platform that stops the wizard
 #   espn            ESPN, replaying Hot Takery's week 8 (read as a public league, so no
 #                   cookie is asked), every default into <home>/ws, then setup espn
-#                   with LAZY_PUNDIT_ESPN_S2 set (warned) and a pasted cookie, which
-#                   the replay accepts
+#                   with LAZY_PUNDIT_ESPN_S2 set (warned) and a pasted 300-character
+#                   cookie, which the replay accepts, shown as "pasted, 300 characters"
 #   espn-bad-id     ESPN with an unknown league ID, re-asked, then Ctrl-C
 #   espn-private    the same league private to one cookie (LAZY_PUNDIT_REPLAY_COOKIE):
-#                   refused without one, the cookie help, that cookie pasted, every
+#                   refused without one, the cookie help, that 300-character cookie
+#                   pasted (shown as "pasted, 300 characters"), every
 #                   default; checks credentials.yaml is 0600 and no workspace file
 #                   holds the cookie
 #   espn-retype     the private league with a wrong cookie pasted, rejected, then
@@ -26,7 +27,8 @@
 #   cancel-folder   Ctrl-C at the folder prompt
 #   rename          rename the first handle to "gus", pick standings
 #   skip-rest       Skip the rest at the handles step
-#   key             enter a key, which the replay can't check, so it's saved with
+#   key             enter a full-length key (shown as "pasted, 108 characters"),
+#                   which the replay can't check, so it's saved with
 #                   a warning that it couldn't be checked; cap 0.10
 #   another         every default, then a second league, cancelled at its name
 #   again           every default, then a second league with the same league ID
@@ -78,6 +80,13 @@ set env(LAZY_PUNDIT_CLIPBOARD) off
 # symbol, such as the one the key scenario waits for, never matches.
 set env(NO_COLOR) 1
 catch {unset env(FORCE_COLOR)}
+# A real espn_s2 is about 300 characters and an Anthropic key about 108, long
+# enough that a mask of one character each would wrap; the masked prompts
+# show only the count. Their answered line is matched without its "│  "
+# gutter: a pattern starting with "│" crashed expect (exit 138) in 6 of 10
+# key runs, on macOS's expect.
+set COOKIE "AEB%2F[string repeat r 294]"
+set KEY "sk-ant-api03-[string repeat x 95]"
 set espn [expr {[string match "espn*" $scenario]}]
 if {$espn} {
   set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/espn/hot-takery-2025/20251028T120000Z-a095861f"
@@ -85,7 +94,7 @@ if {$espn} {
   set env(LAZY_PUNDIT_NOW) "2025-10-28T15:00:00.000Z"
   catch {unset env(LAZY_PUNDIT_REPLAY_COOKIE)}
   if {$scenario in {espn-private espn-retype}} {
-    set env(LAZY_PUNDIT_REPLAY_COOKIE) "AEB%2Fright"
+    set env(LAZY_PUNDIT_REPLAY_COOKIE) $COOKIE
   }
 } else {
   set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/sleeper/fear-the-turtle-2025/20251028T120000Z-c4a2c21d"
@@ -129,15 +138,16 @@ array set writes {
 # espn-private's checks once init is done: credentials.yaml at 0600 holding
 # the cookie, and no file in the workspace holding it. Any miss exits 7.
 proc private_checks {home code} {
+  global COOKIE
   set path "$home/.config/lazy-pundit/credentials.yaml"
   if {![file exists $path]} { puts "\nNO CREDENTIALS"; return 7 }
   set mode [file attributes $path -permissions]
   set fh [open $path]; set stored [read $fh]; close $fh
   puts "\nCREDENTIALS $mode"
-  if {$mode ne "00600" || [string first "AEB%2Fright" $stored] < 0} {
+  if {$mode ne "00600" || [string first $COOKIE $stored] < 0} {
     puts "WRONG CREDENTIALS"; return 7
   }
-  if {![catch {exec grep -rl "AEB%2Fright" "$home/lazy-pundit"}]} {
+  if {![catch {exec grep -rl $COOKIE "$home/lazy-pundit"}]} {
     puts "COOKIE IN WORKSPACE"; return 7
   }
   return $code
@@ -206,7 +216,8 @@ if {$espn} {
     send "\r"
     need "◆  espn_s2 cookie"
     if {$scenario eq "espn-private"} {
-      send "AEB%2Fright\r"
+      send "$COOKIE\r"
+      need "pasted, 300 characters"
     } else {
       send "AEB%2Fwrong\r"
       need "ESPN rejected that cookie"
@@ -308,7 +319,8 @@ if {$scenario eq "key"} {
   # The password prompt's own line: "Anthropic key" alone also matches the
   # explanation and the select's redraw, which come before the prompt listens.
   need "\u25c6  Anthropic key"
-  send "sk-ant-test\r"
+  send "$KEY\r"
+  need "pasted, 108 characters"
   need "couldn't check it"
   need "Spend cap"
   send [string repeat "\x7f" 5]; after 200; send "0.10\r"
@@ -355,7 +367,8 @@ if {$scenario eq "espn"} {
   need "Save a new espn_s2"
   send "\r"
   need "◆  espn_s2 cookie"
-  send "AEB%2Fdriven\r"
+  send "$COOKIE\r"
+  need "pasted, 300 characters"
   need "espn set"
   finish
 }

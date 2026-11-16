@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { relative } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { styleText } from "node:util";
+import { PasswordPrompt } from "@clack/core";
 import {
   confirm,
   intro,
@@ -8,8 +10,10 @@ import {
   log,
   multiselect,
   outro,
-  password,
+  S_BAR,
+  S_BAR_END,
   select,
+  symbol,
   text,
 } from "@clack/prompts";
 import { Command } from "@commander-js/extra-typings";
@@ -523,12 +527,43 @@ async function readEspnLeague(
 /** The ESPN cookie, after how to copy it, at a masked prompt. */
 async function askCookie(): Promise<string> {
   log.info(ESPN_COOKIE_HELP);
-  return answered(
-    await password({
-      message: "espn_s2 cookie",
-      validate: (v) => (v?.trim() ? undefined : "Paste the cookie, or Esc."),
-    }),
-  ).trim();
+  return askMasked("espn_s2 cookie", "Paste the cookie, or Esc.");
+}
+
+/** "1 character", "312 characters". */
+function characters(n: number): string {
+  return `${n} ${n === 1 ? "character" : "characters"}`;
+}
+
+/**
+ * A secret at a prompt that shows only its length, trimmed, so a pasted
+ * 300-character cookie stays on one line: clack's `password` masks each
+ * character and wraps past the frame's gutter. Answered, it reads
+ * "pasted, N characters".
+ */
+async function askMasked(message: string, emptyError: string): Promise<string> {
+  // The frame's gutter, coloured as clack's own prompts colour it per state.
+  const bar = (color: "gray" | "cyan" | "yellow") => styleText(color, S_BAR);
+  const prompt = new PasswordPrompt({
+    validate: (v) => (v?.trim() ? undefined : emptyError),
+    render() {
+      const head = `${bar("gray")}\n${symbol(this.state)}  ${message}\n`;
+      const input = this.userInput ?? "";
+      const length = input.trim().length;
+      const count = input ? characters(length) : "";
+      switch (this.state) {
+        case "submit":
+          return `${head}${bar("gray")}  ${styleText("dim", `pasted, ${characters(length)}`)}`;
+        case "cancel":
+          return `${head}${bar("gray")}  ${styleText(["strikethrough", "dim"], count)}${count ? `\n${bar("gray")}` : ""}`;
+        case "error":
+          return `${head.trim()}\n${bar("yellow")}  ${count}\n${styleText("yellow", S_BAR_END)}  ${styleText("yellow", this.error)}\n`;
+        default:
+          return `${head}${bar("cyan")}  ${count}${styleText(["inverse", "hidden"], "_")}\n${styleText("cyan", S_BAR_END)}\n`;
+      }
+    },
+  });
+  return (answered(await prompt.prompt()) ?? "").trim();
 }
 
 const SKIP = "skip";
@@ -638,12 +673,7 @@ async function askKey(
       log.warn(KEY_SKIPPED);
       return { skipRest: picked === SKIP_REST };
     }
-    const typed = answered(
-      await password({
-        message: "Anthropic key",
-        validate: (v) => (v?.trim() ? undefined : "Enter the key, or Esc."),
-      }),
-    ).trim();
+    const typed = await askMasked("Anthropic key", "Enter the key, or Esc.");
     log.info("Checking the key with Anthropic…");
     const { problem, warning } = await checkKey(deps, typed);
     if (problem) log.error(problem);

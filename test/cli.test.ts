@@ -37,10 +37,14 @@ test("the CLI imports only the library, the arg parser and the prompt", async ()
   const imports = [...text.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
   expect(imports.sort()).toEqual([
     "./index.ts",
+    // The prompt's core, for the masked prompt that shows only a count.
+    "@clack/core",
     "@clack/prompts",
     "@commander-js/extra-typings",
     "node:path",
     "node:readline/promises",
+    // styleText, for that prompt's frame.
+    "node:util",
   ]);
 });
 
