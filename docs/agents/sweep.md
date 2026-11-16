@@ -2,7 +2,7 @@
 
 Step 3 of `ticket-workflow.md` hands this to one subagent after the commit, with the blanks filled:
 
-> Ticket #<n> was built in <sha>. Its results comment, for a run by hand: <link, or "none">. Decisions the diff doesn't show, with any claim nobody ran marked "from reading the code": <list>. Closed tickets it refined, each with the decision: <list>.
+> Ticket #<n> was built in <sha>. Its results comment, for a run by hand: <link, or "none">. Checks run, with their results: <list, such as "full suite, 49 files, 1345 passed">. Decisions the diff doesn't show, with any claim nobody ran marked "from reading the code": <list>. Closed tickets it refined, each with the decision: <list>.
 >
 > First pass: read every open ticket, not only keyword matches, in this one call. It leaves out the spec, the map and each ticket's earlier "Input from" sections:
 >

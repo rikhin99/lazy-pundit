@@ -48,7 +48,7 @@ A change that adds something to every draft's output, such as a league item or a
 
 After the commit, hand the sweep to one subagent, so the main session doesn't spend tokens reading tickets. Give it the prompt in `docs/agents/sweep.md`, with the blanks filled.
 
-Done when the subagent's report accounts for every open ticket, and the main session has asked the user whether to file each unowned item as a ticket. In #56, the changed-outcome warning in `check` and `publish` was left undone by both parts, and #56 was closed with no ticket owning it.
+Done when the subagent's report accounts for every open ticket, and the main session has asked the user, for each unowned item, whether to fix it here, file it as a ticket or leave it, with a guess at each fix's size. In #119, a file-or-leave question was rejected for "can we do the quick ones here". In #56, the changed-outcome warning in `check` and `publish` was left undone by both parts, and #56 was closed with no ticket owning it.
 
 ## 4. Measure
 

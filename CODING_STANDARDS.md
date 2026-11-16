@@ -23,6 +23,7 @@ Read during review. Each rule is a judgement call; the mechanical rules are test
 ## Tests
 
 - Tests sit at the seams listed under "Tests" in `docs/agents/module-map.md`, and use that section's helpers: no live network, no real home directory, no real LLM.
+- A test's setup that the change copies from another test file (a `league.md`, `workspace.md` or settings literal, or a helper) moves to `test/support/` in the same change, and the map lists it. Copies that were already there are left alone. In #119, corrections' high-score rule copied stakes' `highScore()`, and sharing it took a second commit after the sweep.
 - Assert on what a pundit or league member could observe: files written, text published, what was copied, the problems returned.
 - Expected values come from an independent source: a hand-checked literal from the fixture payloads (`npm run fixture:show`), the spec, a worked example.
 - Fixtures are real scrubbed payloads replayed as snapshots. A variant is a real payload patched through a wrapping transport, never a hand-built model.
