@@ -11,7 +11,7 @@ agent=$(printf '%s' "$input" | jq -r '.agent_id // ""')
 # Piped, `gh issue view --comments` prints the comments without the body.
 if printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--comments' &&
   ! printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--json'; then
-  echo "Piped, \`gh issue view --comments\` prints only the comments, without the body. Read the ticket with \`gh issue view <n> --json title,body,comments\`, or one comment with \`--json comments --jq '.comments[-1].body'\`." >&2
+  echo "Piped, \`gh issue view --comments\` prints only the comments, without the body. Read the ticket and its brief (the latest comment) with \`gh issue view <n> --json title,body,comments --jq '.title, .body, (.comments[-1].body // \"\")'\`, or one comment with \`--json comments --jq '.comments[-1].body'\`." >&2
   exit 2
 fi
 
