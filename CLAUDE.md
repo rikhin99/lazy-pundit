@@ -22,4 +22,4 @@ Follow `docs/agents/ticket-workflow.md`: glossary before the first test, then bu
 
 ### Releasing
 
-The README's "Releasing" section has the steps. A ticket that lands something in `CHANGELOG.md`'s "Not in it yet" list moves it to the next release's entry. Agents can't push, so the maintainer pushes `main` and the tag and makes the GitHub release.
+The README's "Releasing" section has the steps. A ticket that lands something in `CHANGELOG.md`'s "Not in it yet" list moves it to the next release's entry. Its bullets run a paragraph each, so find the section with `grep -n '^##' CHANGELOG.md` and Read only the few lines around the insertion (in #93, 34 lines cost 4k). Agents can't push, so the maintainer pushes `main` and the tag and makes the GitHub release.

@@ -147,11 +147,16 @@ describe("the repo's hooks", () => {
     expect(runHook("ticket-brief.sh", command).status).toBe(status);
   });
 
-  // In #120 an `echo ===` between two mutate calls stopped the second.
+  // In #120 an `echo ===` between two mutate calls stopped the second. In #93
+  // a loop check matched a heredoc's `for (` line, so mutate runs alone.
   test.each([
     ["npm run -s mutate -- src/a.ts 'x' 'y' test/a.test.ts", 0],
+    ["npm run -s mutate -- f 'a || b; c' \"d && $(e)\" t 2>&1", 0],
     ["npm run -s mutate -- f 'a' 'b' t && npm run mutate -- f 'c' 'd' t", 2],
     ["for m in a b; do npm run -s mutate -- f $m t; done", 2],
+    ["cd src && npm run -s mutate -- f 'a' 'b' t", 2],
+    ["node x.mjs\nnpm run -s mutate -- f 'a' 'b' t", 2],
+    ["npm run -s mutate -- f 'a' 'b' t | tail -3", 2],
     ["npm run -s format && npx vitest run test/a.test.ts", 0],
   ])("mutate-one.sh on %s exits %i", (command, status) => {
     expect(runHook("mutate-one.sh", command).status).toBe(status);
