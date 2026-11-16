@@ -113,6 +113,19 @@ ${body}`,
   );
 }
 
+/**
+ * A weekly high-score house rule paying `outcome`, as one `house-rules:` item
+ * with `extra` lines (each indented four spaces) added to it.
+ */
+export function highScore(outcome = "$10", extra = ""): string {
+  return `  - id: high-score
+    name: Weekly high score
+    trigger: high-score
+    per: week
+    outcome: ${outcome}
+${extra}`;
+}
+
 /** Each handle's account in Fear The Turtle; any other handle links to no team. */
 const HANDLE_ACCOUNTS: Record<string, string> = {
   gus: "sleeper:800000000000000001",

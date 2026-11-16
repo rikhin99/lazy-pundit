@@ -10,6 +10,7 @@ import {
   fearTheTurtle,
   fixedClock,
   frontMatter,
+  highScore,
   patchingTransport,
   published,
   rankingsDir,
@@ -133,7 +134,7 @@ describe("a drastic correction", () => {
 
   test("a changed trigger winner is a correction too", async () => {
     const ws = await fearTheTurtle(7);
-    await writeLeagueFile(ws.dir, HIGH_SCORE_RULE);
+    await writeLeagueFile(ws.dir, `house-rules:\n${highScore()}`);
     await draft(ws.dir, ws.deps);
     await published(ws.dir, ws.deps);
 
@@ -284,12 +285,3 @@ async function writePersona(dir: string, text: string): Promise<void> {
   await mkdir(join(dir, "pundits", "rikhin"), { recursive: true });
   await writeFile(join(dir, "pundits", "rikhin", "persona.md"), text);
 }
-
-/** A weekly high-score house rule paying $10, as `league.md` front matter. */
-const HIGH_SCORE_RULE = `house-rules:
-  - id: high-score
-    name: Weekly high score
-    trigger: high-score
-    per: week
-    outcome: $10
-`;

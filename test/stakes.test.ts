@@ -17,6 +17,7 @@ import {
   fearTheTurtle,
   fixedClock,
   frontMatter,
+  highScore,
   linkHandles,
   patchingTransport,
   published,
@@ -30,16 +31,6 @@ const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
 const GUS = "## Gus Bus {team=sleeper:1}\n";
 const BEA = "## Bye Bye Bea {team=sleeper:11}\n";
 const INTRO = "## Intro {intro}\n";
-
-/** A weekly high-score rule paying `outcome`. */
-function highScore(outcome = "$10", extra = ""): string {
-  return `  - id: high-score
-    name: Weekly high score
-    trigger: high-score
-    per: week
-    outcome: ${outcome}
-${extra}`;
-}
 
 /** Fear The Turtle at `week` with `fields` of stakes, drafted without an LLM. */
 async function drafted(week: number, fields: string, deps?: (d: Deps) => Deps) {

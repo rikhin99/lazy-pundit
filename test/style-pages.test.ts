@@ -6,6 +6,7 @@ import { draft, publish } from "../src/index.ts";
 import {
   atWeek,
   fearTheTurtle,
+  highScore,
   linkHandles,
   published,
   rankingsDir,
@@ -121,12 +122,7 @@ describe("the Tabloid style page", () => {
     const ws = await drafted(
       8,
       `house-rules:
-  - id: high-score
-    name: Weekly high score
-    trigger: high-score
-    per: week
-    outcome: $10
-rivalry-weeks:
+${highScore()}rivalry-weeks:
   - week: 8
     pairs: [[gus, pete]]
 `,

@@ -108,6 +108,7 @@ The seams, and the helpers each one uses:
   - `withoutPublishRecord(text)` drops a frozen copy's publish-record lines.
   - `writeSettings(dir, lines)` writes the pundit settings' front matter.
   - `writeLeagueFile(dir, fields, body?)` writes the 2025 season's `league.md` with `fields` of front matter (stakes, house rules, rivalry weeks) and `body` (a comment by default) below.
+  - `highScore(outcome?, extra?)` gives a weekly high-score house rule as one `house-rules:` item, with `extra` lines such as `from:` added.
   - `linkHandles(dir, handles)` links `gus`, `wendy`, `frank` and `pete` to their Sleeper accounts in `workspace.md`; any other handle links to no team.
   - `recordingClipboard()` and `fixedClock(iso)` are the deps' clipboard and clock.
   - `FEAR_THE_TURTLE_ID` is the fixture league's ID.
