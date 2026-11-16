@@ -42,6 +42,10 @@ const REFUSED: Record<string, object> = {
     tool_name: "Bash",
     tool_input: { command: "gh issue comment 96 --body 'Zorblax won'" },
   },
+  "long-line-docs.sh": {
+    tool_name: "Bash",
+    tool_input: { command: "grep -n -i handle docs/agents/module-map.md" },
+  },
   "git-log-subjects.sh": {
     tool_name: "Bash",
     tool_input: { command: "git log --oneline -3" },
@@ -173,6 +177,23 @@ describe("the repo's hooks", () => {
     ["git log -1 261c76f", 0],
   ])("git-log-subjects.sh on %s exits %i", (command, status) => {
     expect(runHook("git-log-subjects.sh", command).status).toBe(status);
+  });
+
+  // A module-map row and a CHANGELOG bullet are one long line each: in #110's
+  // retro a module-map grep cost 6.2k and a CHANGELOG sed 3.3k.
+  test.each([
+    ["grep -n -i handle docs/agents/module-map.md", 2],
+    ["sed -n '1,30p' CHANGELOG.md", 2],
+    ["cat CHANGELOG.md", 2],
+    [
+      "grep -n -o '.\\{0,120\\}checkLeague.\\{0,120\\}' docs/agents/module-map.md",
+      0,
+    ],
+    ["grep -n '^##' CHANGELOG.md", 0],
+    ["grep -n espn docs/agents/module-map.md | cut -c1-200", 0],
+    ["grep -rn handle src", 0],
+  ])("long-line-docs.sh on %s exits %i", (command, status) => {
+    expect(runHook("long-line-docs.sh", command).status).toBe(status);
   });
 
   // In #100 and #102 the standards review's one hard finding was a validator

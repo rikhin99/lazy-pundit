@@ -2,6 +2,8 @@
 
 The steps around `/implement <ticket>`, in order. Each ends on the condition that says it's done.
 
+A `ready-for-human` ticket run against a live league follows `docs/agents/live-run.md` instead, and ends at its results comment: each fix it finds is a `ready-for-agent` ticket, built in a fresh session. #110 ran and fixed in one session and ended at 173k.
+
 ## 1. Glossary first, before the first test
 
 Before reading code, list what the ticket adds. If it adds two or more commands or behaviours with their own seams, propose a split once, naming the line to cut on. Size alone is no reason, and a ticket's "Size watch" section is no reason either: #55 and #60 were split, and each part still ended well over the 150k zone while paying for its own review and sweep.
