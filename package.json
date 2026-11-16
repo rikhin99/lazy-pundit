@@ -37,6 +37,7 @@
     "drive:wizard:plain": "bash scripts/drive-wizard-plain.sh",
     "outline": "node scripts/outline.ts",
     "mutate": "node scripts/mutate.ts",
+    "screenshot": "node scripts/screenshot.ts",
     "trace": "node scripts/trace-context.ts",
     "release": "node scripts/release.ts",
     "install:smoke": "bash scripts/install-smoke.sh"
