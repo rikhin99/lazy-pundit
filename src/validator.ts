@@ -86,6 +86,16 @@ function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
       return { status: "unchecked", reason: LOOSE_PLAYOFF_PHRASE, hits: [] };
     }
     const r = resolve(ctx, id, section);
+    const corrected = /^w(\d+)\.correction$/.exec(id);
+    if (!r && corrected) {
+      // Its line was true when `draft` wrote it: the correction has reverted
+      // since, so the week stands as first published.
+      return {
+        status: "wrong",
+        reason: `no drastic correction to week ${corrected[1]} is found now, so this line is out of date: delete it`,
+        hits: [],
+      };
+    }
     if (!r) {
       return {
         status: "unknown-id",

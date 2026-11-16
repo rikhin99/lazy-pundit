@@ -92,6 +92,30 @@ describe("a drastic correction", () => {
     );
   });
 
+  test("a correction that reverts after the draft is a wrong line to delete", async () => {
+    const ws = await week7Published();
+    const result = await draft(ws.dir, week7Corrected(atWeek(ws.deps, 8)));
+
+    const refreshed = await refresh(ws.dir, atWeek(ws.deps, 8));
+
+    expect(
+      refreshed.problems
+        .filter((p) => p.section === "Intro")
+        .map((p) => [p.severity, p.kind, p.text, p.reason]),
+    ).toEqual([
+      [
+        "hard",
+        "wrong",
+        FLIPPED.replace(/^\[|\]\{ev=w7\.correction\}$/g, ""),
+        "no drastic correction to week 7 is found now, so this line is out of date: delete it",
+      ],
+    ]);
+    const text = await readFile(result.path, "utf8");
+    await writeFile(result.path, text.replace(`${FLIPPED}\n`, ""));
+    const checked = await check(ws.dir, ws.deps);
+    expect(checked.problems.filter((p) => p.section === "Intro")).toEqual([]);
+  });
+
   test("a win corrected to a tie says so", async () => {
     const ws = await week7Published();
 
