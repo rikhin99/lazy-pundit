@@ -354,6 +354,25 @@ test("check on a draft with one front-matter key indented prints what to check o
   );
 });
 
+test("check on a draft with a value with a colon names the quote fix on stderr and exits 1, leaving the draft as it was", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  const { path } = await draft(dir, deps);
+  const broken = withFrontMatter(await readFile(path, "utf8"), (lines) => [
+    ...lines,
+    "notes: half: time",
+  ]);
+  await writeFile(path, broken);
+
+  const { code, stdout, stderr } = await cli(dir, ["check"]);
+
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toBe(
+    "week-08.md: the front matter isn't valid YAML; quote a value that has a colon followed by a space\n",
+  );
+  expect(await readFile(path, "utf8")).toBe(broken);
+});
+
 test("refresh with no change says so, and updates checked_at", async () => {
   const { dir, deps } = await fearTheTurtle(8);
   const { path } = await draft(dir, deps);

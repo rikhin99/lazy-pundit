@@ -659,19 +659,83 @@ describe("front matter that isn't valid YAML", () => {
     await expect(check(dir, deps)).rejects.toThrow(message("workspace.md"));
   });
 
+  /** Extra lines after the front matter's last key. */
+  const withLines =
+    (...added: string[]) =>
+    (text: string) =>
+      withFrontMatter(text, (lines) => [...lines, ...added]);
+
   /** An extra key `notes` with `value` after the front matter's last key. */
-  const withNotes = (value: string) => (text: string) =>
-    withFrontMatter(text, (lines) => [...lines, `notes: ${value}`]);
+  const withNotes = (value: string) => withLines(`notes: ${value}`);
+
+  const BARE = "week-08.md: the front matter isn't valid YAML";
+  const COLON = "quote a value that has a colon followed by a space";
+  const BRACKET = "close each bracket you open";
+  const QUOTE = "close each quote you open";
+  const DUPLICATE = "give each key only once";
+  const INDENT = "check each key's indent, and use spaces, not tabs";
 
   test.each([
-    ["a value with a colon", withNotes("half: time")],
-    ["an unclosed bracket", withNotes("[1, 2")],
-    ["an unclosed quote", withNotes('"half time')],
-  ])("%s: no indent fixes it, so check gives no hint", async (_, shape) => {
+    ["a value with a colon", withNotes("half: time"), [COLON]],
+    ["an unclosed square bracket", withNotes("[1, 2"), [BRACKET]],
+    ["an unclosed curly bracket", withNotes("{a: 1"), [BRACKET]],
+    ["an unclosed double quote", withNotes('"half time'), [QUOTE]],
+    ["an unclosed single quote", withNotes("'half time"), [QUOTE]],
+    ["a duplicate key", withLines("week: 9"), [DUPLICATE]],
+    [
+      "a value with a colon, then a duplicate key",
+      withLines("notes: half: time", "week: 9"),
+      [COLON, DUPLICATE],
+    ],
+    [
+      "a value with a colon, then an indented key",
+      withLines("notes: half: time", "  other: x"),
+      [COLON, INDENT],
+    ],
+    [
+      "an unclosed quote, a value with a colon, then a duplicate key",
+      withLines('notes: "half', "other: a: b", "week: 9"),
+      [QUOTE, COLON, DUPLICATE],
+    ],
+    [
+      "a duplicate key with an indented key under it",
+      withLines("week: 9", "  sub: 1"),
+      [DUPLICATE, INDENT],
+    ],
+    [
+      "four values with a colon",
+      withLines("a: b: c", "d: e: f", "g: h: i", "j: k: l"),
+      [COLON],
+    ],
+  ] as const)("%s: check names each fix", async (_, shape, hints) => {
     const { dir, deps } = await reshaped(shape);
 
     await expect(check(dir, deps)).rejects.toMatchObject({
-      message: "week-08.md: the front matter isn't valid YAML",
+      message: [BARE, ...hints].join("; "),
+    });
+  });
+
+  test.each([
+    ["a value no fix mends", withNotes("@x")],
+    [
+      "list items with the same key, one of them unmendable",
+      withLines("items:", "- a: 1", "- a: @x"),
+    ],
+  ])("%s gives no hint", async (_, shape) => {
+    const { dir, deps } = await reshaped(shape);
+
+    await expect(check(dir, deps)).rejects.toMatchObject({ message: BARE });
+  });
+
+  test("lore.md with a value with a colon gets the colon hint, naming lore.md", async () => {
+    const { dir, deps } = await drafted();
+    await writeFile(
+      join(dir, "lore.md"),
+      "---\nlore: 1\nnotes: half: time\n---\n## Running jokes\n- Kept.\n",
+    );
+
+    await expect(check(dir, deps)).rejects.toMatchObject({
+      message: `lore.md: the front matter isn't valid YAML; ${COLON}`,
     });
   });
 });
