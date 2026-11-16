@@ -90,7 +90,7 @@ The seams, and the helpers each one uses:
   - `rerun`: `setup <step>` with a recording confirm.
   - `in-progress`: drafting mid-week and `--include-in-progress`, on week 8 patched to `last_scored_leg: 7`.
   - `init-espn`: the league data step on ESPN (`checkEspnLeague`, public and private leagues, a rejected cookie and a wrong league ID), the cookie saved by `setUpWorkspace`, and `setup espn`.
-  - `hotTakeryAt(deps, week, { status, privateTo, league })` in `support/espn.ts` gives the deps replaying Hot Takery's committed ESPN snapshot: `status` answers the league request (`HOT_TAKERY_LEAGUE_URL`) with it, `privateTo` answers 401 to any request without that cookie, and `league` patches the league payload.
+  - `hotTakeryAt(deps, week, { status, privateTo, league })` in `support/espn.ts` gives the deps replaying Hot Takery's committed ESPN snapshot: `status` answers the league request (`HOT_TAKERY_LEAGUE_URL`) with it, `privateTo` answers 401 to any request without that cookie, and `league` patches the league payload (the standings stay, rebuilt from the matchups). `correction: { week, points }` is the ESPN data change for a `refresh` run: that week's first home box score `points` higher.
   - `fearTheTurtle(week)` in `support/workspace.ts` gives a workspace, deps that replay the committed snapshot, a recording clipboard and a fixed clock.
   - `onStandings(week)` is the same with the pundit settings on the standings method, for literals that follow a team's place.
   - `rankingsDir(dir)` finds the files.

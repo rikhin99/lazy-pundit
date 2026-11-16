@@ -27,12 +27,20 @@ export const HOT_TAKERY_LEAGUE_URL = espnViewUrl(
  * The same deps, replaying Hot Takery's committed snapshot for `week`.
  * `status` answers the league request with that status and no payload;
  * `privateTo` makes it a private league that only that cookie reads (401
- * otherwise); `league` patches the league payload.
+ * otherwise); `league` patches the league payload, which leaves the standings
+ * as they are, since they're rebuilt from the matchups. `correction` is a stat
+ * correction, the data change a `refresh` run needs: that week's first home
+ * score `points` higher, in its box scores.
  */
 export function hotTakeryAt(
   deps: Deps,
   week: number,
-  opts: { status?: number; privateTo?: string; league?: Patch } = {},
+  opts: {
+    status?: number;
+    privateTo?: string;
+    league?: Patch;
+    correction?: { week: number; points: number };
+  } = {},
 ): Deps {
   const weeks = JSON.parse(
     readFileSync(join(HOT_TAKERY, "weeks.json"), "utf8"),
@@ -55,8 +63,29 @@ export function hotTakeryAt(
         ) {
           return refused;
         }
-        return inner.request(req);
+        const res = await inner.request(req);
+        const { correction } = opts;
+        // By hand: every week's box scores share one URL, told apart by
+        // `scoringPeriodId`, and `patchingTransport` matches the URL alone.
+        if (
+          !correction ||
+          req.url !== HOT_TAKERY_BOX_SCORES_URL ||
+          req.params?.scoringPeriodId !== String(correction.week)
+        ) {
+          return res;
+        }
+        const box = JSON.parse(new TextDecoder().decode(res.body));
+        box.schedule.find(
+          (g: { matchupPeriodId: number }) =>
+            g.matchupPeriodId === correction.week,
+        ).home.totalPoints += correction.points;
+        return { ...res, body: new TextEncoder().encode(JSON.stringify(box)) };
       },
     },
   };
 }
+
+const HOT_TAKERY_BOX_SCORES_URL = espnViewUrl(
+  espnLeagueUrl("2025", HOT_TAKERY_ID),
+  ESPN_VIEWS.boxscores,
+);

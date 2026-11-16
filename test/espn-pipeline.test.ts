@@ -13,6 +13,7 @@ import {
   refresh,
   saveCredentials,
 } from "../src/index.ts";
+import { hotTakeryAt } from "./support/espn.ts";
 import { fearTheTurtle, operator, rankingsDir } from "./support/workspace.ts";
 
 const HOT_TAKERY = join(
@@ -52,29 +53,6 @@ async function atWeek(deps: Deps, week: number): Promise<Deps> {
     await readFile(join(HOT_TAKERY, "weeks.json"), "utf8"),
   );
   return { ...deps, transport: fileTransport(HOT_TAKERY, weeks[String(week)]) };
-}
-
-/**
- * The same deps, with a stat correction: week 14's first home score a point
- * higher. By hand, since `patchingTransport` matches the URL alone and every
- * week's box scores share one, told apart by `scoringPeriodId`.
- */
-function corrected(deps: Deps): Deps {
-  return {
-    ...deps,
-    transport: {
-      async request(req) {
-        const res = await deps.transport.request(req);
-        if (!req.url.includes("view=mMatchupScore")) return res;
-        if (req.params?.scoringPeriodId !== "14") return res;
-        const box = JSON.parse(new TextDecoder().decode(res.body));
-        box.schedule.find(
-          (g: { matchupPeriodId: number }) => g.matchupPeriodId === 14,
-        ).home.totalPoints += 1;
-        return { ...res, body: new TextEncoder().encode(JSON.stringify(box)) };
-      },
-    },
-  };
 }
 
 /** The same deps, except ESPN rejects the cookie. */
@@ -201,7 +179,10 @@ describe("a credentials.yaml others can read, on an ESPN workspace", () => {
 
   test("refresh onto changed data warns once", async () => {
     const { dir, deps, path } = await drafted(0o644);
-    const result = await refresh(dir, corrected(deps));
+    const corrected = hotTakeryAt(deps, 14, {
+      correction: { week: 14, points: 1 },
+    });
+    const result = await refresh(dir, corrected);
     expect(result.changes).not.toEqual([]);
     expect(count(result.warnings, exposed(path))).toBe(1);
   });
