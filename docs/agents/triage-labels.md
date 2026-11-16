@@ -27,3 +27,5 @@ A criterion that asks for a test gives the expected value as a literal, as CODIN
 A criterion for a warning names what clears it: undoing the change, republishing, or a later week. In #76 the brief said when the changed-outcome warning shows but not what ends it, and the spec review found that republishing left it showing, since outcomes were recorded only at draft time.
 
 An example output in a brief matches its criteria: work it out for the fixture week and keep one source for each value. A layout criterion, such as a row fitting on one line, names the narrowest width it holds at. In #94, the example header said "data through week 9" while the criteria said the ranking week (10), and "each row stays on one line" can't hold below about 69 columns.
+
+A desired literal HEAD can't produce yet starts from HEAD's output for the same text, with only the changed part edited. Run the same text in each section a row names: a claim judged against another team's stats carries that team's ID on its reason (`sleeper:6/streak is L3`, not `streak is L3`). In #104, rows 1 and 2's desired reasons were written from the section-6 rows, and the build pinned the prefixed form.
