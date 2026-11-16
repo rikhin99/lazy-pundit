@@ -15,6 +15,7 @@ import {
   rankingsDir,
   statCorrection,
   withoutReminder,
+  writeLeagueFile,
 } from "./support/workspace.ts";
 
 const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
@@ -132,7 +133,7 @@ describe("a drastic correction", () => {
 
   test("a changed trigger winner is a correction too", async () => {
     const ws = await fearTheTurtle(7);
-    await writeLeagueFile(ws.dir);
+    await writeLeagueFile(ws.dir, HIGH_SCORE_RULE);
     await draft(ws.dir, ws.deps);
     await published(ws.dir, ws.deps);
 
@@ -284,23 +285,11 @@ async function writePersona(dir: string, text: string): Promise<void> {
   await writeFile(join(dir, "pundits", "rikhin", "persona.md"), text);
 }
 
-/** The 2025 season's `league.md` with a weekly high-score rule. */
-async function writeLeagueFile(dir: string): Promise<void> {
-  const season = join(dir, "seasons", "2025");
-  await mkdir(season, { recursive: true });
-  await writeFile(
-    join(season, "league.md"),
-    `---
-league: 1
-season: "2025"
-family-league: off
-house-rules:
+/** A weekly high-score house rule paying $10, as `league.md` front matter. */
+const HIGH_SCORE_RULE = `house-rules:
   - id: high-score
     name: Weekly high score
     trigger: high-score
     per: week
     outcome: $10
----
-`,
-  );
-}
+`;

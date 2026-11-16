@@ -107,6 +107,8 @@ The seams, and the helpers each one uses:
   - `withFrontMatter(text, rewrite)` rewrites a file's front-matter lines, such as indenting a key, for a test of front matter the pundit's editing broke.
   - `withoutPublishRecord(text)` drops a frozen copy's publish-record lines.
   - `writeSettings(dir, lines)` writes the pundit settings' front matter.
+  - `writeLeagueFile(dir, fields, body?)` writes the 2025 season's `league.md` with `fields` of front matter (stakes, house rules, rivalry weeks) and `body` (a comment by default) below.
+  - `linkHandles(dir, handles)` links `gus`, `wendy`, `frank` and `pete` to their Sleeper accounts in `workspace.md`; any other handle links to no team.
   - `recordingClipboard()` and `fixedClock(iso)` are the deps' clipboard and clock.
   - `FEAR_THE_TURTLE_ID` is the fixture league's ID.
   - `operator()` gives deps alone, with temp config, cache and workspaces folders and no environment overrides and `noLlm`, so nothing touches the real home directory or calls an LLM.

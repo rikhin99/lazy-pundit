@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
@@ -17,11 +17,13 @@ import {
   fearTheTurtle,
   fixedClock,
   frontMatter,
+  linkHandles,
   patchingTransport,
   published,
   rankingsDir,
   statCorrection,
   withoutPublishRecord,
+  writeLeagueFile,
 } from "./support/workspace.ts";
 
 const LEAGUE = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
@@ -37,26 +39,6 @@ function highScore(outcome = "$10", extra = ""): string {
     per: week
     outcome: ${outcome}
 ${extra}`;
-}
-
-/** The 2025 season's `league.md` with `fields` of stakes front matter. */
-async function writeLeagueFile(
-  dir: string,
-  fields: string,
-  body = "<!-- Free text rules go under a heading. -->\n",
-): Promise<void> {
-  const season = join(dir, "seasons", "2025");
-  await mkdir(season, { recursive: true });
-  await writeFile(
-    join(season, "league.md"),
-    `---
-league: 1
-season: "2025"
-family-league: off
-${fields}---
-
-${body}`,
-  );
 }
 
 /** Fear The Turtle at `week` with `fields` of stakes, drafted without an LLM. */
@@ -97,24 +79,6 @@ async function claimProblems(
   return problems.filter((p) =>
     /^(wk\.)?(rule|stakes|platform)\./.test(p.id ?? ""),
   );
-}
-
-/** Each handle's account in Fear The Turtle; any other handle links to no team. */
-const ACCOUNTS: Record<string, string> = {
-  gus: "sleeper:800000000000000001",
-  wendy: "sleeper:800000000000000002",
-  frank: "sleeper:800000000000000004",
-  pete: "sleeper:800000000000000006",
-};
-
-/** Links each handle to its account in `workspace.md`. */
-async function linkHandles(dir: string, handles: string[]): Promise<void> {
-  const path = join(dir, "workspace.md");
-  const text = await readFile(path, "utf8");
-  const lines = handles
-    .map((h) => `  ${h}: ["${ACCOUNTS[h] ?? "sleeper:no-such-account"}"]`)
-    .join("\n");
-  await writeFile(path, text.replace("\n---\n", `\nhandles:\n${lines}\n---\n`));
 }
 
 /**

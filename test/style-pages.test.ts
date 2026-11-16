@@ -6,29 +6,20 @@ import { draft, publish } from "../src/index.ts";
 import {
   atWeek,
   fearTheTurtle,
+  linkHandles,
   published,
   rankingsDir,
+  writeLeagueFile,
 } from "./support/workspace.ts";
 
-/** Fear The Turtle drafted at `week` without an LLM, with `league.md`'s `fields` if given. */
-async function drafted(week: number, fields?: string, handles?: string) {
+/**
+ * Fear The Turtle drafted at `week` without an LLM, with `league.md`'s
+ * `fields` and `handles` linked, if given.
+ */
+async function drafted(week: number, fields?: string, handles?: string[]) {
   const ws = await fearTheTurtle(week);
-  if (fields !== undefined) {
-    const season = join(ws.dir, "seasons", "2025");
-    await mkdir(season, { recursive: true });
-    await writeFile(
-      join(season, "league.md"),
-      `---\nleague: 1\nseason: "2025"\nfamily-league: off\n${fields}---\n`,
-    );
-  }
-  if (handles) {
-    const path = join(ws.dir, "workspace.md");
-    const text = await readFile(path, "utf8");
-    await writeFile(
-      path,
-      text.replace("\n---\n", `\nhandles:\n${handles}---\n`),
-    );
-  }
+  if (fields !== undefined) await writeLeagueFile(ws.dir, fields);
+  if (handles) await linkHandles(ws.dir, handles);
   const result = await draft(ws.dir, ws.deps);
   return { ...ws, path: result.path };
 }
@@ -139,7 +130,7 @@ rivalry-weeks:
   - week: 8
     pairs: [[gus, pete]]
 `,
-      '  gus: ["sleeper:800000000000000001"]\n  pete: ["sleeper:800000000000000006"]\n',
+      ["gus", "pete"],
     );
     await published(ws.dir, ws.deps);
     const awards = awardsOn(await tabloid(ws.dir, 8));

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -88,6 +88,52 @@ export async function writeSettings(dir: string, lines: string) {
     join(dir, "pundits/rikhin/settings.md"),
     `---\nformat: 1\n${lines}\n---\n`,
   );
+}
+
+/**
+ * Writes the 2025 season's `league.md` with `fields` of front matter (stakes,
+ * house rules, rivalry weeks), each line ending in a newline, and `body` below.
+ */
+export async function writeLeagueFile(
+  dir: string,
+  fields: string,
+  body = "<!-- Free text rules go under a heading. -->\n",
+): Promise<void> {
+  const season = join(dir, "seasons", "2025");
+  await mkdir(season, { recursive: true });
+  await writeFile(
+    join(season, "league.md"),
+    `---
+league: 1
+season: "2025"
+family-league: off
+${fields}---
+
+${body}`,
+  );
+}
+
+/** Each handle's account in Fear The Turtle; any other handle links to no team. */
+const HANDLE_ACCOUNTS: Record<string, string> = {
+  gus: "sleeper:800000000000000001",
+  wendy: "sleeper:800000000000000002",
+  frank: "sleeper:800000000000000004",
+  pete: "sleeper:800000000000000006",
+};
+
+/** Links each handle to its account (`HANDLE_ACCOUNTS`) in `workspace.md`. */
+export async function linkHandles(
+  dir: string,
+  handles: string[],
+): Promise<void> {
+  const path = join(dir, "workspace.md");
+  const text = await readFile(path, "utf8");
+  const lines = handles
+    .map(
+      (h) => `  ${h}: ["${HANDLE_ACCOUNTS[h] ?? "sleeper:no-such-account"}"]`,
+    )
+    .join("\n");
+  await writeFile(path, text.replace("\n---\n", `\nhandles:\n${lines}\n---\n`));
 }
 
 /**
