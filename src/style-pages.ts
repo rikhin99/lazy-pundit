@@ -279,6 +279,7 @@ body{margin:0;padding:16px;background:#e9e7e1;color:#111}
 .correction{margin:0;padding:8px 14px;border-bottom:1px solid #111;font-size:12px;line-height:1.35;background:#fff6d6}
 .awards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111}
 .awards li{padding:7px 10px;border-right:1px solid #ccc;border-bottom:1px solid #ccc;font-size:12px;line-height:1.25}
+.awards li:last-child:nth-child(odd){grid-column:1/-1}
 .awards b{display:block;font:700 10px/1.2 ${SANS};text-transform:uppercase;letter-spacing:.08em;color:#b0201a}
 .places{list-style:none;margin:0;padding:6px 14px 10px}
 .group{display:inline-block;margin-top:8px;padding:4px 6px;font:700 10px/1 ${SANS};letter-spacing:.14em;text-transform:uppercase;background:#111;color:#fff}
