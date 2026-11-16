@@ -299,6 +299,12 @@ _Avoid_: Header, summary
 **Award**:
 A league-wide item picked deterministically from the week's data, such as the top score, the biggest margin or an upset. Awards appear on publish styles and are never written by the LLM.
 
+**Upset**:
+The award for the week's winner that had the worse all-play record going into the week, by the biggest gap. It goes by score, so in the losers bracket the higher score is the winner.
+
+**Robbed**:
+The award for the team that lost with the most points scored that week.
+
 **Revision**:
 An LLM rewrite of one team's blurb that follows the pundit's instruction. It is held to the same checks as an LLM draft, stays within the persona's tone controls whatever the instruction asks, and replaces the blurb only when the pundit accepts it. An edit the pundit makes with some other LLM isn't a revision; it counts as the pundit's own edit.
 _Avoid_: Rewrite, regenerate
@@ -508,3 +514,15 @@ _Avoid_: Post
 **Publish style**:
 A screenshot-ready page layout of the published ranking, such as Tabloid or Broadcast. Every style renders from the same frozen copy, so a style never changes the ranking.
 _Avoid_: Theme, template
+
+**Tabloid**:
+The publish style laid out as a newspaper front page: a masthead, the week intro as its headline, an awards box and pull quotes from the blurbs.
+
+**Broadcast**:
+The publish style laid out as a sports-show graphic: "The week" strip, award chips and slanted rows with big place numbers. It shares only its name with the Broadcast preset; a persona never changes a style page.
+
+**Style page**:
+The page one publish style writes for a published week, opened in a browser and screenshotted. Publishing again writes it again from the new edition.
+
+**Correction note**:
+The style pages' place for the week intro's stat-correction lines, kept apart from the intro so a correction never becomes the headline.

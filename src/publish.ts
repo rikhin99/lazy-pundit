@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { awards } from "./awards.ts";
 import {
   type CheckedDraft,
   checkDraft,
@@ -8,6 +9,7 @@ import {
   type Problem,
 } from "./check.ts";
 import type { Deps } from "./deps.ts";
+import { draftData } from "./draft-data.ts";
 import { rawFrontMatterValue, WorkspaceFileError } from "./front-matter.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
@@ -20,6 +22,7 @@ import {
 } from "./ranking-file.ts";
 import { freshDataWarnings } from "./refresh.ts";
 import { houseRuleOutcomes, logRecord } from "./stakes.ts";
+import { renderTabloid } from "./style-pages.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -51,6 +54,8 @@ export type PublishResult =
       publishedPath: string;
       /** The plain text file. */
       textPath: string;
+      /** Each publish style's page: `week-NN.tabloid.html`. */
+      stylePaths: string[];
       /** The plain text, as written and copied. */
       text: string;
       /** Whether the text reached a clipboard. */
@@ -73,8 +78,8 @@ export type PublishResult =
 /**
  * Checks the latest draft and diffs fresh data against its snapshot, warning
  * without re-snapshotting. Then it freezes the draft as `week-NN.published.md`,
- * renders the plain text from the frozen copy into `week-NN.txt`, and copies it
- * to the clipboard. Hard problems are put to `confirm` first; soft ones are only
+ * renders the plain text from the frozen copy into `week-NN.txt`, writes each
+ * publish style's page beside it, and copies the text to the clipboard. Hard problems are put to `confirm` first; soft ones are only
  * returned.
  */
 export async function publish(
@@ -118,33 +123,74 @@ export async function publish(
     }
   }
 
-  const record = publishRecord(ownCopy, checked, deps.clock.now());
-  await writeWorkspaceFile(
-    publishedPath,
-    frozenCopy(name, checked.text, record),
-  );
   // The frozen copy is the checked draft with its edition, so the draft's
-  // parse and order evidence render it.
+  // parse and order evidence render it. Every output is rendered before the
+  // first write, so a rendering failure leaves nothing half-published.
   const text = renderPlainText(
     checked.ranking,
     checked.league,
     checked.order,
     checked.baseline,
   );
+  const pages = stylePages(stem, checked);
+  const record = publishRecord(ownCopy, checked, deps.clock.now());
+  await writeWorkspaceFile(
+    publishedPath,
+    frozenCopy(name, checked.text, record),
+  );
   const textPath = join(dir, `${stem}.txt`);
   await writeOutput(textPath, text);
   const copied = await deps.clipboard.write(text);
+  // The text is in hand by now, so a page that can't be written doesn't
+  // cost it.
+  const stylePaths: string[] = [];
+  for (const [file, html] of pages) {
+    const path = join(dir, file);
+    await writeOutput(path, html);
+    stylePaths.push(path);
+  }
 
   return {
     published: true,
     week,
     publishedPath,
     textPath,
+    stylePaths,
     text,
     copied,
     problems,
     warnings,
   };
+}
+
+/**
+ * Each publish style's page, rendered from the frozen copy (the checked draft
+ * with its edition) with the week's awards, by its file name
+ * `week-NN.<style>.html`. The stat lines `draft` writes with no LLM come
+ * along, so a page can tell prose from them.
+ */
+function stylePages(stem: string, checked: CheckedDraft): [string, string][] {
+  const { league, stakes, ranking } = checked;
+  const generated = draftData(
+    league,
+    ranking.meta.week,
+    stakes,
+    ranking.meta.in_progress_week,
+  );
+  const input = {
+    ranking,
+    league,
+    order: checked.order,
+    baseline: checked.baseline,
+    awards: awards(checked.evidence.league, league, stakes),
+    statLines: {
+      intro: generated.intro,
+      teams: Object.fromEntries(
+        Object.entries(generated.teams).map(([id, t]) => [id, t.statLine]),
+      ),
+    },
+  };
+  return [[`${stem}.tabloid.html`, renderTabloid(input)]];
 }
 
 /**

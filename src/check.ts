@@ -153,6 +153,8 @@ export interface CheckedDraft extends CheckResult {
   handles: Workspace["handles"];
   /** Each team's order evidence in the checked order. */
   order: Record<TeamId, OrderEvidence>;
+  /** The evidence pack the draft was checked against. */
+  evidence: EvidencePack;
   /** What movement was measured against, or none before the first publish. */
   baseline?: MovementBaseline;
   /**
@@ -266,6 +268,7 @@ export async function checkDraft(
     stakes,
     handles: ws.handles,
     order,
+    evidence,
     ...(baseline ? { baseline } : {}),
     clashWarnings,
   };

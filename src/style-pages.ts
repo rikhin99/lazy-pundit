@@ -1,0 +1,192 @@
+import type { Award } from "./awards.ts";
+import { formatRecord, type League, type TeamId } from "./league.ts";
+import { type MovementBaseline, movementMark } from "./movement.ts";
+import { credit, movementSince, weekTitle } from "./plain-text.ts";
+import type { RankingFile } from "./ranking-file.ts";
+import { type OrderEvidence, stripTags } from "./validator.ts";
+
+/** What every style page renders: the frozen copy and what checking it found. */
+export interface StylePageInput {
+  ranking: RankingFile;
+  league: League;
+  order: Record<TeamId, OrderEvidence>;
+  baseline: MovementBaseline | undefined;
+  awards: Award[];
+  /**
+   * The stat lines `draft` writes when there's no LLM: the league's, as the
+   * intro, and each team's, as its blurb. Tags and all.
+   */
+  statLines: { intro: string; teams: Record<string, string> };
+}
+
+/** Whether `written` is still `generated`, whatever its tags. */
+function unchanged(written: string, generated: string | undefined): boolean {
+  return (
+    generated !== undefined &&
+    stripTags(written).trim() === stripTags(generated).trim()
+  );
+}
+
+/**
+ * The week intro split for the style pages: each line citing a
+ * `w<N>.correction` item goes to the correction note, and the rest is the
+ * intro. Read from the frozen copy's text, since the pundit may have edited
+ * or deleted a line; tags are stripped after the split.
+ */
+function splitIntro(intro: string | undefined): {
+  corrections: string[];
+  rest: string;
+} {
+  const corrections: string[] = [];
+  const rest: string[] = [];
+  for (const line of (intro ?? "").split("\n")) {
+    if (/\{ev=w\d+\.correction\}/.test(line)) {
+      corrections.push(stripTags(line).trim());
+    } else rest.push(line);
+  }
+  return { corrections, rest: stripTags(rest.join("\n")).trim() };
+}
+
+/** `text`'s first sentence, and what follows it. */
+function firstSentence(text: string): [string, string] {
+  const at = text.search(/(?<=[.!?…])\s/);
+  return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at).trim()];
+}
+
+/** The Tabloid style page: masthead, intro as headline, awards box, pull quotes. */
+export function renderTabloid(input: StylePageInput): string {
+  const { ranking, league, order, baseline, awards, statLines } = input;
+  const { week, pundit } = ranking.meta;
+  const teams = new Map(league.teams.map((t) => [t.id as string, t]));
+  const parts: string[] = [];
+
+  const since = movementSince(week, baseline);
+  parts.push(
+    `<header class="masthead"><h1>${esc(league.name)}</h1><p>${esc(weekTitle(week))} · Power Rankings · by ${esc(pundit)}</p>${since ? `<p>${esc(since)}</p>` : ""}</header>`,
+  );
+
+  const { corrections, rest } = splitIntro(ranking.intro);
+  // The league stat line says what the awards box says, so an intro that is
+  // still the one `draft` wrote with no LLM gets the no-intro layout.
+  if (rest && !unchanged(rest, statLines.intro)) {
+    const [headline, more] = firstSentence(rest);
+    parts.push(
+      `<section class="story"><h2 class="headline">${esc(headline)}</h2>${more ? `<div class="standfirst">${paragraphs(more)}</div>` : ""}</section>`,
+    );
+  }
+  if (corrections.length > 0) {
+    parts.push(
+      `<p class="correction">${corrections.map(esc).join("<br>")}</p>`,
+    );
+  }
+  if (awards.length > 0) {
+    parts.push(
+      `<ul class="awards">${awards.map((a) => `<li><b>${esc(a.label)}</b>${esc(a.says)}</li>`).join("")}</ul>`,
+    );
+  }
+
+  const rows: string[] = [];
+  let place = 0;
+  for (const entry of ranking.entries) {
+    if (entry.kind === "group") {
+      rows.push(`<li class="group">${esc(entry.label)}</li>`);
+      continue;
+    }
+    place += 1;
+    const team = teams.get(entry.team);
+    if (!team) throw new Error(`No team ${entry.team} in the league`);
+    const move = order[team.id]?.move;
+    const mark =
+      week > 0 && move !== undefined
+        ? `<span class="move ${moveClass(move)}">${esc(movementMark(move))}</span>`
+        : "<span></span>";
+    // A stat line has no sentence to quote, so it shows whole, unquoted.
+    const blurb = stripTags(entry.blurb).trim();
+    const [quote] = firstSentence(blurb);
+    const under = !blurb
+      ? ""
+      : unchanged(blurb, statLines.teams[team.id])
+        ? `<span class="statline">${esc(blurb)}</span>`
+        : `<span class="quote">“${esc(quote)}”</span>`;
+    rows.push(
+      `<li class="row"><span class="place">${place}</span><span class="name">${esc(team.name)} <span class="record">${esc(formatRecord(team.standing))}</span></span>${mark}${under}</li>`,
+    );
+  }
+  parts.push(`<ol class="places">${rows.join("")}</ol>`);
+  parts.push(`<footer class="credit">${esc(credit(league))}</footer>`);
+
+  return page(
+    `${league.name} power rankings, ${weekTitle(week)}`,
+    TABLOID_CSS,
+    `<main class="tabloid">${parts.join("\n")}</main>`,
+  );
+}
+
+function moveClass(move: number | "new"): string {
+  if (move === "new") return "new";
+  if (move === 0) return "same";
+  return move > 0 ? "up" : "down";
+}
+
+function paragraphs(text: string): string {
+  return text
+    .split(/\n\s*\n/)
+    .map((p) => `<p>${esc(p.trim())}</p>`)
+    .join("");
+}
+
+/** A self-contained page: no script, no font or file from the network. */
+function page(title: string, css: string, body: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<style>${css}</style>
+</head>
+<body>
+${body}
+</body>
+</html>
+`;
+}
+
+function esc(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const SANS = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
+const HEAVY = '"Arial Black",Impact,"Helvetica Neue",sans-serif';
+
+const TABLOID_CSS = `
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:#e9e7e1;color:#111}
+.tabloid{max-width:440px;margin:0 auto;background:#fff;border:3px solid #111;font-family:Georgia,"Times New Roman",serif}
+.masthead{border-bottom:3px double #111;padding:10px 14px 6px;text-align:center}
+.masthead h1{margin:0;font:900 30px/1 ${HEAVY};letter-spacing:-.02em;text-transform:uppercase}
+.masthead p{margin:4px 0 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+.story{padding:10px 14px;border-bottom:1px solid #111}
+.headline{margin:0;font:900 22px/1.05 ${HEAVY};text-transform:uppercase}
+.standfirst p{margin:6px 0 0;font-size:14px;line-height:1.35}
+.correction{margin:0;padding:8px 14px;border-bottom:1px solid #111;font-size:12px;line-height:1.35;background:#fff6d6}
+.awards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111}
+.awards li{padding:7px 10px;border-right:1px solid #ccc;border-bottom:1px solid #ccc;font-size:12px;line-height:1.25}
+.awards b{display:block;font:700 10px/1.2 ${SANS};text-transform:uppercase;letter-spacing:.08em;color:#b0201a}
+.places{list-style:none;margin:0;padding:6px 14px 10px}
+.group{display:inline-block;margin-top:8px;padding:4px 6px;font:700 10px/1 ${SANS};letter-spacing:.14em;text-transform:uppercase;background:#111;color:#fff}
+.row{display:grid;grid-template-columns:26px 1fr auto;gap:2px 8px;padding:6px 0;border-bottom:1px dotted #999;font-size:13px;line-height:1.3}
+.place{font:900 18px/1 ${HEAVY}}
+.name{font-weight:700}
+.record{font-weight:400;color:#555}
+.move{font:700 11px/1.4 ${SANS};white-space:nowrap}
+.move.up{color:#1f8a4c}.move.down{color:#c0392b}.move.same{color:#9a9480}.move.new{color:#2f6fdb}
+.quote{grid-column:2/4;font-style:italic;color:#333}
+.statline{grid-column:2/4;font:12px/1.3 ${SANS};color:#555}
+.credit{padding:8px 14px;border-top:1px solid #111;font:11px/1.3 ${SANS};color:#555;text-align:center}
+`;

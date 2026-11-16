@@ -28,13 +28,10 @@ export function renderPlainText(
   const showMovement = week > 0;
   const header = [
     `🏈 ${league.name.toUpperCase()} POWER RANKINGS`,
-    `${week === 0 ? "Preseason" : `after Week ${week}`} · by ${pundit}`,
+    `${weekTitle(week)} · by ${pundit}`,
   ];
-  if (showMovement && baseline && baseline.week !== week - 1) {
-    header.push(
-      `Movement since ${baseline.week === 0 ? "Preseason" : `week ${baseline.week}`}`,
-    );
-  }
+  const since = movementSince(week, baseline);
+  if (since) header.push(since);
   const blocks: string[] = [header.join("\n")];
   if (ranking.intro) blocks.push(stripTags(ranking.intro));
 
@@ -54,8 +51,28 @@ export function renderPlainText(
     blocks.push(entry.blurb ? `${line}\n${stripTags(entry.blurb)}` : line);
   }
 
-  blocks.push(
-    `Stats: ${PLATFORM_NAMES[league.platform]} · made with Lazy Pundit`,
-  );
+  blocks.push(credit(league));
   return `${blocks.join("\n\n")}\n`;
+}
+
+/** A published ranking's week: "after Week 8", or "Preseason" for week 0. */
+export function weekTitle(week: number): string {
+  return week === 0 ? "Preseason" : `after Week ${week}`;
+}
+
+/**
+ * "Movement since week M" (or "since Preseason") when the movement baseline
+ * isn't the week before the ranking week; otherwise, and at week 0, none.
+ */
+export function movementSince(
+  week: number,
+  baseline: MovementBaseline | undefined,
+): string | undefined {
+  if (week === 0 || !baseline || baseline.week === week - 1) return undefined;
+  return `Movement since ${baseline.week === 0 ? "Preseason" : `week ${baseline.week}`}`;
+}
+
+/** The published ranking's credit line. */
+export function credit(league: League): string {
+  return `Stats: ${PLATFORM_NAMES[league.platform]} · made with Lazy Pundit`;
 }

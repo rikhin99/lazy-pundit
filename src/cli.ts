@@ -361,6 +361,10 @@ program
     console.log(`Published week ${result.week}:`);
     console.log(`  ${shown(result.publishedPath)}`);
     console.log(`  ${shown(result.textPath)}`);
+    for (const path of result.stylePaths) console.log(`  ${shown(path)}`);
+    console.log(
+      "Open a style page in a browser to screenshot it for the league chat.",
+    );
     console.log(
       result.copied
         ? "Copied the text to the clipboard."
