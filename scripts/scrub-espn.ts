@@ -126,7 +126,8 @@ export async function scrubEspnFixtures(opts: {
   return ids;
 }
 
-async function readRaw(dir: string): Promise<Raw> {
+/** Reads a raw folder, the layout `npm run capture:espn` writes. */
+export async function readRaw(dir: string): Promise<Raw> {
   const read = async (f: string) =>
     JSON.parse(await readFile(join(dir, f), "utf8")) as Obj;
   const byWeek = async (folder: string) => {
