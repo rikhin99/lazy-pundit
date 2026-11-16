@@ -47,6 +47,32 @@ function splitIntro(intro: string | undefined): {
   return { corrections, rest: stripTags(rest.join("\n")).trim() };
 }
 
+/**
+ * `intro` (tags stripped) with each whole occurrence of the week intro's stat
+ * line `generated` taken out, trimmed. Whole means it starts its line or
+ * follows a sentence's end, and ends its line or comes before a new sentence;
+ * with words of the pundit's run on to it, it's an edited stat line, which
+ * stays. A line that held only the stat line goes, so the lines around it
+ * stay one paragraph, as written.
+ */
+function withoutStatLine(intro: string, generated: string | undefined): string {
+  const statLine = stripTags(generated ?? "").trim();
+  if (!statLine) return intro;
+  const whole = new RegExp(
+    `(?<=^|[.!?…]\\s+)${statLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s*$|\\s+[\\p{Lu}\\p{N}"“'‘(])`,
+    "gu",
+  );
+  return intro
+    .split("\n")
+    .flatMap((line) => {
+      if (line.search(whole) < 0) return [line];
+      const prose = line.replace(whole, "").trim();
+      return prose ? [prose] : [];
+    })
+    .join("\n")
+    .trim();
+}
+
 /** `text`'s first sentence, and what follows it. */
 function firstSentence(text: string): [string, string] {
   const at = text.search(/(?<=[.!?…])\s/);
@@ -77,9 +103,11 @@ interface StylePageParts {
   /** The "Movement since" line, if any. */
   since: string | undefined;
   /**
-   * The week intro without its correction lines, tags stripped; empty for no
-   * intro, or one that is still the league stat line `draft` wrote with no
-   * LLM, since the awards say what it says.
+   * The week intro without its correction lines, tags stripped, and without
+   * each whole, untouched occurrence of the stat line `draft` wrote for it
+   * with no LLM, since the awards say what it says; the pundit's own
+   * sentences stay as written. Empty for no intro, or one that was only
+   * that stat line. A stat line the pundit edited is prose and stays.
    */
   intro: string;
   corrections: string[];
@@ -122,7 +150,7 @@ function stylePageParts(input: StylePageInput): StylePageParts {
     title: weekTitle(week),
     pundit: ranking.meta.pundit,
     since: movementSince(week, baseline),
-    intro: unchanged(rest, statLines.intro) ? "" : rest,
+    intro: withoutStatLine(rest, statLines.intro),
     corrections,
     awards,
     rows,

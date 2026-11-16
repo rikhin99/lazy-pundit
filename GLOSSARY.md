@@ -290,7 +290,7 @@ The pundit's working copy of a week's ranking. It can be edited freely, before a
 The short prose about one team that goes with its place in the ranking. The LLM drafts it and the pundit can rewrite it.
 
 **Stat line**:
-A blurb made only of the team's checked stats, such as its record, points rank, streak and latest result, with no prose. It stands in whenever no LLM blurb exists, and the pundit can keep, extend or delete it.
+A blurb made only of the team's checked stats, such as its record, points rank, streak and latest result, with no prose; the week intro's is the league's, such as the week high and low and the closest matchup. It stands in whenever no LLM blurb exists, and the pundit can keep, extend or delete it.
 
 **Week intro**:
 An optional blurb about the whole league's week, above the teams. It cites league-wide evidence and any team's stats, follows the persona's blurb shape, and carries the line for any drastic correction. A persona setting turns it off.

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { draft, PublishWriteError, publish } from "../src/index.ts";
+import { draft, PublishWriteError, publish, stripTags } from "../src/index.ts";
 import {
   atWeek,
   fearTheTurtle,
@@ -13,6 +13,25 @@ import {
   rankingsDir,
   writeLeagueFile,
 } from "./support/workspace.ts";
+
+/** A sentence of the pundit's own, added to the week intro. */
+const SENTENCE = "What a week for chaos.";
+
+/**
+ * Replaces the draft's week intro, the stat line `draft` wrote with no LLM,
+ * with `edit` of it (tags and all), and returns the new intro.
+ */
+async function withIntro(
+  path: string,
+  edit: (statLine: string) => string,
+): Promise<string> {
+  const text = await readFile(path, "utf8");
+  const statLine = text.match(/## Intro \{intro\}\n(.+)\n/)?.[1];
+  expect(statLine).toContain("Week high:");
+  const intro = edit(statLine as string);
+  await writeFile(path, text.replace(statLine as string, intro));
+  return intro;
+}
 
 /**
  * Fear The Turtle drafted at `week` without an LLM, with `league.md`'s
@@ -212,7 +231,8 @@ ${highScore()}rivalry-weeks:
       "2nd in points · won 9 straight · beat Bye Bye Bea by 23.9 · Clinched a playoff spot",
     );
 
-    // An edited stat line is the pundit's prose: a headline and a quote.
+    // A sentence added to a stat line is the pundit's prose: the intro's is
+    // the headline, and the team's is quoted.
     const text = await readFile(ws.path, "utf8");
     await writeFile(
       ws.path,
@@ -227,6 +247,76 @@ ${highScore()}rivalry-weeks:
     const edited = await tabloid(ws.dir, 10);
     expect(partOf(edited, "headline")).toBe("Bench Mob clinched.");
     expect(textOf(edited)).toContain("“Still perfect-ish.”");
+  });
+
+  test.each([
+    [
+      "on the line after the pundit's sentence",
+      (s: string) => `${SENTENCE}\n${s}`,
+    ],
+    [
+      "on the line before the pundit's sentence",
+      (s: string) => `${s}\n${SENTENCE}`,
+    ],
+    [
+      "after the pundit's sentence on its line",
+      (s: string) => `${SENTENCE} ${s}`,
+    ],
+    [
+      "before the pundit's sentence on its line",
+      (s: string) => `${s} ${SENTENCE}`,
+    ],
+  ])(
+    "the intro's untouched stat line %s is left off both pages, keeping the sentence",
+    async (_, intro) => {
+      const ws = await drafted(10);
+      await withIntro(ws.path, intro);
+      await published(ws.dir, ws.deps);
+
+      const page = await tabloid(ws.dir, 10);
+      expect(partOf(page, "headline")).toBe(SENTENCE);
+      expect(partOf(page, "standfirst")).toBeUndefined();
+      expect(textOf(page)).not.toContain("Week high:");
+      const show = await broadcast(ws.dir, 10);
+      expect(partOf(show, "intro")).toBe(SENTENCE);
+      expect(textOf(show)).not.toContain("Week high:");
+      // The plain text keeps the intro as written.
+      const plain = await readFile(
+        join(rankingsDir(ws.dir), "week-10.txt"),
+        "utf8",
+      );
+      expect(plain).toContain(SENTENCE);
+      expect(plain).toContain("Week high:");
+    },
+  );
+
+  test.each([
+    ["one value changed", (s: string) => s.replace("76.24", "76.25")],
+    ["words added after it", (s: string) => `${s} and Alpha`],
+    ["a word added before it", (s: string) => `Big ${s}`],
+  ])(
+    "an intro stat line the pundit edited (%s) is prose: it shows whole on both pages",
+    async (_, edit) => {
+      const ws = await drafted(10);
+      const line = stripTags(await withIntro(ws.path, edit));
+      // A changed value no longer matches its evidence, so publish anyway.
+      await publish(ws.dir, ws.deps, { yes: true });
+      expect(partOf(await broadcast(ws.dir, 10), "intro")).toBe(line);
+      expect(partOf(await tabloid(ws.dir, 10), "headline")).toBe(line);
+    },
+  );
+
+  test("an untouched stat line between two of the pundit's lines leaves them one paragraph", async () => {
+    const ws = await drafted(10);
+    await withIntro(ws.path, (s) => `${SENTENCE}\n${s}\nNobody saw it coming.`);
+    await published(ws.dir, ws.deps);
+    const html = await broadcast(ws.dir, 10);
+    expect(html).toContain(
+      `<div class="intro"><p>${SENTENCE}\nNobody saw it coming.</p></div>`,
+    );
+    expect(partOf(await tabloid(ws.dir, 10), "standfirst")).toBe(
+      "Nobody saw it coming.",
+    );
   });
 
   test("correction lines go in a correction note, never the headline; with nothing else, there's no headline", async () => {
