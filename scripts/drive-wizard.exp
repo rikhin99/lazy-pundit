@@ -16,6 +16,12 @@
 #                   with LAZY_PUNDIT_ESPN_S2 set (warned) and a pasted cookie, which
 #                   the replay accepts
 #   espn-bad-id     ESPN with an unknown league ID, re-asked, then Ctrl-C
+#   espn-private    the same league private to one cookie (LAZY_PUNDIT_REPLAY_COOKIE):
+#                   refused without one, the cookie help, that cookie pasted, every
+#                   default; checks credentials.yaml is 0600 and no workspace file
+#                   holds the cookie
+#   espn-retype     the private league with a wrong cookie pasted, rejected, then
+#                   "Type the league ID again", then Ctrl-C at the ID
 #   cancel          Ctrl-C at the first prompt
 #   cancel-folder   Ctrl-C at the folder prompt
 #   rename          rename the first handle to "gus", pick standings
@@ -43,12 +49,12 @@
 
 # The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
 # setup does. drive-wizard-all.sh reads this line.
-set cancelled {bad-id espn-bad-id cancel cancel-folder another again}
+set cancelled {bad-id espn-bad-id espn-retype cancel cancel-folder another again}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|espn-bad-id|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
+if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id espn-private espn-retype cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|espn-bad-id|espn-private|espn-retype|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -77,6 +83,10 @@ if {$espn} {
   set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/espn/hot-takery-2025/20251028T120000Z-a095861f"
   # ESPN's URLs name the season, which setup takes from the clock.
   set env(LAZY_PUNDIT_NOW) "2025-10-28T15:00:00.000Z"
+  catch {unset env(LAZY_PUNDIT_REPLAY_COOKIE)}
+  if {$scenario in {espn-private espn-retype}} {
+    set env(LAZY_PUNDIT_REPLAY_COOKIE) "AEB%2Fright"
+  }
 } else {
   set env(LAZY_PUNDIT_REPLAY) "$repo/fixtures/sleeper/fear-the-turtle-2025/20251028T120000Z-c4a2c21d"
 }
@@ -112,6 +122,25 @@ array set writes {
   cancel-folder nothing
   espn ws
   espn-bad-id nothing
+  espn-private lazy-pundit/the-hot-takery-league-2-0
+  espn-retype nothing
+}
+
+# espn-private's checks once init is done: credentials.yaml at 0600 holding
+# the cookie, and no file in the workspace holding it. Any miss exits 7.
+proc private_checks {home code} {
+  set path "$home/.config/lazy-pundit/credentials.yaml"
+  if {![file exists $path]} { puts "\nNO CREDENTIALS"; return 7 }
+  set mode [file attributes $path -permissions]
+  set fh [open $path]; set stored [read $fh]; close $fh
+  puts "\nCREDENTIALS $mode"
+  if {$mode ne "00600" || [string first "AEB%2Fright" $stored] < 0} {
+    puts "WRONG CREDENTIALS"; return 7
+  }
+  if {![catch {exec grep -rl "AEB%2Fright" "$home/lazy-pundit"}]} {
+    puts "COOKIE IN WORKSPACE"; return 7
+  }
+  return $code
 }
 
 proc finish {} {
@@ -122,6 +151,7 @@ proc finish {} {
   }
   lassign [wait] pid spawnid oserror code
   global scenario writes
+  if {$scenario eq "espn-private" && $code == 0} { set code [private_checks $home $code] }
   set wrote [wrote $home]
   puts "\nWROTE $wrote"
   if {[info exists writes($scenario)] && $wrote ne $writes($scenario)} {
@@ -170,6 +200,23 @@ if {$espn} {
     finish
   }
   send "900000001\r"
+  if {$scenario in {espn-private espn-retype}} {
+    need "is private"
+    need "Next?"
+    send "\r"
+    need "◆  espn_s2 cookie"
+    if {$scenario eq "espn-private"} {
+      send "AEB%2Fright\r"
+    } else {
+      send "AEB%2Fwrong\r"
+      need "ESPN rejected that cookie"
+      need "Next?"
+      send "$DOWN"; after 200; send "\r"
+      need "◆  ESPN league ID"
+      send $CTRL_C
+      finish
+    }
+  }
 } else {
   send "\r"
   need "username"

@@ -20,7 +20,12 @@ plain() {
       # A line clack wrapped, with no symbol of its own, belongs to the last kept one.
       cont && $0 != "" && $0 !~ /^(│|└|┌|◇|◆|●|■|▲)/ && $0 !~ /^(HOME|EXIT) / { print; next }
       # A log line of several lines: each one after the first is "│  <text>".
+      # A bare "│" inside it is a blank line when more of the log follows,
+      # and the log'"'"'s end otherwise, so it waits for the next line.
+      blank && /^│  ./ { print "│"; print; blank = 0; next }
+      blank { blank = 0; cont = 0; logged = 0 }
       logged && /^│  ./ { print; next }
+      logged && $0 == "│" { blank = 1; next }
       { cont = 0; logged = 0 }
       answer {
         answer = 0

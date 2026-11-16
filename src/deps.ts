@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { anthropicLlm, type Llm } from "./anthropic.ts";
 import { type Clipboard, noClipboard, systemClipboard } from "./clipboard.ts";
 import { type Clock, systemClock } from "./clock.ts";
+import { ESPN_API } from "./espn/api.ts";
 import { fileTransport } from "./file-transport.ts";
 import { httpTransport, type Transport } from "./transport.ts";
 
@@ -50,6 +51,21 @@ function fixedAt(iso: string): Clock {
 }
 
 /**
+ * A replay whose ESPN league is private to `cookie`: an ESPN request without
+ * it gets a 401, as ESPN answers a private league. No cookie, no change.
+ */
+function privateTo(cookie: string | undefined, replay: Transport): Transport {
+  if (!cookie) return replay;
+  return {
+    request: (req) =>
+      req.url.startsWith(ESPN_API) &&
+      req.headers?.Cookie !== `espn_s2=${cookie}`
+        ? Promise.resolve({ status: 401, body: new Uint8Array() })
+        : replay.request(req),
+  };
+}
+
+/**
  * The real network, system time and system clipboard, with folders and
  * overrides read from the environment. This is the only place that reads
  * environment variables:
@@ -67,6 +83,9 @@ function fixedAt(iso: string): Clock {
  *   LAZY_PUNDIT_NOW        with LAZY_PUNDIT_REPLAY, an ISO time the clock
  *                          reads instead of the system's, so a scripted run
  *                          asks for the replay's season
+ *   LAZY_PUNDIT_REPLAY_COOKIE  with LAZY_PUNDIT_REPLAY, the one espn_s2 the
+ *                          replayed ESPN league reads with: any other, or
+ *                          none, gets a 401, as from a private league
  */
 export function systemDeps(): Deps {
   const env = process.env;
@@ -74,9 +93,12 @@ export function systemDeps(): Deps {
   const http = httpTransport();
   return {
     transport: env.LAZY_PUNDIT_REPLAY
-      ? fileTransport(
-          dirname(env.LAZY_PUNDIT_REPLAY),
-          basename(env.LAZY_PUNDIT_REPLAY),
+      ? privateTo(
+          env.LAZY_PUNDIT_REPLAY_COOKIE,
+          fileTransport(
+            dirname(env.LAZY_PUNDIT_REPLAY),
+            basename(env.LAZY_PUNDIT_REPLAY),
+          ),
         )
       : http,
     llm: anthropicLlm(http),

@@ -61,3 +61,37 @@ test("the plain filter keeps answered prompts, every line of a log line, success
     ].join("\n"),
   );
 });
+
+test("a log line with a blank line inside keeps every line after it, up to the bare line that ends it", () => {
+  const raw = [
+    "●  To copy your espn_s2 cookie:",
+    "│    1. Open the league.",
+    "│",
+    "│       ┌ Cookies ┐",
+    "│",
+    "│  It's kept in credentials.yaml.",
+    "│",
+    "◆  espn_s2 cookie",
+    "│  _",
+    "◇  espn_s2 cookie",
+    "│  ▪▪▪▪",
+    "EXIT 0",
+  ]
+    .map((line) => `${line}\r\n`)
+    .join("");
+
+  expect(plain(raw)).toBe(
+    [
+      "●  To copy your espn_s2 cookie:",
+      "│    1. Open the league.",
+      "│",
+      "│       ┌ Cookies ┐",
+      "│",
+      "│  It's kept in credentials.yaml.",
+      "◇  espn_s2 cookie",
+      "│  ▪▪▪▪",
+      "EXIT 0",
+      "",
+    ].join("\n"),
+  );
+});
