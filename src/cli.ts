@@ -345,6 +345,7 @@ program
       },
       confirmRelaxed,
       onWarnings: printWarnings,
+      showPath: shown,
     });
     if (!result.published) {
       console.log(

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { draft, PublishWriteError, publish } from "../src/index.ts";
@@ -335,6 +335,31 @@ ${highScore()}rivalry-weeks:
     expect(ws.clipboard.copied).toHaveLength(0);
     expect(existsSync(tabloidPath(ws.dir, 10))).toBe(false);
   });
+
+  // A folder at the frozen copy's path stops `checkDraft`'s read before any
+  // write, so only a folder that can't be written to reaches this. Root and
+  // Windows write past the mode bits.
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "a frozen copy that can't be written says nothing was published, and writes nothing else",
+    async () => {
+      const ws = await drafted(10);
+      const season = rankingsDir(ws.dir);
+      await chmod(season, 0o555);
+      try {
+        const failed = publish(ws.dir, ws.deps);
+        await expect(failed).rejects.toThrow(
+          new PublishWriteError(
+            "Week 10 wasn't published: couldn't write its frozen copy to pundits/rikhin/2025/week-10.published.md: Lazy Pundit isn't allowed to write there. Nothing else was written or copied. Make the file and its folder writable, then run `lazy-pundit publish` again in the league's workspace.",
+          ),
+        );
+        await expect(failed).rejects.toThrow(PublishWriteError);
+      } finally {
+        await chmod(season, 0o755);
+      }
+      expect(existsSync(join(season, "week-10.txt"))).toBe(false);
+      expect(ws.clipboard.copied).toHaveLength(0);
+    },
+  );
 
   test("publish run again once the way is cleared goes through as the next edition", async () => {
     const ws = await drafted(10);

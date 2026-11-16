@@ -244,6 +244,21 @@ async function withWrongClaim() {
   return { dir, txt: join(rankingsDir(dir), "week-08.txt") };
 }
 
+test("publish run from the season folder with a style page it can't write prints one message, with paths as the CLI shows them, and fails", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+  const season = rankingsDir(dir);
+  await mkdir(join(season, "week-08.tabloid.html"));
+
+  const { code, stderr } = await cli(season, ["publish", "--yes"]);
+
+  expect(code).toBe(1);
+  expect(stderr.trim().split("\n").at(-1)).toBe(
+    "Published week 8 as edition 1, wrote its text to week-08.txt (no clipboard found; paste from the .txt file), but couldn't write the Tabloid page to week-08.tabloid.html: it's a folder. The Broadcast page wasn't written either. Move or remove that folder, then run `lazy-pundit publish` again in the league's workspace; that publishes week 8 as edition 2.",
+  );
+  expect(stderr).not.toMatch(/^\s+at /m);
+});
+
 test("publish with a hard problem and no answer goes back to editing and fails", async () => {
   const { dir, txt } = await withWrongClaim();
 

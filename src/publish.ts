@@ -44,6 +44,12 @@ export interface PublishOptions {
    * is asked or written. The result carries them too.
    */
   onWarnings?: (warnings: string[]) => void;
+  /**
+   * How a `PublishWriteError` shows a file's path: the CLI's own way, so the
+   * message matches the paths it lists. Relative to the league workspace when
+   * not given.
+   */
+  showPath?: (path: string) => string;
 }
 
 export type PublishResult =
@@ -134,13 +140,24 @@ export async function publish(
   );
   const pages = stylePages(stem, checked);
   const record = publishRecord(ownCopy, checked, deps.clock.now());
-  await writeWorkspaceFile(
-    publishedPath,
-    frozenCopy(name, checked.text, record),
-  );
+  const shown =
+    opts.showPath ?? ((path: string) => relative(workspaceDir, path));
+  try {
+    await writeWorkspaceFile(
+      publishedPath,
+      frozenCopy(name, checked.text, record),
+    );
+  } catch (cause) {
+    // A frozen copy this build can't read back is a bug, not a write to clear.
+    if (!(cause as NodeJS.ErrnoException).code) throw cause;
+    const { why, fix } = unwritable(cause);
+    throw new PublishWriteError(
+      `Week ${week} wasn't published: couldn't write its frozen copy to ${shown(publishedPath)}: ${why}. Nothing else was written or copied. ${fix}, then run \`lazy-pundit publish\` again in the league's workspace.`,
+      { cause },
+    );
+  }
   // From here the week is published, so an output that can't be written ends
   // on a message saying what was done and how to publish again.
-  const shown = (path: string) => relative(workspaceDir, path);
   const unwritten = (failure: Omit<UnwrittenOutput, "week" | "edition">) =>
     new PublishWriteError(
       unwrittenMessage({ week, edition: record.edition, ...failure }),
@@ -238,9 +255,10 @@ function stylePages(
 }
 
 /**
- * `publish` couldn't write `week-NN.txt` or a style page after the frozen copy
- * was written: the week is published, and the message says what else was done
- * and how to publish it again.
+ * `publish` couldn't write one of its files. The frozen copy first: nothing
+ * was published. Then `week-NN.txt` or a style page: the week is published,
+ * and the message says what else was done. Either way it says why and how to
+ * publish again.
  */
 export class PublishWriteError extends Error {
   override name = "PublishWriteError";
@@ -254,7 +272,7 @@ interface UnwrittenOutput {
   done: string;
   /** The output that couldn't be written: "its text" or "the Tabloid page". */
   what: string;
-  /** Its path, relative to the league workspace. */
+  /** Its path, as `PublishOptions.showPath` shows it. */
   path: string;
   cause: unknown;
   /** Sentences on what wasn't done because of it, or "". */
