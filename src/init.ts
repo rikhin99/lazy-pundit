@@ -23,6 +23,7 @@ import {
   type LeagueNames,
   type LeagueType,
   type Lore,
+  looksLikePersonalData,
   validatorNames,
 } from "./lore.ts";
 import { PRESETS, type PresetName, personaPath } from "./persona.ts";
@@ -99,6 +100,16 @@ export function platformStop(platform: PlatformChoice): string | undefined {
 /** Where an ESPN league's ID is, said at its prompt. */
 export const ESPN_LEAGUE_ID_PROMPT =
   "ESPN league ID (the number after leagueId= in the league's URL)";
+
+/**
+ * Why a typed ESPN league ID can't be one, if it can't: it's only digits, so a
+ * stray character is caught at the prompt rather than sent to ESPN.
+ */
+export function espnLeagueIdProblem(typed: string): string | undefined {
+  return /^\d+$/.test(typed.trim())
+    ? undefined
+    : "An ESPN league ID is only digits: the number after leagueId= in the league's URL.";
+}
 
 /**
  * How to copy the ESPN cookie, said before its masked prompt, with a sketch of
@@ -325,7 +336,9 @@ export interface LoreAnswers {
 /**
  * The lore step's prefill: each team's name and its managers' display names,
  * leaving out any that would read as another team's, so accepting it never
- * makes a nickname clash.
+ * makes a nickname clash, and any the personal-data warning would flag, such
+ * as ESPN's default display name (ESPNFAN and ten digits). A team's name and
+ * its managers' display names count as nicknames anyway.
  */
 export function proposedNicknames(
   league: LeagueCheck,
@@ -344,7 +357,11 @@ export function proposedNicknames(
     for (const name of new Set(names)) {
       if (nicknameShapeProblem(name)) continue;
       entry.nicknames.push(name);
-      if (nicknamesProblem(league, handles, proposed)) entry.nicknames.pop();
+      if (
+        looksLikePersonalData(nicknamesLine(entry.nicknames)) ||
+        nicknamesProblem(league, handles, proposed)
+      )
+        entry.nicknames.pop();
     }
   }
   return proposed;
@@ -363,6 +380,14 @@ function sectionFor(
   return handle && more.length === 0 && teamsRun.length === 1
     ? `{manager=${handle.handle}}`
     : `{team=${team.id}}`;
+}
+
+/**
+ * A lore section's nicknames line, as `lore.md` holds it and the personal-data
+ * warning reads it.
+ */
+function nicknamesLine(nicknames: string[]): string {
+  return `nicknames: ${nicknames.join(", ")}`;
 }
 
 /** A team's typed nicknames, separated by commas. */
@@ -468,7 +493,7 @@ function loreText(answers: LoreAnswers, league: LeagueCheck): string {
     return [
       `## ${t.section}`,
       t.nicknames.length > 0
-        ? `nicknames: ${t.nicknames.join(", ")}`
+        ? nicknamesLine(t.nicknames)
         : `<!-- ${who.join(", ")} -->`,
     ].join("\n");
   });

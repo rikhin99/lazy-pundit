@@ -7,6 +7,7 @@ import {
   checkEspnLeague,
   checkWorkspace,
   draft,
+  espnLeagueIdProblem,
   espnWorkspaceLeague,
   FetchError,
   loadCredentials,
@@ -32,6 +33,17 @@ async function refusal(promise: Promise<unknown>): Promise<SetupRefusal> {
   expect(err).toBeInstanceOf(SetupRefusal);
   return err as SetupRefusal;
 }
+
+test("a typed ESPN league ID is only digits, so a stray character never reaches ESPN", () => {
+  // In #110's live run, "<ID>." went to ESPN, which answered 400 and ended init.
+  for (const typed of ["12345678.", "1234 5678", "leagueId=12345678", ""]) {
+    expect(espnLeagueIdProblem(typed)).toBe(
+      "An ESPN league ID is only digits: the number after leagueId= in the league's URL.",
+    );
+  }
+  expect(espnLeagueIdProblem("12345678")).toBeUndefined();
+  expect(espnLeagueIdProblem(" 12345678 ")).toBeUndefined();
+});
 
 test("a public ESPN league is read with no cookie and set up on ESPN", async () => {
   const deps = hotTakeryAt(await operator(), 8);

@@ -205,6 +205,59 @@ test("a prefilled nickname that would read as another team's is left out", () =>
   ]);
 });
 
+test("a display name the personal-data warning would flag, such as ESPN's default one, is left out of the prefill", () => {
+  // In #110's live run, ESPNFAN plus ten digits made every draft warn of a
+  // long digit run in a lore.md the pundit never edited.
+  const league = {
+    platform: "espn" as const,
+    leagueId: "1",
+    name: "L",
+    season: "2026",
+    teams: 2,
+    warnings: [],
+    managers: [
+      { account: "espn:{A}", displayName: "ESPNFAN1234567890" },
+      { account: "espn:{B}", displayName: "jo" },
+    ],
+    teamList: [
+      {
+        id: "espn:1" as const,
+        name: "Gridiron Gang",
+        managers: [{ account: "espn:{A}", displayName: "ESPNFAN1234567890" }],
+      },
+      {
+        id: "espn:2" as const,
+        name: "Waiver Wire",
+        managers: [{ account: "espn:{B}", displayName: "jo" }],
+      },
+    ],
+  };
+  expect(proposedNicknames(league).map((t) => t.nicknames)).toEqual([
+    ["Gridiron Gang"],
+    ["Waiver Wire", "jo"],
+  ]);
+
+  // The warning reads the written line, where a birth word in one name and a
+  // date in the next read as a date of birth, though neither does alone.
+  const [gang, wire] = league.teamList;
+  if (!gang || !wire) throw new Error("two teams");
+  const together = {
+    ...league,
+    teamList: [
+      {
+        ...gang,
+        name: "Born Ballers",
+        managers: [{ account: "espn:{A}", displayName: "12/25 Crew" }],
+      },
+      wire,
+    ],
+  };
+  expect(proposedNicknames(together).map((t) => t.nicknames)).toEqual([
+    ["Born Ballers"],
+    ["Waiver Wire", "jo"],
+  ]);
+});
+
 test("answered lore is written with its type and nicknames, loads with no warnings and reaches a draft", async () => {
   const deps = atWeek(await operator(), 8);
   const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);

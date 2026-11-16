@@ -63,6 +63,7 @@ export {
   defaultWorkspaceFolder,
   ESPN_COOKIE_HELP,
   ESPN_LEAGUE_ID_PROMPT,
+  espnLeagueIdProblem,
   familyLeagueDefault,
   familyLeagueLowers,
   HANDLES_SKIPPED,

@@ -36,6 +36,7 @@ import {
   ESPN_COOKIE_HELP,
   ESPN_LEAGUE_ID_PROMPT,
   editsWorkspace,
+  espnLeagueIdProblem,
   espnWorkspaceLeague,
   FetchError,
   familyLeagueDefault,
@@ -471,7 +472,7 @@ async function askEspnLeague(
     const leagueId = answered(
       await text({
         message: ESPN_LEAGUE_ID_PROMPT,
-        validate: (v) => (v?.trim() ? undefined : "Enter the league ID."),
+        validate: (v) => espnLeagueIdProblem(v ?? ""),
       }),
     ).trim();
     await refuseLeagueSetUp(deps, { punditName, platform: "espn", leagueId });

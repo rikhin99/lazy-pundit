@@ -151,6 +151,21 @@ const PERSONAL_DATA: { kind: string; shape: RegExp }[] = [
 ];
 
 /**
+ * Whether the personal-data warning would flag this text, so setup can leave it
+ * out of a prefill rather than write a warning into lore.
+ */
+export function looksLikePersonalData(text: string): boolean {
+  return personalDataKinds(text).length > 0;
+}
+
+/** Each kind of personal data this text looks like it holds. */
+function personalDataKinds(text: string): string[] {
+  return PERSONAL_DATA.filter(({ shape }) => shape.test(text)).map(
+    ({ kind }) => kind,
+  );
+}
+
+/**
  * The personal-data warning for these lines, if any looks like it holds some.
  * A heading that is a section's own tag holds an ID, not personal data.
  */
@@ -159,9 +174,7 @@ function personalDataWarning(
 ): string | undefined {
   const found = lines.flatMap(({ text, at }) => {
     if (SECTION_TAG.test(HEADING.exec(text)?.[1] ?? "")) return [];
-    return PERSONAL_DATA.filter(({ shape }) => shape.test(text)).map(
-      ({ kind }) => `line ${at} (${kind})`,
-    );
+    return personalDataKinds(text).map((kind) => `line ${at} (${kind})`);
   });
   if (found.length === 0) return undefined;
   return `lore.md may hold personal data: ${found.join(", ")}. Lore is sent to the LLM provider and copied into each LLM transcript, so remove what shouldn't go there; \`lazy-pundit transcripts delete\` removes the copies.`;
