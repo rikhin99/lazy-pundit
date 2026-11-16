@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { checkAnthropicKey } from "../src/anthropic.ts";
 import { systemDeps } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { HOT_TAKERY_LEAGUE_URL } from "./support/espn.ts";
@@ -31,6 +32,18 @@ test("LAZY_PUNDIT_REPLAY_COOKIE makes a replayed ESPN league private to that coo
   expect((await ask({ Cookie: "espn_s2=AEB%2Fwrong" })).status).toBe(401);
   expect((await ask({ Cookie: "espn_s2=AEB%2Fright" })).status).toBe(200);
   // Other platforms' requests are replayed as before.
+  expect(
+    (await transport.request({ url: `${SLEEPER_API}/state/nfl` })).status,
+  ).toBe(404);
+});
+
+test("under LAZY_PUNDIT_REPLAY the key check sends nothing, and says so rather than naming an answer from Anthropic", async () => {
+  vi.stubEnv("LAZY_PUNDIT_REPLAY", `${HOT_TAKERY}/20251028T120000Z-a095861f`);
+  const { transport } = systemDeps();
+  expect(await checkAnthropicKey(transport, "sk-ant-k")).toEqual({
+    unreachable: "LAZY_PUNDIT_REPLAY is set, so nothing went to Anthropic",
+  });
+  // A request the replay didn't record still gets its 404.
   expect(
     (await transport.request({ url: `${SLEEPER_API}/state/nfl` })).status,
   ).toBe(404);

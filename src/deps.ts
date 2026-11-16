@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { anthropicLlm, type Llm } from "./anthropic.ts";
+import { ANTHROPIC_API, anthropicLlm, type Llm } from "./anthropic.ts";
 import { type Clipboard, noClipboard, systemClipboard } from "./clipboard.ts";
 import { type Clock, systemClock } from "./clock.ts";
 import { ESPN_API } from "./espn/api.ts";
@@ -66,6 +66,24 @@ function privateTo(cookie: string | undefined, replay: Transport): Transport {
 }
 
 /**
+ * A replay that sends nothing to Anthropic: a request to its API, which no
+ * snapshot records, fails saying so, so the key check's warning doesn't
+ * report the replay's 404 as Anthropic's answer.
+ */
+function withoutAnthropic(replay: Transport): Transport {
+  return {
+    request: (req) =>
+      req.url.startsWith(ANTHROPIC_API)
+        ? Promise.reject(
+            new Error(
+              "LAZY_PUNDIT_REPLAY is set, so nothing went to Anthropic",
+            ),
+          )
+        : replay.request(req),
+  };
+}
+
+/**
  * The real network, system time and system clipboard, with folders and
  * overrides read from the environment. This is the only place that reads
  * environment variables:
@@ -79,7 +97,8 @@ function privateTo(cookie: string | undefined, replay: Transport): Transport {
  *                          without one, so scripted runs don't overwrite it
  *   LAZY_PUNDIT_REPLAY     a snapshot's folder: every request replays it, not
  *                          the network, so scripted runs stay offline; one it
- *                          didn't record, such as the key check, gets a 404
+ *                          didn't record gets a 404, and the key check fails
+ *                          with a reason that says nothing went to Anthropic
  *   LAZY_PUNDIT_NOW        with LAZY_PUNDIT_REPLAY, an ISO time the clock
  *                          reads instead of the system's, so a scripted run
  *                          asks for the replay's season
@@ -93,11 +112,13 @@ export function systemDeps(): Deps {
   const http = httpTransport();
   return {
     transport: env.LAZY_PUNDIT_REPLAY
-      ? privateTo(
-          env.LAZY_PUNDIT_REPLAY_COOKIE,
-          fileTransport(
-            dirname(env.LAZY_PUNDIT_REPLAY),
-            basename(env.LAZY_PUNDIT_REPLAY),
+      ? withoutAnthropic(
+          privateTo(
+            env.LAZY_PUNDIT_REPLAY_COOKIE,
+            fileTransport(
+              dirname(env.LAZY_PUNDIT_REPLAY),
+              basename(env.LAZY_PUNDIT_REPLAY),
+            ),
           ),
         )
       : http,

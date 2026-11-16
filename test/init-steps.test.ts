@@ -634,9 +634,13 @@ test("a key is checked live: a rejected one is asked again, and one that can't b
   });
   expect(await checkKey(answering(200), "k")).toEqual({});
   expect((await checkKey(answering(401), "k")).problem).toMatch(/refused/);
-  const unreachable = await checkKey(answering(500), "k");
-  expect(unreachable.problem).toBeUndefined();
-  expect(unreachable.warning).toMatch(/couldn't check/);
+  for (const status of [404, 500]) {
+    const unreachable = await checkKey(answering(status), "k");
+    expect(unreachable.problem).toBeUndefined();
+    expect(unreachable.warning).toMatch(
+      `couldn't check it (Anthropic answered ${status})`,
+    );
+  }
 });
 
 test("a key check that never gets an answer gives up after its bounded wait: the key is kept with a warning, and the request is aborted", async () => {
