@@ -25,15 +25,43 @@ async function drafted(week: number, fields?: string, handles?: string[]) {
   return { ...ws, path: result.path };
 }
 
-function tabloidPath(dir: string, week: number): string {
+function stylePath(
+  dir: string,
+  week: number,
+  style: "tabloid" | "broadcast",
+): string {
   return join(
     rankingsDir(dir),
-    `week-${String(week).padStart(2, "0")}.tabloid.html`,
+    `week-${String(week).padStart(2, "0")}.${style}.html`,
   );
+}
+
+function tabloidPath(dir: string, week: number): string {
+  return stylePath(dir, week, "tabloid");
 }
 
 async function tabloid(dir: string, week: number): Promise<string> {
   return readFile(tabloidPath(dir, week), "utf8");
+}
+
+function broadcastPath(dir: string, week: number): string {
+  return stylePath(dir, week, "broadcast");
+}
+
+async function broadcast(dir: string, week: number): Promise<string> {
+  return readFile(broadcastPath(dir, week), "utf8");
+}
+
+/** Fails if `html` references anything outside itself, or shows a tag or tool-internal flag. */
+function expectSelfContained(html: string): void {
+  expect(html).toMatch(/^<!doctype html>/);
+  expect(html).toContain('name="viewport"');
+  expect(html).not.toMatch(/https?:|\/\/|url\(|@import|<script|<link|src=/i);
+  const text = textOf(html);
+  expect(text).not.toMatch(
+    /\{(ev|lore|stakes|log|team|intro)\b|\]\{|\[[^\]]*\]\{/,
+  );
+  expect(text).not.toMatch(/power score|small-sample|auto-tag|\{|\}/i);
 }
 
 /** The text a viewer reads in `html`, tags removed and entities decoded. */
@@ -50,9 +78,13 @@ function textOf(html: string): string {
     .trim();
 }
 
-/** The awards box's awards as label → what it says, in page order. */
-function awardsOn(html: string): [string, string][] {
-  const box = html.match(/<ul class="awards">([\s\S]*?)<\/ul>/)?.[1] ?? "";
+/**
+ * The awards as label → what it says, in page order: Tabloid's awards box,
+ * or Broadcast's award chips with `list` "chips".
+ */
+function awardsOn(html: string, list = "awards"): [string, string][] {
+  const box =
+    html.match(new RegExp(`<ul class="${list}">([\\s\\S]*?)</ul>`))?.[1] ?? "";
   return [...box.matchAll(/<li><b>(.*?)<\/b>(.*?)<\/li>/g)].map((m) => [
     textOf(m[1] ?? ""),
     textOf(m[2] ?? ""),
@@ -71,15 +103,12 @@ describe("the Tabloid style page", () => {
     const result = await published(ws.dir, ws.deps);
     const html = await tabloid(ws.dir, 10);
 
-    expect(result.stylePaths).toEqual([tabloidPath(ws.dir, 10)]);
-    expect(html).toMatch(/^<!doctype html>/);
-    expect(html).toContain('name="viewport"');
-    expect(html).not.toMatch(/https?:|\/\/|url\(|@import|<script|<link|src=/i);
+    expect(result.stylePaths).toEqual([
+      tabloidPath(ws.dir, 10),
+      broadcastPath(ws.dir, 10),
+    ]);
+    expectSelfContained(html);
     const text = textOf(html);
-    expect(text).not.toMatch(
-      /\{(ev|lore|stakes|log|team|intro)\b|\]\{|\[[^\]]*\]\{/,
-    );
-    expect(text).not.toMatch(/power score|small-sample|auto-tag|\{|\}/i);
     expect(text).toContain("after Week 10");
     expect(text).toMatch(/Stats: Sleeper · made with Lazy Pundit/);
     // Every team, in the draft's order, with its record.
@@ -287,5 +316,116 @@ ${highScore()}rivalry-weeks:
     });
     expect(result.published).toBe(false);
     expect(existsSync(tabloidPath(ws.dir, 10))).toBe(false);
+    expect(existsSync(broadcastPath(ws.dir, 10))).toBe(false);
+  });
+});
+
+describe("the Broadcast style page", () => {
+  test("publish writes week-NN.broadcast.html, with no external URL, tag or tool-internal flag", async () => {
+    const ws = await drafted(10);
+    await published(ws.dir, ws.deps);
+    const html = await broadcast(ws.dir, 10);
+
+    expectSelfContained(html);
+    const text = textOf(html);
+    expect(text).toContain("Power Rankings");
+    expect(text).toContain("after Week 10");
+    expect(text).toMatch(/Stats: Sleeper · made with Lazy Pundit/);
+    // Each row: its big place number, the team and its record.
+    expect(partOf(html, "row")).toMatch(/^1 Bench Mob 9-1\b/);
+    for (const name of ["Gus Bus", "Hail Mary Hustle"]) {
+      expect(text).toContain(name);
+    }
+  });
+
+  test("the award chips are the week's awards, as in Tabloid's awards box; one with no candidate is absent", async () => {
+    const ws = await drafted(10);
+    await published(ws.dir, ws.deps);
+    const chips = awardsOn(await broadcast(ws.dir, 10), "chips");
+    expect(chips[0]).toEqual(["Top score", "Wendy's Wire · 157.1"]);
+    expect(chips).toContainEqual(["Upset", "Hail Mary Hustle over Gus Bus"]);
+    expect(chips).toEqual(awardsOn(await tabloid(ws.dir, 10)));
+
+    const rules = await drafted(
+      8,
+      `house-rules:
+${highScore()}rivalry-weeks:
+  - week: 8
+    pairs: [[gus, pete]]
+`,
+      ["gus", "pete"],
+    );
+    await published(rules.dir, rules.deps);
+    const html = await broadcast(rules.dir, 8);
+    const week8 = awardsOn(html, "chips");
+    expect(week8).toContainEqual(["Weekly high score", "Gus Bus"]);
+    expect(week8).toContainEqual([
+      "Rivalry week",
+      "Gus Bus and Pylon Patrol, won by Gus Bus",
+    ]);
+    // Week 8 clinches no one: no chip, and no empty one.
+    expect(textOf(html)).not.toContain("Clinched");
+    expect(week8.every(([, says]) => says !== "")).toBe(true);
+  });
+
+  test("'The week' strip holds the whole intro and its correction note; each row has its blurb's first sentence", async () => {
+    const ws = await drafted(10);
+    const text = await readFile(ws.path, "utf8");
+    await writeFile(
+      ws.path,
+      text
+        .replace(
+          /## Intro \{intro\}\n[\s\S]*?\n(?=## )/,
+          "## Intro {intro}\n[Correction from week 7: Gus Bus beat Bench Mob after all]{ev=w7.correction}\nChaos at the top. Everyone else just watched.\n\n",
+        )
+        .replace(
+          /(## Bench Mob \{team=sleeper:3\}\n)[^\n]*\n/,
+          "$1Unstoppable again. They won by plenty.\n",
+        ),
+    );
+    // The made-up item is a hard problem, so publish anyway.
+    await publish(ws.dir, ws.deps, { yes: true });
+    const html = await broadcast(ws.dir, 10);
+    expect(partOf(html, "intro")).toBe(
+      "Chaos at the top. Everyone else just watched.",
+    );
+    expect(partOf(html, "correction")).toBe(
+      "Correction from week 7: Gus Bus beat Bench Mob after all",
+    );
+    expect(partOf(html, "week")).toMatch(/^The week /);
+    expect(partOf(html, "quote")).toBe("Unstoppable again.");
+    expect(textOf(html)).not.toContain("They won by plenty.");
+  });
+
+  test("with no LLM, or no intro, there's no 'The week' strip; each team's stat line shows whole", async () => {
+    const ws = await drafted(10);
+    await published(ws.dir, ws.deps);
+    const html = await broadcast(ws.dir, 10);
+    expect(partOf(html, "week")).toBeUndefined();
+    expect(textOf(html)).not.toContain("Week high:");
+    expect(partOf(html, "statline")).toBe(
+      "2nd in points · won 9 straight · beat Bye Bye Bea by 23.9 · Clinched a playoff spot",
+    );
+
+    const text = await readFile(ws.path, "utf8");
+    await writeFile(
+      ws.path,
+      text.replace(/## Intro \{intro\}\n[\s\S]*?\n(?=## )/, ""),
+    );
+    await published(ws.dir, ws.deps);
+    expect(partOf(await broadcast(ws.dir, 10), "week")).toBeUndefined();
+  });
+
+  test("movement is shown as in the text, with the same 'Movement since' line", async () => {
+    const ws = await drafted(8);
+    await published(ws.dir, ws.deps);
+    const deps = atWeek(ws.deps, 10);
+    await draft(ws.dir, deps);
+    const result = await published(ws.dir, deps);
+    const text = textOf(await broadcast(ws.dir, 10));
+    expect(text).toContain("Movement since week 8");
+    const marks = result.text.match(/\((▲\d+|▼\d+|—|new)\)/g) ?? [];
+    expect(marks.length).toBeGreaterThan(0);
+    for (const mark of marks) expect(text).toContain(mark);
   });
 });

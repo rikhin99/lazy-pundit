@@ -263,6 +263,7 @@ test("answering p at the prompt publishes anyway", async () => {
   expect(code).toBe(0);
   expect(stdout).toContain("Published week 8:");
   expect(stdout).toContain("week-08.tabloid.html");
+  expect(stdout).toContain("week-08.broadcast.html");
   expect(stdout).toContain(
     "Open a style page in a browser to screenshot it for the league chat.",
   );

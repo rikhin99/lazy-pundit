@@ -65,10 +65,10 @@ lazy-pundit table     # the Stats table: each team in the draft's order, its sta
                       # now edit week-NN.md: reorder the ## team sections, rewrite the intro and blurbs
 lazy-pundit check     # list the draft's problems and tag the claims it can check
 lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it to the clipboard,
-                      # and write the style page week-NN.tabloid.html
+                      # and write the style pages week-NN.tabloid.html and week-NN.broadcast.html
 ```
 
-Then paste into your league chat. If there's no clipboard, `publish` says so: open `week-NN.txt` and copy it from there. To share a picture instead, open `week-NN.tabloid.html` in a browser and screenshot it: the Tabloid style puts the intro as a headline, with the week's awards and a quote from each blurb.
+Then paste into your league chat. If there's no clipboard, `publish` says so: open `week-NN.txt` and copy it from there. To share a picture instead, open a style page in a browser and screenshot it. `week-NN.tabloid.html` is a newspaper front page: the intro as a headline, with the week's awards and a quote from each blurb. `week-NN.broadcast.html` is a sports-show graphic: "The week" strip, the awards as chips, and a row for each team with its place in big numbers.
 
 With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `draft` drafts the last scored week. Run while a week's matchups are still being played, it says a week is in progress and drafts the week before; `draft --include-in-progress` adds the in-progress week's stats as evidence, so claims about it are listed as provisional until the week is scored.
 
@@ -102,7 +102,7 @@ A hard problem (✗) would put something false in front of the league: fix it, a
 
 - `pundits/<you>/<season>/week-NN.md`: the week's draft. Edit it.
 - `lore.md`, `seasons/<season>/league.md` (stakes, house rules and the Log), `pundits/<you>/persona.md` and `pundits/<you>/settings.md` (the power-score method): what `init` asked. Change them with `lazy-pundit setup <step>`, which shows a diff before overwriting a hand edit, or edit them by hand.
-- Leave the rest alone: `workspace.md`, `.snapshots/` (the league data as fetched), `transcripts/`, and each `week-NN.published.md`, the frozen copy of a published week. `week-NN.txt` and `week-NN.tabloid.html` are written again on each publish, so an edit to them is lost: edit the draft and publish again.
+- Leave the rest alone: `workspace.md`, `.snapshots/` (the league data as fetched), `transcripts/`, and each `week-NN.published.md`, the frozen copy of a published week. `week-NN.txt`, `week-NN.tabloid.html` and `week-NN.broadcast.html` are written again on each publish, so an edit to them is lost: edit the draft and publish again.
 
 **Also:**
 

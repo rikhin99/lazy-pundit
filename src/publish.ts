@@ -22,7 +22,7 @@ import {
 } from "./ranking-file.ts";
 import { freshDataWarnings } from "./refresh.ts";
 import { houseRuleOutcomes, logRecord } from "./stakes.ts";
-import { renderTabloid } from "./style-pages.ts";
+import { renderBroadcast, renderTabloid } from "./style-pages.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -54,7 +54,7 @@ export type PublishResult =
       publishedPath: string;
       /** The plain text file. */
       textPath: string;
-      /** Each publish style's page: `week-NN.tabloid.html`. */
+      /** Each publish style's page: `week-NN.tabloid.html`, then `week-NN.broadcast.html`. */
       stylePaths: string[];
       /** The plain text, as written and copied. */
       text: string;
@@ -190,7 +190,10 @@ function stylePages(stem: string, checked: CheckedDraft): [string, string][] {
       ),
     },
   };
-  return [[`${stem}.tabloid.html`, renderTabloid(input)]];
+  return [
+    [`${stem}.tabloid.html`, renderTabloid(input)],
+    [`${stem}.broadcast.html`, renderBroadcast(input)],
+  ];
 }
 
 /**
