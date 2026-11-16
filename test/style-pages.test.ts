@@ -1,13 +1,14 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { draft, publish } from "../src/index.ts";
+import { draft, PublishWriteError, publish } from "../src/index.ts";
 import {
   atWeek,
   fearTheTurtle,
   highScore,
   linkHandles,
+  noClipboard,
   published,
   rankingsDir,
   writeLeagueFile,
@@ -292,12 +293,62 @@ ${highScore()}rivalry-weeks:
     }
   });
 
-  test("a style page that can't be written fails publish after the text is written and copied", async () => {
+  test("a style page that can't be written fails publish after the text is written and copied, saying what was done and the fix", async () => {
     const ws = await drafted(10);
     // A folder where the page goes makes its write fail.
     await mkdir(tabloidPath(ws.dir, 10));
-    await expect(publish(ws.dir, ws.deps)).rejects.toThrow();
+    const failed = publish(ws.dir, ws.deps);
+    await expect(failed).rejects.toThrow(PublishWriteError);
+    // An error instance makes toThrow compare the whole message.
+    await expect(failed).rejects.toThrow(
+      new PublishWriteError(
+        "Published week 10 as edition 1, wrote its text to pundits/rikhin/2025/week-10.txt and copied it to the clipboard, but couldn't write the Tabloid page to pundits/rikhin/2025/week-10.tabloid.html: it's a folder. The Broadcast page wasn't written either. Move or remove that folder, then run `lazy-pundit publish` again in the league's workspace; that publishes week 10 as edition 2.",
+      ),
+    );
     expect(existsSync(join(rankingsDir(ws.dir), "week-10.txt"))).toBe(true);
+    expect(ws.clipboard.copied).toHaveLength(1);
+  });
+
+  test("a Broadcast page that can't be written says the Tabloid page was written, and a clipboard that isn't there", async () => {
+    const ws = await drafted(10);
+    await mkdir(broadcastPath(ws.dir, 10));
+    await expect(
+      publish(ws.dir, { ...ws.deps, clipboard: noClipboard() }),
+    ).rejects.toThrow(
+      new PublishWriteError(
+        "Published week 10 as edition 1, wrote its text to pundits/rikhin/2025/week-10.txt (no clipboard found; paste from the .txt file) and the Tabloid page to pundits/rikhin/2025/week-10.tabloid.html, but couldn't write the Broadcast page to pundits/rikhin/2025/week-10.broadcast.html: it's a folder. Move or remove that folder, then run `lazy-pundit publish` again in the league's workspace; that publishes week 10 as edition 2.",
+      ),
+    );
+    expect(existsSync(tabloidPath(ws.dir, 10))).toBe(true);
+  });
+
+  test("a week-NN.txt that can't be written fails publish before the clipboard copy and the style pages", async () => {
+    const ws = await drafted(10);
+    await mkdir(join(rankingsDir(ws.dir), "week-10.txt"));
+    const failed = publish(ws.dir, ws.deps);
+    await expect(failed).rejects.toThrow(PublishWriteError);
+    await expect(failed).rejects.toThrow(
+      new PublishWriteError(
+        "Published week 10 as edition 1, but couldn't write its text to pundits/rikhin/2025/week-10.txt: it's a folder. The text wasn't copied, and no style page was written. Move or remove that folder, then run `lazy-pundit publish` again in the league's workspace; that publishes week 10 as edition 2.",
+      ),
+    );
+    expect(ws.clipboard.copied).toHaveLength(0);
+    expect(existsSync(tabloidPath(ws.dir, 10))).toBe(false);
+  });
+
+  test("publish run again once the way is cleared goes through as the next edition", async () => {
+    const ws = await drafted(10);
+    const blocked = join(rankingsDir(ws.dir), "week-10.txt");
+    await mkdir(blocked);
+    await expect(publish(ws.dir, ws.deps)).rejects.toThrow(PublishWriteError);
+    await rm(blocked, { recursive: true });
+    const result = await publish(ws.dir, ws.deps);
+    expect(result.published).toBe(true);
+    const frozen = await readFile(
+      join(rankingsDir(ws.dir), "week-10.published.md"),
+      "utf8",
+    );
+    expect(frozen).toMatch(/^edition: 2$/m);
     expect(ws.clipboard.copied).toHaveLength(1);
   });
 

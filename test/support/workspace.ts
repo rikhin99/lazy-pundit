@@ -52,6 +52,11 @@ export function recordingClipboard(): Clipboard & { copied: string[] } {
   };
 }
 
+/** A machine with no clipboard: nothing to copy to. */
+export function noClipboard(): Clipboard {
+  return { write: async () => false, find: async () => undefined };
+}
+
 export function fixedClock(iso: string): Clock {
   return { now: () => new Date(iso) };
 }

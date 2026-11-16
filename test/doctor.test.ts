@@ -14,7 +14,12 @@ import {
   HOT_TAKERY_LEAGUE_URL,
   hotTakeryAt,
 } from "./support/espn.ts";
-import { fearTheTurtle, fixedClock, operator } from "./support/workspace.ts";
+import {
+  fearTheTurtle,
+  fixedClock,
+  noClipboard,
+  operator,
+} from "./support/workspace.ts";
 
 /**
  * A transport that answers Anthropic's model list with `status`, and
@@ -340,7 +345,7 @@ test("an espn_s2 cookie 10 months old passes", async () => {
 
 test("no clipboard command is a warning, since publish still writes the text file", async () => {
   const { deps } = await setUp();
-  deps.clipboard = { write: async () => false, find: async () => undefined };
+  deps.clipboard = noClipboard();
 
   const { checks, ok } = await doctor(deps);
 

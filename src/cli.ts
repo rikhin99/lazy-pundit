@@ -65,6 +65,7 @@ import {
   PRESETS,
   type PresetName,
   type Problem,
+  PublishWriteError,
   payoutsOf,
   payoutsProblem,
   personaDefault,
@@ -1115,6 +1116,7 @@ try {
     err instanceof ConfigFileError ||
     err instanceof DraftExistsError ||
     err instanceof FetchError ||
+    err instanceof PublishWriteError ||
     err instanceof SetupRefusal ||
     err instanceof SetupCancelled
   ) {

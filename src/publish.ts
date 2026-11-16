@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { awards } from "./awards.ts";
 import {
@@ -138,17 +138,55 @@ export async function publish(
     publishedPath,
     frozenCopy(name, checked.text, record),
   );
+  // From here the week is published, so an output that can't be written ends
+  // on a message saying what was done and how to publish again.
+  const shown = (path: string) => relative(workspaceDir, path);
+  const unwritten = (failure: Omit<UnwrittenOutput, "week" | "edition">) =>
+    new PublishWriteError(
+      unwrittenMessage({ week, edition: record.edition, ...failure }),
+      { cause: failure.cause },
+    );
   const textPath = join(dir, `${stem}.txt`);
-  await writeOutput(textPath, text);
+  try {
+    await writeOutput(textPath, text);
+  } catch (cause) {
+    throw unwritten({
+      done: "",
+      what: "its text",
+      path: shown(textPath),
+      cause,
+      notDone: "The text wasn't copied, and no style page was written.",
+    });
+  }
   const copied = await deps.clipboard.write(text);
   // The text is in hand by now, so a page that can't be written doesn't
   // cost it.
-  const stylePaths: string[] = [];
-  for (const [file, html] of pages) {
+  const written: { style: string; path: string }[] = [];
+  for (const [i, [style, file, html]] of pages.entries()) {
     const path = join(dir, file);
-    await writeOutput(path, html);
-    stylePaths.push(path);
+    try {
+      await writeOutput(path, html);
+    } catch (cause) {
+      const clipboard = copied
+        ? " and copied it to the clipboard"
+        : " (no clipboard found; paste from the .txt file)";
+      const pagesDone = written.map(
+        (w) => ` and the ${w.style} page to ${shown(w.path)}`,
+      );
+      const notDone = pages
+        .slice(i + 1)
+        .map(([s]) => `The ${s} page wasn't written either.`);
+      throw unwritten({
+        done: `, wrote its text to ${shown(textPath)}${clipboard}${pagesDone.join("")}`,
+        what: `the ${style} page`,
+        path: shown(path),
+        cause,
+        notDone: notDone.join(" "),
+      });
+    }
+    written.push({ style, path });
   }
+  const stylePaths = written.map((w) => w.path);
 
   return {
     published: true,
@@ -169,7 +207,10 @@ export async function publish(
  * `week-NN.<style>.html`. The stat lines `draft` writes with no LLM come
  * along, so a page can tell prose from them.
  */
-function stylePages(stem: string, checked: CheckedDraft): [string, string][] {
+function stylePages(
+  stem: string,
+  checked: CheckedDraft,
+): [style: string, file: string, html: string][] {
   const { league, stakes, ranking } = checked;
   const generated = draftData(
     league,
@@ -191,9 +232,57 @@ function stylePages(stem: string, checked: CheckedDraft): [string, string][] {
     },
   };
   return [
-    [`${stem}.tabloid.html`, renderTabloid(input)],
-    [`${stem}.broadcast.html`, renderBroadcast(input)],
+    ["Tabloid", `${stem}.tabloid.html`, renderTabloid(input)],
+    ["Broadcast", `${stem}.broadcast.html`, renderBroadcast(input)],
   ];
+}
+
+/**
+ * `publish` couldn't write `week-NN.txt` or a style page after the frozen copy
+ * was written: the week is published, and the message says what else was done
+ * and how to publish it again.
+ */
+export class PublishWriteError extends Error {
+  override name = "PublishWriteError";
+}
+
+interface UnwrittenOutput {
+  week: number;
+  /** The edition just published. */
+  edition: number;
+  /** What was done besides the frozen copy, each part after ", ", or "". */
+  done: string;
+  /** The output that couldn't be written: "its text" or "the Tabloid page". */
+  what: string;
+  /** Its path, relative to the league workspace. */
+  path: string;
+  cause: unknown;
+  /** Sentences on what wasn't done because of it, or "". */
+  notDone: string;
+}
+
+function unwrittenMessage(u: UnwrittenOutput): string {
+  const notDone = u.notDone ? ` ${u.notDone}` : "";
+  const { why, fix } = unwritable(u.cause);
+  return `Published week ${u.week} as edition ${u.edition}${u.done}, but couldn't write ${u.what} to ${u.path}: ${why}.${notDone} ${fix}, then run \`lazy-pundit publish\` again in the league's workspace; that publishes week ${u.week} as edition ${u.edition + 1}.`;
+}
+
+/** Why a write failed, in words, from its error code, and what clears it. */
+function unwritable(err: unknown): { why: string; fix: string } {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === "EISDIR") {
+    return { why: "it's a folder", fix: "Move or remove that folder" };
+  }
+  if (code === "EACCES" || code === "EPERM") {
+    return {
+      why: "Lazy Pundit isn't allowed to write there",
+      fix: "Make the file and its folder writable",
+    };
+  }
+  return {
+    why: `the write failed (${code ?? String(err)})`,
+    fix: "Fix what stops a file being written at that path",
+  };
 }
 
 /**

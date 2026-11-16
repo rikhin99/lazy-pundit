@@ -152,7 +152,12 @@ export {
   powerScores,
   startingOrder,
 } from "./power-score.ts";
-export { type PublishOptions, type PublishResult, publish } from "./publish.ts";
+export {
+  type PublishOptions,
+  type PublishResult,
+  PublishWriteError,
+  publish,
+} from "./publish.ts";
 export {
   DEFAULT_SETTINGS,
   loadPunditSettings,
