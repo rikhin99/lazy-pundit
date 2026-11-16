@@ -336,6 +336,24 @@ ${highScore()}rivalry-weeks:
     expect(existsSync(tabloidPath(ws.dir, 10))).toBe(false);
   });
 
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "a read-only style page on a republish says it isn't allowed to write there, and to make it writable",
+    async () => {
+      const ws = await drafted(10);
+      await publish(ws.dir, ws.deps);
+      await chmod(broadcastPath(ws.dir, 10), 0o444);
+      try {
+        await expect(publish(ws.dir, ws.deps)).rejects.toThrow(
+          new PublishWriteError(
+            "Published week 10 as edition 2, wrote its text to pundits/rikhin/2025/week-10.txt and copied it to the clipboard and the Tabloid page to pundits/rikhin/2025/week-10.tabloid.html, but couldn't write the Broadcast page to pundits/rikhin/2025/week-10.broadcast.html: Lazy Pundit isn't allowed to write there. Make the file and its folder writable, then run `lazy-pundit publish` again in the league's workspace; that publishes week 10 as edition 3.",
+          ),
+        );
+      } finally {
+        await chmod(broadcastPath(ws.dir, 10), 0o644);
+      }
+    },
+  );
+
   // A folder at the frozen copy's path stops `checkDraft`'s read before any
   // write, so only a folder that can't be written to reaches this. Root and
   // Windows write past the mode bits.
