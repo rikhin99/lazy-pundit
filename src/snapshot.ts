@@ -255,6 +255,18 @@ export class SnapshotDamagedError extends Error {
   override name = "SnapshotDamagedError";
 }
 
+/**
+ * Why a snapshot behind a can't-compare item couldn't be read, from the error
+ * its read or normalizing threw: gone, damaged, or not readable by this version.
+ */
+export function unreadableSnapshotWhy(err: unknown): string {
+  return (err as NodeJS.ErrnoException).code === "ENOENT"
+    ? "it's missing from the snapshots folder"
+    : err instanceof SnapshotDamagedError
+      ? "it's damaged in the snapshots folder"
+      : `this version can't read it (${(err as Error).message})`;
+}
+
 /** Reads a snapshot's manifest. */
 export async function readManifest(
   snapshotsDir: string,

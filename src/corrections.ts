@@ -2,7 +2,7 @@ import { diff } from "./data-diff.ts";
 import type { League, Matchup, MatchupSide, TeamId } from "./league.ts";
 import { normalizeSnapshot } from "./normalize.ts";
 import { lastPublished } from "./ranking-file.ts";
-import { readSnapshot, SnapshotDamagedError } from "./snapshot.ts";
+import { readSnapshot, unreadableSnapshotWhy } from "./snapshot.ts";
 import { type Stakes, triggerWinnerChanges, winnersText } from "./stakes.ts";
 import { rankingsDir, snapshotsDir, type Workspace } from "./workspace.ts";
 
@@ -37,15 +37,9 @@ export async function corrections(
   try {
     old = normalizeSnapshot(await readSnapshot(snapshotsDir(ws), id));
   } catch (err) {
-    const why =
-      (err as NodeJS.ErrnoException).code === "ENOENT"
-        ? "it's missing from the snapshots folder"
-        : err instanceof SnapshotDamagedError
-          ? "it's damaged in the snapshots folder"
-          : `this version can't read it (${(err as Error).message})`;
     return {
       items: {},
-      cantCompare: `can't compare with \`${id}\`, the week ${last.week} ranking's snapshot: ${why}, so a drastic correction to week ${last.week} or earlier won't show`,
+      cantCompare: `can't compare with \`${id}\`, the week ${last.week} ranking's snapshot: ${unreadableSnapshotWhy(err)}, so a drastic correction to week ${last.week} or earlier won't show`,
     };
   }
 

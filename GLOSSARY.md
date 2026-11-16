@@ -457,7 +457,7 @@ A problems-list item about the whole league rather than a team or a line of the 
 A soft league item from a command whose fetch failed: what failed, the last complete snapshot's data as of, and the fix for what failed: `lazy-pundit refresh` once fetching works; checking `league_id` in `workspace.md` when the platform doesn't know the league; or checking for a newer Lazy Pundit when the platform answers in a shape this version can't read. Only the command that fetched lists it; `check` never does. With no last complete snapshot, the same fix ends the stopping error, except that running the command again once fetching works takes the place of `lazy-pundit refresh`, since there's no draft for it to move.
 
 **Can't-compare item**:
-A soft league item when the snapshot behind the latest published ranking is gone, damaged or no longer reads with this version: "can't compare with `<snapshot id>`", so drastic corrections to that ranking's weeks won't show. The draft carries on without them.
+A soft league item when a snapshot the check compares with is gone, damaged or no longer reads with this version: "can't compare with `<snapshot id>`". For the snapshot behind the latest published ranking, drastic corrections to that ranking's weeks won't show. For one of a draft's earlier snapshots, a claim true when written may read as wrong; there is one item per such snapshot. The check carries on without it.
 
 **Correction-timing reminder**:
 A soft league item on a draft of a scored week, since nothing signals when stat corrections stop: "Scored. Corrections may land through Thursday" on Sleeper.

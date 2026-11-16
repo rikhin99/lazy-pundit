@@ -65,6 +65,19 @@ const STALE_CLAIMS = [
 
 const body = (text: string) => text.slice(text.indexOf("\n---\n"));
 
+const GONE = "it's missing from the snapshots folder";
+
+/** The can't-compare item for an earlier snapshot `id` that can't be read. */
+const earlierCantCompare = (id: string, why: string) => ({
+  severity: "soft",
+  kind: "cant-compare",
+  team: null,
+  section: "League",
+  line: null,
+  text: "",
+  reason: `can't compare with \`${id}\`, an earlier snapshot of this draft: ${why}, so a claim true when written may read as wrong`,
+});
+
 async function drafted() {
   const ws = await onStandings(8);
   const { path } = await draft(ws.dir, ws.deps);
@@ -280,9 +293,10 @@ describe("refresh", () => {
     const gus = problems.find((p) => p.team === "sleeper:1" && p.text === "55");
     expect(gus).toMatchObject({ kind: "stale", cause: "refresh" });
     expect(problems.some((p) => p.kind === "wrong")).toBe(false);
+    expect(problems.filter((p) => p.kind === "cant-compare")).toEqual([]);
   });
 
-  test("with an earlier snapshot gone, a later check still runs on the draft's own", async () => {
+  test("with an earlier snapshot gone, a later check still runs on the draft's own and says why", async () => {
     const { dir, deps, read } = await drafted();
     const was = String(frontMatter(await read()).snapshot);
     await refresh(dir, later(deps, GUS_CORRECTED));
@@ -292,6 +306,59 @@ describe("refresh", () => {
 
     const gus = problems.find((p) => p.team === "sleeper:1" && p.text === "55");
     expect(gus).toMatchObject({ kind: "wrong" });
+    expect(problems).toContainEqual(earlierCantCompare(was, GONE));
+  });
+
+  test("a damaged earlier snapshot gives the can't-compare item", async () => {
+    const { dir, deps, read } = await drafted();
+    const was = String(frontMatter(await read()).snapshot);
+    await refresh(dir, later(deps, GUS_CORRECTED));
+    await writeFile(await deleteOwnBlob(dir, was), "not gzip");
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems).toContainEqual(
+      earlierCantCompare(was, "it's damaged in the snapshots folder"),
+    );
+  });
+
+  test("each earlier snapshot gone gives its own item, in the draft's order", async () => {
+    const { dir, deps, read } = await drafted();
+    await refresh(dir, later(deps, GUS_CORRECTED));
+    await refresh(dir, later(deps, { [WEEK_8]: statCorrection(1, 3) }));
+    const ids = (frontMatter(await read()).earlier_snapshots ?? []) as string[];
+    expect(ids).toHaveLength(2);
+    for (const id of ids) {
+      await rm(join(dir, ".snapshots", id), { recursive: true });
+    }
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems.filter((p) => p.kind === "cant-compare")).toEqual(
+      ids.map((id) => earlierCantCompare(id, GONE)),
+    );
+  });
+
+  test("with one of two earlier snapshots gone, a claim the other vouches for still reads stale", async () => {
+    const { dir, deps, read, edit } = await drafted();
+    const original = String(frontMatter(await read()).snapshot);
+    await refresh(dir, later(deps, GUS_CORRECTED));
+    const GUS = "## Gus Bus {team=sleeper:1}\n";
+    await edit((t) =>
+      t.replace(GUS, `${GUS}They won by [56.8]{ev=w8.margin} this week.\n`),
+    );
+    await refresh(dir, later(deps, { [WEEK_8]: statCorrection(1, 3) }));
+    await rm(join(dir, ".snapshots", original), { recursive: true });
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        kind: "stale",
+        cause: "refresh",
+        text: "56.8",
+      }),
+    );
   });
 
   test("a claim that was never true stays wrong after a refresh", async () => {

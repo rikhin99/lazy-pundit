@@ -36,6 +36,7 @@ import {
   readSnapshot,
   type Snapshot,
   SnapshotDamagedError,
+  unreadableSnapshotWhy,
 } from "./snapshot.ts";
 import {
   leagueFileChangeWarnings,
@@ -214,6 +215,7 @@ export async function checkDraft(
     (c) =>
       `${clashText(c)} in ${name}'s snapshot, so this check counts it for ${c.team} only. Remove it from ${c.section} to clear this; \`draft\`, and \`refresh\` onto changed data, stop on it while the platform has that name`,
   );
+  const earlier = await earlierEvidence(ws, ranking, stakes);
   const { problems, autoTags } = reviewProse({
     text: written,
     ranking,
@@ -221,10 +223,7 @@ export async function checkDraft(
     evidence,
     order,
     validatorNames: names,
-    before: {
-      order: startingOrder,
-      evidence: await earlierEvidence(ws, ranking, stakes),
-    },
+    before: { order: startingOrder, evidence: earlier.packs },
   });
   problems.push(
     ...movedTeams(ranking, order, startingOrder, teamNames(league)),
@@ -233,6 +232,7 @@ export async function checkDraft(
     ...(found.cantCompare
       ? [leagueItem("cant-compare", found.cantCompare)]
       : []),
+    ...earlier.cantCompare,
     ...uncarriedCorrections(found.items, written).map((reason) =>
       leagueItem("correction-missing", reason),
     ),
@@ -305,27 +305,34 @@ export function claimsGoingStale(
 /**
  * The evidence from a refreshed draft's earlier snapshots, newest first, so a
  * claim true when written reads as stale rather than wrong. A snapshot that's
- * gone or no longer normalizes never blocks a check: it's just left out, and a
- * claim that only it could vouch for reads as wrong.
+ * gone, damaged or no longer normalizes never blocks a check: it's left out,
+ * a claim that only it could vouch for reads as wrong, and its can't-compare
+ * item says why, in `earlier_snapshots` order.
  */
 async function earlierEvidence(
   ws: Workspace,
   ranking: RankingFile,
   stakes: Stakes,
-): Promise<EvidencePack[]> {
+): Promise<{ packs: EvidencePack[]; cantCompare: Problem[] }> {
   const packs: EvidencePack[] = [];
-  for (const id of (ranking.meta.earlier_snapshots ?? []).toReversed()) {
+  const cantCompare: Problem[] = [];
+  for (const id of ranking.meta.earlier_snapshots ?? []) {
+    let league: League;
     try {
-      const league = normalizeSnapshot(
-        await readSnapshot(snapshotsDir(ws), id),
+      league = normalizeSnapshot(await readSnapshot(snapshotsDir(ws), id));
+    } catch (err) {
+      cantCompare.push(
+        leagueItem(
+          "cant-compare",
+          `can't compare with \`${id}\`, an earlier snapshot of this draft: ${unreadableSnapshotWhy(err)}, so a claim true when written may read as wrong`,
+        ),
       );
-      const { week, in_progress_week } = ranking.meta;
-      packs.push(draftData(league, week, stakes, in_progress_week).evidence);
-    } catch {
-      // Left out, as above.
+      continue;
     }
+    const { week, in_progress_week } = ranking.meta;
+    packs.unshift(draftData(league, week, stakes, in_progress_week).evidence);
   }
-  return packs;
+  return { packs, cantCompare };
 }
 
 function teamNames(league: League): Map<string, string> {
