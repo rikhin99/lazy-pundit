@@ -1,5 +1,5 @@
 import type { TeamId } from "../league.ts";
-import { CLAUSE_BREAK, RESULT_VERBS } from "./extract.ts";
+import { CLAUSE_BREAK, LOSS_VERB, RESULT_VERBS } from "./extract.ts";
 import { normalize, wholeWords } from "./names.ts";
 import type { Ctx } from "./types.ts";
 
@@ -35,6 +35,12 @@ const OBJECT_BEFORE = new RegExp(
 
 /** Words meaning the section's team: "we", "they", "this team". */
 const PRONOUN = /\b(?:we|us|our|they|them|their|this team|the team)\b/gi;
+
+/**
+ * The pronouns of `PRONOUN` that, in the clause straight after a result,
+ * mean the team that lost instead.
+ */
+const BEATEN_PRONOUN = /^(?:them|their)$/;
 
 /** A clause about the team named just before it: "Bench Mob, who sit at 7-1". */
 const RELATIVE = /^\s*(?:who|which)\b/i;
@@ -98,6 +104,47 @@ function subjectOf(s: string, names: Named[], c: Clause): Named | undefined {
 }
 
 /**
+ * The team that lost a result between two teams in clause `c`: the object of
+ * a win ("Gus Bus beat Pete"), the subject of a loss ("Pete lost to Gus
+ * Bus"). Null when that's the section's team and the section has none;
+ * undefined when the clause holds no such result.
+ */
+function beatenIn(
+  s: string,
+  names: Named[],
+  c: Clause,
+): TeamId | null | undefined {
+  const subject = subjectOf(s, names, c);
+  if (!subject) return undefined;
+  for (const m of s.slice(c.from, c.to).matchAll(RESULT_VERBS)) {
+    const at = c.from + m.index + m[0].length;
+    const object = names.find((n) => n.start === at);
+    if (!object) continue;
+    const lost = LOSS_VERB.test((m[1] as string).toLowerCase());
+    return lost ? subject.team : object.team;
+  }
+  return undefined;
+}
+
+/**
+ * `names` with "them" or "their" as the team that lost, in the clause straight
+ * after a result between two teams ("Gus Bus beat Pete, handing them a third
+ * loss in a row"). A clause holding only space, as between ", and", is
+ * skipped. Only the claim's own clause reads these: a later clause carrying
+ * on the subject is the sentence's ("…, handing them a loss, and sits at 4-4").
+ */
+function withBeaten(s: string, names: Named[], cs: Clause[]): Named[] {
+  const said = cs.filter((c) => /\S/.test(s.slice(c.from, c.to)));
+  return names.map((n) => {
+    if (!BEATEN_PRONOUN.test(normalize(s.slice(n.start, n.end)))) return n;
+    const k = said.findLastIndex((c) => c.from <= n.start);
+    const before = said[k - 1];
+    const beaten = before && beatenIn(s, names, before);
+    return beaten === undefined ? n : { ...n, team: beaten };
+  });
+}
+
+/**
  * The claim's team for an untagged claim at `start` of sentence `s`: the
  * subject of the claim's clause. A claim in brackets or a "who" clause
  * straight after a name is that team's ("lost to Gus Bus (4-4)"); a phrase
@@ -113,16 +160,17 @@ export function claimsTeam(
 ): TeamId | null {
   const names = named(ctx, s, section);
   const cs = clauses(s);
+  const here = withBeaten(s, names, cs);
   const i = cs.findLastIndex((c) => c.from <= start);
   const c = cs[i] as Clause;
   const text = s.slice(c.from, c.to);
 
   if (c.opener === "(" || (c.opener === "," && RELATIVE.test(text))) {
     const before = s.slice(0, c.from - c.opener.length).trimEnd().length;
-    const prior = names.findLast((n) => n.end === before);
+    const prior = here.findLast((n) => n.end === before);
     if (prior) return prior.team;
   }
-  const own = subjectOf(s, names, c);
+  const own = subjectOf(s, here, c);
   if (own) return own.team;
   const next = cs[i + 1];
   if (i === 0 && next?.opener === "," && FRONTED.test(text)) {

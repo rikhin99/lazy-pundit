@@ -51,6 +51,9 @@ export const PLAIN_PROSE = [
   "At home, Bench Mob lead the way, with Pete behind them.",
   "Gus Bus beat us, and we know it.",
   "Nobody wants to be on the wrong end of Bench Mob, than whom nobody is hotter.",
+  // "them" or "their" straight after a result (#104)
+  "Gus Bus beat Pete, handing them plenty to think about.",
+  "Pete lost to Gus Bus, and their kicker took the blame.",
 ];
 
 /**
@@ -156,6 +159,41 @@ export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
     null,
     "Pylon Patrol lost to Gus Bus and sits at 3-5.",
     ["sleeper:6/w8.result", "sleeper:6/record"],
+  ],
+  [
+    1,
+    "Gus Bus beat Pete by 55, handing them a third loss in a row.",
+    ["w8.result", "w8.margin", "sleeper:6/streak"],
+  ],
+  [
+    1,
+    "Pete lost to Gus Bus by 55, leaving them at 3-5.",
+    ["sleeper:6/w8.result", "sleeper:6/w8.margin", "sleeper:6/record"],
+  ],
+  [
+    1,
+    "We beat Pete by 55, dropping their record to 3-5.",
+    ["w8.result", "w8.margin", "sleeper:6/record"],
+  ],
+  [
+    1,
+    "Gus Bus beat Pete by 55, and that leaves them at 3-5.",
+    ["w8.result", "w8.margin", "sleeper:6/record"],
+  ],
+  [
+    1,
+    "Gus Bus beat Pete by 55, and they sit at 4-4.",
+    ["w8.result", "w8.margin", "record"],
+  ],
+  [
+    1,
+    "Gus Bus beat Pete by 55, a big day, and that leaves them at 4-4.",
+    ["w8.result", "w8.margin", "record"],
+  ],
+  [
+    1,
+    "Gus Bus beat Pete by 55, handing them a loss, and sits at 4-4.",
+    ["w8.result", "w8.margin", "record"],
   ],
 ];
 

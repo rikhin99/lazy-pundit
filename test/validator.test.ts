@@ -341,6 +341,98 @@ describe("grounding prototype scenarios, pundit prose", () => {
       ["3-5", "verified", "record"],
     ]);
   });
+
+  test('a claim\'s team: "them" or "their" in the clause straight after a result is the team that lost', () => {
+    // Gus Bus (sleeper:1) is 4-4 on W1; Pylon Patrol (Pete, sleeper:6) is 3-5
+    // on L3.
+    const judged = (team: number, text: string, claim: string) =>
+      validate(blurb(team, text))
+        .claims.filter((c) => c.text === claim)
+        .map((c) => [c.text, c.status, c.reason]);
+    const streak = "third loss in a row";
+    const verified = [[streak, "verified", "streak is L3"]];
+    // In Gus Bus's section, Pylon Patrol's stat carries its team ID.
+    const pylons = [[streak, "verified", "sleeper:6/streak is L3"]];
+    expect(
+      judged(
+        1,
+        "Gus Bus beat Pete by 55, handing them a third loss in a row.",
+        streak,
+      ),
+    ).toEqual(pylons);
+    expect(
+      judged(
+        1,
+        "Pete lost to Gus Bus by 55, leaving them on a third loss in a row.",
+        streak,
+      ),
+    ).toEqual(pylons);
+    expect(
+      judged(
+        6,
+        "Gus Bus beat Pete by 55, handing them a third loss in a row.",
+        streak,
+      ),
+    ).toEqual(verified);
+    expect(
+      judged(
+        6,
+        "Pete lost to Gus Bus by 55, leaving them on a third loss in a row.",
+        streak,
+      ),
+    ).toEqual(verified);
+    expect(
+      judged(
+        6,
+        "Pete lost to Gus Bus, and they sit on a third loss in a row.",
+        streak,
+      ),
+    ).toEqual(verified);
+    // A claim there that fits only the winner is wrong, against the loser.
+    expect(
+      judged(
+        1,
+        "Gus Bus beat Pete by 55, handing them a first win in a row.",
+        "first win in a row",
+      ),
+    ).toEqual([["first win in a row", "wrong", "sleeper:6/streak is L3"]]);
+    const loserRecord = [
+      ["4-4", "wrong", "sleeper:6/record is 3-5, sleeper:6/allplay is 31-57"],
+    ];
+    expect(
+      judged(1, "Gus Bus beat Pete by 55, leaving them at 4-4.", "4-4"),
+    ).toEqual(loserRecord);
+    expect(
+      judged(
+        1,
+        "Gus Bus beat Pete by 55, dropping their record to 4-4.",
+        "4-4",
+      ),
+    ).toEqual(loserRecord);
+  });
+
+  test('a claim\'s team: "they" after a result, or "them" two clauses on, is still the section\'s team', () => {
+    const judged = (text: string, claim: string) =>
+      validate(blurb(1, text))
+        .claims.filter((c) => c.text === claim)
+        .map((c) => [c.text, c.status, c.id]);
+    expect(
+      judged("Gus Bus beat Pete by 55, and they sit at 4-4.", "4-4"),
+    ).toEqual([["4-4", "verified", "record"]]);
+    expect(
+      judged(
+        "Gus Bus beat Pete by 55, a big day, and that leaves them at 4-4.",
+        "4-4",
+      ),
+    ).toEqual([["4-4", "verified", "record"]]);
+    // A later clause naming no subject carries on the sentence's, not "them".
+    expect(
+      judged(
+        "Gus Bus beat Pete by 55, handing them a loss, and sits at 4-4.",
+        "4-4",
+      ),
+    ).toEqual([["4-4", "verified", "record"]]);
+  });
 });
 
 describe("grounding prototype scenarios, format B (tags stripped, prose matched)", () => {
