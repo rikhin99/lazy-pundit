@@ -27,6 +27,13 @@ const REFUSED: Record<string, object> = {
     tool_name: "Bash",
     tool_input: { command: "gh issue view 71 --comments" },
   },
+  "mutate-one.sh": {
+    tool_name: "Bash",
+    tool_input: {
+      command:
+        "npm run -s mutate -- f 'a' 'b' t; echo ===; npm run -s mutate -- f 'c' 'd' t",
+    },
+  },
   "commit-message-file.sh": {
     tool_name: "Bash",
     tool_input: {
@@ -138,6 +145,16 @@ describe("the repo's hooks", () => {
     ["gh issue view 66 2>&1 > /tmp/66.md && gh issue view 64 2>&1", 2],
   ])("ticket-brief.sh on %s exits %i", (command, status) => {
     expect(runHook("ticket-brief.sh", command).status).toBe(status);
+  });
+
+  // In #120 an `echo ===` between two mutate calls stopped the second.
+  test.each([
+    ["npm run -s mutate -- src/a.ts 'x' 'y' test/a.test.ts", 0],
+    ["npm run -s mutate -- f 'a' 'b' t && npm run mutate -- f 'c' 'd' t", 2],
+    ["for m in a b; do npm run -s mutate -- f $m t; done", 2],
+    ["npm run -s format && npx vitest run test/a.test.ts", 0],
+  ])("mutate-one.sh on %s exits %i", (command, status) => {
+    expect(runHook("mutate-one.sh", command).status).toBe(status);
   });
 
   // In #96 a tester's name turned up in issue edit history and main's history.

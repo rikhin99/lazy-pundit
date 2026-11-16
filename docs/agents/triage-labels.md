@@ -26,6 +26,8 @@ A message that tells the pundit what to run or edit, a note as much as an error:
 
 A criterion that asks for a test gives the expected value as a literal, as CODING_STANDARDS.md's Tests rule asks; a test that must fail when a list grows pins the list as a literal. In #97, "built from the list, or checked against it" led to an expectation built from `RERUN_STEPS`, the code under test, and the standards review asked for the literal.
 
+A criterion that finds generated text inside text the pundit may edit (a stat line, a tag) names an edit that still contains it, with words added at either end, and what that edit shows. In #120, "wherever it appears whole" was built as a substring match, and the spec review found "…Bench Mob and Alpha" showing as "and Alpha".
+
 A criterion for a warning names what clears it: undoing the change, republishing, or a later week. In #76 the brief said when the changed-outcome warning shows but not what ends it, and the spec review found that republishing left it showing, since outcomes were recorded only at draft time.
 
 An example output in a brief matches its criteria: work it out for the fixture week and keep one source for each value. A layout criterion, such as a row fitting on one line, names the narrowest width it holds at. In #94, the example header said "data through week 9" while the criteria said the ranking week (10), and "each row stays on one line" can't hold below about 69 columns.

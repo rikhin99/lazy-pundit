@@ -4,7 +4,10 @@
  * is framed in an iframe of the width asked for: a screenshot at 390px of the
  * page itself crops it, which looks like overflow.
  *
- *   npm run -s screenshot -- <page.html>... [--width 390] [--height 2000]
+ *   npm run -s screenshot -- <page.html>... [--width 390] [--height 2000] [--label <name>]
+ *
+ * `--label` puts its name in each PNG's (`week-10.tabloid.no-llm.390.png`),
+ * so a second run on the same pages, after an edit, keeps the first's.
  *
  * Needs Google Chrome; set CHROME to its binary if it isn't in the usual
  * place.
@@ -31,9 +34,17 @@ function option(name: string, fallback: number): number {
 }
 const width = option("--width", 390);
 const height = option("--height", 2000);
+const labelAt = args.indexOf("--label");
+const label = labelAt < 0 ? undefined : args[labelAt + 1];
+if (labelAt >= 0) {
+  if (!label || !/^[\w-]+$/.test(label)) {
+    stop("--label takes a name of letters, digits, - and _");
+  }
+  args.splice(labelAt, 2);
+}
 if (args.length === 0) {
   stop(
-    "usage: npm run -s screenshot -- <page.html>... [--width 390] [--height 2000]",
+    "usage: npm run -s screenshot -- <page.html>... [--width 390] [--height 2000] [--label <name>]",
   );
 }
 
@@ -56,7 +67,7 @@ try {
       frame,
       `<!doctype html><body style="margin:0"><iframe src="${pathToFileURL(page).href}" width="${width}" height="${height}" style="border:0;display:block"></iframe>`,
     );
-    const png = `${page.replace(/\.html$/, "")}.${width}.png`;
+    const png = `${page.replace(/\.html$/, "")}${label ? `.${label}` : ""}.${width}.png`;
     const run = spawnSync(
       chrome,
       [
