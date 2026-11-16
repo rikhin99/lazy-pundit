@@ -97,7 +97,7 @@ The seams, and the helpers each one uses:
   - `rankingsDir(dir)` finds the files.
   - `atWeek(deps, week)` replays a later week, to publish one week and draft the next in the same workspace.
   - `published(dir, deps)` publishes and fails the test if it's held back.
-  - `failingOn(deps, url)` fails the fetch on one request.
+  - `failingOn(deps, url, { params, answer })` fails the fetch on one request: the one for `url` with each of `params` (a week's ESPN box scores or transactions share one URL, told apart by `scoringPeriodId`), answered with `answer` (a status and body), or rejected as offline.
   - `newerSnapshot(dir, deps)` writes a week-10 snapshot nothing names, newer than a week-8 draft's, and `deleteOwnBlob(dir, id)` deletes a blob only that snapshot lists and gives its path, for a last complete snapshot that skips it.
   - `silentOn(transport, url?)` never answers it (or any request), and its `asked()` gives that request's `signal` once every other request is answered, for advancing fake timers past `PLATFORM_WAIT_MS`.
   - `withoutReminder(problems)` drops the correction-timing reminder every draft of a scored week carries, so a clean list reads `[]`.

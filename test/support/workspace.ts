@@ -16,6 +16,8 @@ import {
   readManifest,
   readSnapshot,
   type Transport,
+  type TransportRequest,
+  type TransportResponse,
 } from "../../src/index.ts";
 import { SLEEPER_API } from "../../src/sleeper/api.ts";
 import { listSnapshots } from "../../src/snapshot.ts";
@@ -154,15 +156,28 @@ export function silentOn(
   };
 }
 
-/** The same deps, whose fetch fails on the request for `url` alone. */
-export function failingOn(deps: Deps, url: string): Deps {
+/**
+ * The same deps, whose fetch fails on the request for `url` alone: one with
+ * every one of `params` too (a week's ESPN box scores share one URL, told
+ * apart by `scoringPeriodId`), answered with `answer`, or rejected as offline.
+ */
+export function failingOn(
+  deps: Deps,
+  url: string,
+  opts: { params?: Record<string, string>; answer?: TransportResponse } = {},
+): Deps {
+  const matches = (req: TransportRequest) =>
+    req.url === url &&
+    Object.entries(opts.params ?? {}).every(([k, v]) => req.params?.[k] === v);
   return {
     ...deps,
     transport: {
       request: (req) =>
-        req.url === url
-          ? Promise.reject(new Error("offline"))
-          : deps.transport.request(req),
+        !matches(req)
+          ? deps.transport.request(req)
+          : opts.answer
+            ? Promise.resolve(opts.answer)
+            : Promise.reject(new Error("offline")),
     },
   };
 }

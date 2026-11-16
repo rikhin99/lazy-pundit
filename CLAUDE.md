@@ -18,7 +18,7 @@ Before reading source files, read `docs/agents/module-map.md` (or grep it, for a
 
 ### Implementing a ticket
 
-Follow `docs/agents/ticket-workflow.md`: glossary before the first test, then build, sweep and measure.
+Follow `docs/agents/ticket-workflow.md`: glossary before the first test, then build; after the commit, sweep (step 3) before measuring (step 4).
 
 ### Releasing
 

@@ -7,7 +7,7 @@ import { readRaw, scrubEspnFixtures } from "../scripts/scrub-espn.ts";
 import { ESPN_VIEWS, espnLeagueUrl, espnViewUrl } from "../src/espn/api.ts";
 import { type Deps, fetchEspn, saveCredentials } from "../src/index.ts";
 import { HOT_TAKERY_ID, hotTakeryAt } from "./support/espn.ts";
-import { type Json, operator } from "./support/workspace.ts";
+import { failingOn, type Json, operator } from "./support/workspace.ts";
 
 const COOKIE = "AEB%2Fcapture-cookie";
 
@@ -300,7 +300,7 @@ test.each([
   {
     failure: "week 9's box scores answering 500",
     views: ESPN_VIEWS.boxscores,
-    week: "9",
+    params: { scoringPeriodId: "9" },
     answer: { status: 500, body: new Uint8Array() },
     message:
       "GET https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/<league ID>?view=mMatchupScore&view=mScoreboard&scoringPeriodId=9 returned 500. Nothing was written: run it again.",
@@ -308,7 +308,7 @@ test.each([
   {
     failure: "a schedule this version can't read",
     views: ESPN_VIEWS.schedule,
-    week: undefined,
+    params: {},
     answer: { status: 200, body: new TextEncoder().encode("{}") },
     message:
       "ESPN league <league ID> sent a schedule this version can't read. Nothing was written: the fetcher needs updating for ESPN's answer before a capture.",
@@ -318,15 +318,10 @@ test.each([
   async (c) => {
     const { deps } = await replay();
     const url = espnViewUrl(espnLeagueUrl("2025", HOT_TAKERY_ID), c.views);
-    const transport = deps.transport;
-    deps.transport = {
-      request: (req) =>
-        req.url === url && req.params?.scoringPeriodId === c.week
-          ? Promise.resolve(c.answer)
-          : transport.request(req),
-    };
 
-    const { rawDir, error } = await capture(deps);
+    const { rawDir, error } = await capture(
+      failingOn(deps, url, { params: c.params, answer: c.answer }),
+    );
 
     expect(error).toBeInstanceOf(CaptureError);
     expect((error as Error).message).toBe(c.message);
