@@ -82,9 +82,7 @@ set env(NO_COLOR) 1
 catch {unset env(FORCE_COLOR)}
 # A real espn_s2 is about 300 characters and an Anthropic key about 108, long
 # enough that a mask of one character each would wrap; the masked prompts
-# show only the count. Their answered line is matched without its "│  "
-# gutter: a pattern starting with "│" crashed expect (exit 138) in 6 of 10
-# key runs, on macOS's expect.
+# show only the count.
 set COOKIE "AEB%2F[string repeat r 294]"
 set KEY "sk-ant-api03-[string repeat x 95]"
 set espn [expr {[string match "espn*" $scenario]}]
@@ -173,6 +171,12 @@ proc finish {} {
 }
 
 proc need {prompt} {
+  # A pattern starting with the gutter crashed macOS's expect (exit 138, no
+  # EXIT line) in 6 of 10 runs in #114: match the text after "│  ".
+  if {[string match "│*" $prompt]} {
+    puts stderr "need: start the pattern after \"│  \"; one starting with │ crashes expect (exit 138)"
+    exit 2
+  }
   expect {
     -ex $prompt { after 300 }
     timeout { puts "\nTIMEOUT waiting for \"$prompt\""; exec kill -9 [exp_pid]; exit 9 }
