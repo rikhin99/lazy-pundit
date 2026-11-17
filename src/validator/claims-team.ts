@@ -126,15 +126,20 @@ function beatenIn(
   return undefined;
 }
 
+/** Whether clause `c` holds more than space, as the one between ", and" doesn't. */
+function hasWords(s: string, c: Clause): boolean {
+  return /\S/.test(s.slice(c.from, c.to));
+}
+
 /**
  * `names` with "them" or "their" as the team that lost, in the clause straight
  * after a result between two teams ("Gus Bus beat Pete, handing them a third
  * loss in a row"). A clause holding only space, as between ", and", is
- * skipped. Only the claim's own clause reads these: a later clause carrying
- * on the subject is the sentence's ("…, handing them a loss, and sits at 4-4").
+ * skipped. Only the claim's own clause reads these, and one opened by a bare
+ * "and" straight after it (see `claimsTeam`).
  */
 function withBeaten(s: string, names: Named[], cs: Clause[]): Named[] {
-  const said = cs.filter((c) => /\S/.test(s.slice(c.from, c.to)));
+  const said = cs.filter((c) => hasWords(s, c));
   return names.map((n) => {
     if (!BEATEN_PRONOUN.test(normalize(s.slice(n.start, n.end)))) return n;
     const k = said.findLastIndex((c) => c.from <= n.start);
@@ -150,7 +155,10 @@ function withBeaten(s: string, names: Named[], cs: Clause[]): Named[] {
  * straight after a name is that team's ("lost to Gus Bus (4-4)"); a phrase
  * put before its subject takes the next clause's ("At 7-1, Bench Mob lead");
  * a clause naming no subject carries on the one before it ("Pete lost to Gus
- * Bus and sits at 3-5"), and the sentence starts from the section's team.
+ * Bus and sits at 3-5"), and the sentence starts from the section's team. A
+ * clause opened by a bare "and" carries on "them" as the team that lost
+ * ("Bench Mob beat Sam, leaving them 4-4 and fifth"); one after ", and"
+ * carries on the sentence's subject ("…, handing them a loss, and sits at 4-4").
  */
 export function claimsTeam(
   ctx: Ctx,
@@ -177,8 +185,12 @@ export function claimsTeam(
     const later = subjectOf(s, names, next);
     if (later) return later.team;
   }
+  // ", and" leaves a clause of only space straight before, which names no one,
+  // so only a bare "and" reaches the clause holding "them".
+  const bareAnd = /^and$/i.test(c.opener);
   for (let j = i - 1; j >= 0; j--) {
-    const earlier = subjectOf(s, names, cs[j] as Clause);
+    const pool = bareAnd && j === i - 1 ? here : names;
+    const earlier = subjectOf(s, pool, cs[j] as Clause);
     if (earlier) return earlier.team;
   }
   return section;

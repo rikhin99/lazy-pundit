@@ -65,6 +65,8 @@ export const PLAIN_PROSE = [
   "Another weekly high score would be nice, and a weekly low would sting.",
   // a number before a house rule's words that isn't a count (#126)
   "Their week 3 high score still stands, and their first low score came early.",
+  // a bare "and" after the "them" clause of a result, with no claim (#128)
+  "Bench Mob beat Sam, leaving them stunned and out of answers.",
 ];
 
 /**
@@ -266,6 +268,32 @@ export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
     5,
     "Bench Mob posted a season-high 162.9 back in week 2.",
     ["sleeper:3/high"],
+  ],
+  // a bare "and" after the "them" clause carries on the team that lost; ", and" carries on the subject (#128)
+  [
+    3,
+    "Bench Mob beat Sam, leaving them 4-4 and fifth in the standings.",
+    ["w8.result", "sleeper:12/record", "sleeper:12/standing"],
+  ],
+  [
+    1,
+    "Gus Bus beat Pete by 55, leaving them 3-5 and 11th in the standings.",
+    ["w8.result", "w8.margin", "sleeper:6/record", "sleeper:6/standing"],
+  ],
+  [
+    3,
+    "Bench Mob are 7-1 after beating Sam, leaving them 4-4 and fifth in the standings.",
+    ["record", "w8.result", "sleeper:12/record", "sleeper:12/standing"],
+  ],
+  [
+    3,
+    "Bench Mob beat Sam, leaving them 4-4, and sit first in the standings.",
+    ["w8.result", "sleeper:12/record", "standing"],
+  ],
+  [
+    3,
+    "Bench Mob beat Sam, leaving them 4-4 and fifth in the standings (Bench Mob are 7-1).",
+    ["w8.result", "sleeper:12/record", "sleeper:12/standing", "record"],
   ],
 ];
 
