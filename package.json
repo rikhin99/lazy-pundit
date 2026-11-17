@@ -40,7 +40,8 @@
     "screenshot": "node scripts/screenshot.ts",
     "trace": "node scripts/trace-context.ts",
     "release": "node scripts/release.ts",
-    "install:smoke": "bash scripts/install-smoke.sh"
+    "install:smoke": "bash scripts/install-smoke.sh",
+    "claims:diff": "node scripts/claims-diff.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
