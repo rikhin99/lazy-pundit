@@ -58,6 +58,9 @@ export const PLAIN_PROSE = [
   "The second time this season they lost on a Monday, and the standings shrugged.",
   // a cue in the ordinal's clause but over 30 characters from it (#124)
   "They scored nothing for a quarter of the season before the second half woke up.",
+  // a result verb's "-ing" form with no team after it (#125)
+  "Handling the bye weeks was the real test, and nobody enjoys losing to a kicker.",
+  "After beating the odds all year, Bench Mob are taking down the decorations.",
 ];
 
 /**
@@ -210,6 +213,42 @@ export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
     2,
     "Wendy's Wire sit 8th in the standings (3rd in points) and lost to Frank's FAAB Fund.",
     ["standing", "pf_rank", "w8.result"],
+  ],
+  // a participle result names its opponent as an object, not a subject (#125)
+  [
+    3,
+    "Bench Mob are 7-1 and first in the standings after beating Sam by 2.71.",
+    ["record", "standing", "w8.result", "w8.margin"],
+  ],
+  [
+    12,
+    "Snap Judgement are 4-4 and fifth in the standings after losing to Bench Mob by 2.71.",
+    ["record", "standing", "w8.result", "w8.margin"],
+  ],
+  [
+    3,
+    "They sit in the standings after edging Sam by 2.71.",
+    ["w8.result", "w8.margin"],
+  ],
+  [
+    12,
+    "They sit in the standings after dropping one to Bench Mob by 2.71.",
+    ["w8.result", "w8.margin"],
+  ],
+  [
+    3,
+    "Bench Mob are 7-1 after beating Sam by 2.71 and sit first in the standings.",
+    ["record", "w8.result", "w8.margin", "standing"],
+  ],
+  [
+    12,
+    "Snap Judgement are 4-4 after losing to Bench Mob (7-1) and sit fifth in the standings.",
+    ["record", "w8.result", "sleeper:3/record", "standing"],
+  ],
+  [
+    3,
+    "After beating Sam by 2.71, Bench Mob sit first in the standings.",
+    ["w8.result", "w8.margin", "standing"],
   ],
 ];
 

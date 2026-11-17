@@ -7,6 +7,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 ### Fixed
 
 - `check` reads two ordinals in one sentence each against its own stat: in "Second in points and first in the standings", "first" is checked against the standings. Before, it took the points cue from the clause before it and was marked wrong.
+- `check` reads a result told with "-ing" ("after beating Team B", "after losing to Team B") as the section's team's result, as it reads "beat" and "lost to". Before, it found no result there and judged the clause's other claims, such as "first in the standings", against the opponent.
 
 ## 0.1.1
 

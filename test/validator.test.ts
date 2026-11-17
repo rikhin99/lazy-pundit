@@ -247,6 +247,45 @@ describe("grounding prototype scenarios, pundit prose", () => {
     ).toEqual([]);
   });
 
+  test.each([
+    [3, "beating Sam", "W"],
+    [3, "edging Sam", "W"],
+    [3, "crushing Sam", "W"],
+    [3, "smoking Sam", "W"],
+    [3, "taking down Sam", "W"],
+    [3, "squeaking past Sam", "W"],
+    [3, "handling Sam", "W"],
+    [3, "blowing out Sam", "W"],
+    [3, "outlasting Sam", "W"],
+    [12, "losing to Bench Mob", "L"],
+    [12, "falling to Bench Mob", "L"],
+    [12, "dropping one to Bench Mob", "L"],
+  ] as const)(
+    "a participle result reads as the section's team's, in section %s: \"%s\"",
+    (team, result, wl) => {
+      const r = validate(
+        blurb(team, `They sit in the standings after ${result} by 2.71.`),
+      );
+      expect(r.claims.map((c) => [c.text, c.status, c.id])).toEqual([
+        [result, "verified", "w8.result"],
+        ["2.71", "verified", "w8.margin"],
+      ]);
+      expect(r.claims[0]?.reason).toMatch(new RegExp(`^w8\\.result is ${wl} `));
+    },
+  );
+
+  test("a participle result the section's team didn't get is a hard problem", () => {
+    const r = validate(
+      blurb(
+        12,
+        "Snap Judgement are 4-4 and fifth in the standings after beating Bench Mob by 2.71.",
+      ),
+    );
+    const result = r.claims.find((c) => c.text === "beating Bench Mob");
+    expect(result?.status).toBe("wrong");
+    expect(isHard(result?.status ?? "verified")).toBe(true);
+  });
+
   test("a claim's team: the team a result is against doesn't lend its stats", () => {
     const judged = (text: string) =>
       validate(blurb(6, text)).claims.map((c) => [

@@ -146,9 +146,12 @@ function namedWeek(
   return best;
 }
 
+/** A result's verb, finite or "-ing" ("beat", "after beating"), before the opponent. */
 export const RESULT_VERBS =
-  /\b(beat|beats|edged|edges|crushed|crushes|smoked|smokes|took down|takes down|squeaked past|squeaks past|handled|handles|blew out|blows out|outlasted|outlasts|lost to|loses to|fell to|falls to|dropped one to|drops one to)\s+/gi;
-export const LOSS_VERB = /^(lost|loses|fell|falls|dropped|drops)/;
+  /\b(beat|beats|beating|edged|edges|edging|crushed|crushes|crushing|smoked|smokes|smoking|took down|takes down|taking down|squeaked past|squeaks past|squeaking past|handled|handles|handling|blew out|blows out|blowing out|outlasted|outlasts|outlasting|lost to|loses to|losing to|fell to|falls to|falling to|dropped one to|drops one to|dropping one to)\s+/gi;
+/** The `RESULT_VERBS` forms that mean a loss, finite or "-ing". */
+export const LOSS_VERB =
+  /^(lost|loses|losing|fell|falls|falling|dropped|drops|dropping)/;
 
 export const ORDINAL_CUES: [RegExp, (w: number) => string][] = [
   [/all[- ]play/, () => "allplay_rank"],
