@@ -10,6 +10,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 - `check` reads a result told with "-ing" ("after beating Team B", "after losing to Team B") as the section's team's result, as it reads "beat" and "lost to". Before, it found no result there and judged the clause's other claims, such as "first in the standings", against the opponent.
 - `check` reads a count before a house rule's name or its trigger's wording ("2 weekly high scores", "a third low score") as that rule's count, and tags it when it's right. Before, "weekly high" was read as the season high and the count was marked wrong against it. "Weekly high" and "weekly low" no longer mean the season's high or low.
 - `check` no longer reads one stat word for two numbers: in "They've allowed 924.43 while scoring 891.03 in total", "891.03" is checked against points for, not points against.
+- In a league with no house rule for it, `check` no longer marks a count like "2 high scores" or "3 low scores" wrong against the week's points or the season's high or low. It can't tell which stat such a count means, so it leaves it unchecked or loose.
 
 ## 0.1.1
 
