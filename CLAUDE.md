@@ -8,6 +8,10 @@ Issues live in GitHub Issues (`rikhin99/lazy-pundit`) via the `gh` CLI. See `doc
 
 Default five-label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), and the checks before writing a brief's acceptance criteria. See `docs/agents/triage-labels.md`.
 
+### Tester feedback
+
+`private/feedback.md` (gitignored) logs what testers and leaguemates said, by release. Read it when triaging or planning a release; add to it when the maintainer relays feedback. It holds real league names, so anything taken from it into an issue or commit uses placeholders.
+
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
