@@ -14,10 +14,13 @@ It's a snapshot folder: `blobs/` holds the gzip payloads named by SHA-256, and e
 | 7, 8 | Mid-season, and the week before |
 | 9, 10 | The first clinch (team `sleeper:3`, week 10), and the week before |
 | 14, 15 | The first playoff week, and the last regular-season week |
+| 17 | The final: every playoff game (weeks 15 to 17) in the winners bracket, its consolation games and the losers bracket |
 
-Each snapshot replays the season as of its week, fetched the Tuesday after it: the league is scored through that week, only weeks 1 to N are present, standings (W-L-T, points for and against) are rebuilt from those weeks, the brackets are seeded once the regular season is scored and show results only for rounds already played, and the season's champion is removed from the league metadata. Other roster fields (max points, waiver use, current players and injuries) are as they were at the end of the season.
+Each snapshot replays the season as of its week, fetched the Tuesday after it: the league is scored through that week, only weeks 1 to N are present, standings (W-L-T, points for and against) are rebuilt from those weeks, the brackets show results (and the teams a result feeds in) only for rounds already played, and the season's champion is removed from the league metadata. Other roster fields (max points, waiver use, current players and injuries) are as they were at the end of the season.
 
-Each snapshot also holds `players/nfl`, Sleeper's players file trimmed to the players its league names (rosters, matchups, transactions). It comes from the raw `players_nfl.json.gz`, fetched in October 2026, so positions, NFL teams and injuries are as of then, not 2025. The brackets are empty before week 14, where real Sleeper serves a projected bracket with `null` teams.
+Each snapshot also holds `players/nfl`, Sleeper's players file trimmed to the players its league names (rosters, matchups, transactions). It comes from the raw `players_nfl.json.gz`, fetched in October 2026, so positions, NFL teams and injuries are as of then, not 2025.
+
+Before the playoffs the brackets are projected, as real Sleeper serves them (the mid-season 2026 leagues on the `fixtures/raw` branch): every game, with `null` results and `null` teams where a result feeds them in. Real Sleeper projects from the current standings; here every week projects the final seeding, since nothing reads a bracket's teams before its round is played. So `losersBracket` is true from week 1.
 
 A snapshot ID ends with the start of its data hash, so the IDs change whenever the normalized model changes shape.
 

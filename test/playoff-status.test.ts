@@ -382,6 +382,26 @@ describe("knocked out of the playoffs", () => {
     expect(pack.league["wk.knocked_out"]).toBe("sleeper:5,sleeper:8");
   });
 
+  // Week 16 is round 2: Kim Possible Kicks (:7) beat Bench Mob (:3), Frank's
+  // FAAB Fund (:4) beat Bye Bye Bea (:11). Week 17 is the final: :4 beat :7.
+  // Consolation games (:5 v :8, then :3 v :11) knock no one out.
+  test("a later-round loser has knocked_out with its round, and week 17's wk.knocked_out lists only the final's loser", async () => {
+    const pack = draftData(await committed(17), 17).evidence;
+    const rounds = Object.fromEntries(
+      Object.entries(pack.teams)
+        .filter(([, t]) => t.knocked_out !== undefined)
+        .map(([id, t]) => [id, t.knocked_out]),
+    );
+    expect(rounds).toEqual({
+      "sleeper:5": 1,
+      "sleeper:8": 1,
+      "sleeper:3": 2,
+      "sleeper:11": 2,
+      "sleeper:7": 3,
+    });
+    expect(pack.league["wk.knocked_out"]).toBe("sleeper:7");
+  });
+
   /** Validates `text` in `team`'s section of `league`'s week, teams known by name. */
   const validateAt = (
     league: League,

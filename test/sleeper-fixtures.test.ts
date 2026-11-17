@@ -50,7 +50,7 @@ async function committedText(): Promise<string[]> {
 }
 
 describe("committed Sleeper fixtures (Fear The Turtle 2025)", () => {
-  test("hold a snapshot for each eval week and the week before it", async () => {
+  test("hold a snapshot for each eval week and the week before it, and the final", async () => {
     expect(Object.keys(await committedWeeks())).toEqual([
       "1",
       "7",
@@ -59,6 +59,7 @@ describe("committed Sleeper fixtures (Fear The Turtle 2025)", () => {
       "10",
       "14",
       "15",
+      "17",
     ]);
   });
 
@@ -82,16 +83,41 @@ describe("committed Sleeper fixtures (Fear The Turtle 2025)", () => {
     expect(week10.metadata).toMatchObject({
       latest_league_winner_roster_id: null,
     });
-    // After the regular season the bracket is seeded, with no results yet.
-    type Game = { r: number; m: number; t1?: number; t2?: number; w?: number };
-    expect(await payload("9", "/winners_bracket")).toEqual([]);
-    const seeded = (await payload("14", "/winners_bracket")) as Game[];
-    expect(seeded.find((g) => g.m === 1)).toMatchObject({ r: 1, t1: 5, t2: 7 });
-    expect(seeded.some((g) => g.w !== undefined)).toBe(false);
+    // Mid-season the bracket is projected, as Sleeper serves it: every game,
+    // results null, and null teams where a result feeds them in.
+    type Game = {
+      r: number;
+      m: number;
+      t1: number | null;
+      t2: number | null;
+      w: number | null;
+      l: number | null;
+    };
+    // Hand-read from the raw league_losers_bracket.json: m3 and m4 take a
+    // round-1 winner as t2, and m5 to m7 take both teams from results.
+    const projected = (await payload("9", "/losers_bracket")) as Game[];
+    expect(projected.map((g) => [g.m, g.r, g.t1, g.t2, g.w, g.l])).toEqual([
+      [1, 1, 10, 2, null, null],
+      [2, 1, 12, 1, null, null],
+      [3, 2, 6, null, null, null],
+      [4, 2, 9, null, null, null],
+      [5, 2, null, null, null, null],
+      [6, 3, null, null, null, null],
+      [7, 3, null, null, null, null],
+    ]);
+    expect(await payload("14", "/winners_bracket")).toEqual(
+      await payload("9", "/winners_bracket"),
+    );
+    // After round 1 its results are in, and the teams they feed in.
     const afterRound1 = (await payload("15", "/winners_bracket")) as Game[];
     expect(afterRound1.find((g) => g.m === 1)).toMatchObject({ w: 7 });
-    expect(afterRound1.find((g) => g.m === 3)).toMatchObject({ t1: 3, t2: 7 });
-    expect(afterRound1.find((g) => g.m === 3)?.w).toBeUndefined();
+    expect(afterRound1.find((g) => g.m === 3)).toMatchObject({
+      t1: 3,
+      t2: 7,
+      w: null,
+    });
+    const final = (await payload("17", "/winners_bracket")) as Game[];
+    expect(final.find((g) => g.m === 6)).toMatchObject({ t1: 7, t2: 4, w: 4 });
 
     const rosters15 = (await payload("15", "/rosters")) as typeof rosters10;
     expect(rosters15.find((r) => r.roster_id === 3)?.settings).toMatchObject({

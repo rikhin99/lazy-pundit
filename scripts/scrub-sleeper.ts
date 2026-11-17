@@ -33,8 +33,8 @@ import { gunzipSync } from "node:zlib";
 import { fetchSleeperSnapshot, type Transport } from "../src/index.ts";
 import { SLEEPER_API, SLEEPER_PLAYERS_URL } from "../src/sleeper/api.ts";
 
-/** Week 1, a mid-season week, the first clinch week, the first playoff week, and the week before each. */
-export const FEAR_THE_TURTLE_2025_WEEKS = [1, 7, 8, 9, 10, 14, 15];
+/** Week 1, a mid-season week, the first clinch week and the first playoff week, each with the week before, and the final. */
+export const FEAR_THE_TURTLE_2025_WEEKS = [1, 7, 8, 9, 10, 14, 15, 17];
 
 /** Tuesday after week 1 of the 2025 NFL season, noon UTC. */
 const FIRST_TUESDAY_2025 = Date.UTC(2025, 8, 9, 12);
@@ -343,13 +343,14 @@ function asOfWeek(raw: Raw, week: number): Map<string, Json> {
     };
   });
 
-  // Sleeper seeds the brackets once the regular season is scored. Results
-  // (and teams fed in by a result) appear only for rounds already played.
-  const roundsPlayed = week - playoffStart + 1;
+  // Before the playoffs Sleeper serves a projected bracket: every game, with
+  // null results and null teams where a result feeds them in. Here the
+  // projection is the final seeding, since nothing reads a bracket's teams
+  // before its round is played. Results (and teams fed in by a result)
+  // appear only for rounds already played.
+  const roundsPlayed = Math.max(0, week - playoffStart + 1);
   const bracket = (games: Obj[]): Obj[] =>
-    week < regularSeasonEnd
-      ? []
-      : games.map((g) => bracketAsOf(g, roundsPlayed));
+    games.map((g) => bracketAsOf(g, roundsPlayed));
 
   const base = `${SLEEPER_API}/league/${FAKE_LEAGUE_ID}`;
   const payloads = new Map<string, Json>([
@@ -385,13 +386,13 @@ function bracketAsOf(game: Obj, roundsPlayed: number): Obj {
   const round = Number(game.r);
   const out: Obj = { ...game };
   if (round > roundsPlayed) {
-    delete out.w;
-    delete out.l;
+    out.w = null;
+    out.l = null;
   }
   // A team fed in from the previous round is known once that round is played.
   if (round - 1 > roundsPlayed) {
-    if (game.t1_from) delete out.t1;
-    if (game.t2_from) delete out.t2;
+    if (game.t1_from) out.t1 = null;
+    if (game.t2_from) out.t2 = null;
   }
   return out;
 }

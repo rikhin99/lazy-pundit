@@ -13,7 +13,7 @@
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/losers_bracket",
       "params": {},
-      "sha256": "ee73c4d3d2a6d5772427b2687b4d3c4c13065100c57cfa585216851342a7edb9"
+      "sha256": "5d3849c65f6615fe42b30b664994254d82407ba3b6cefde1cbf5d9212e7d6e1e"
     },
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/matchups/1",
@@ -168,7 +168,7 @@
     {
       "url": "https://api.sleeper.app/v1/league/900000000000000001/winners_bracket",
       "params": {},
-      "sha256": "be35eb4f44760d7b780b648be13d34398e28de5ae1d399907cca49f45aabdff8"
+      "sha256": "74643da95262a922907dee70cffa95db11a574aac4a95560699bcc1b4845ad91"
     },
     {
       "url": "https://api.sleeper.app/v1/players/nfl",

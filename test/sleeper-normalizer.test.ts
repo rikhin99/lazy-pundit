@@ -1,18 +1,11 @@
-import { existsSync } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { scrubSleeperFixtures } from "../scripts/scrub-sleeper.ts";
 import {
   bestLineupPoints,
   isStarter,
   type League,
   type MatchupSide,
-  normalizeSleeper,
-  readSnapshot,
 } from "../src/index.ts";
-import { committed, FIXTURES, patched } from "./support/workspace.ts";
+import { committed, patched, WEEKS } from "./support/workspace.ts";
 
 /** Each matchup of a week as `kind round: team v team`, sorted. */
 function kinds(league: League, week: number): string[] {
@@ -190,58 +183,48 @@ describe("Sleeper playoff weeks", () => {
     expect(side(league, 15, "sleeper:4")?.tiebreak).toBeUndefined();
   });
 
-  const RAW = join(
-    FIXTURES,
-    "..",
-    "..",
-    "raw",
-    "sleeper",
-    "fear-the-turtle-2025",
-  );
-  test.skipIf(!existsSync(RAW))(
-    "every 2025 playoff game gets its bracket's kind (full raw fixtures, local only)",
-    async () => {
-      const dir = await mkdtemp(join(tmpdir(), "lazy-pundit-raw-"));
-      const ids = await scrubSleeperFixtures({
-        rawDir: RAW,
-        outDir: dir,
-        weeks: [17],
-      });
-      const league = normalizeSleeper(
-        await readSnapshot(dir, ids["17"] as string),
-      );
-      // Hand-read from league_winners_bracket.json and league_losers_bracket.json.
-      expect(kinds(league, 15)).toEqual([
-        "losers 1: 1 v 12",
-        "losers 1: 2 v 10",
-        "winners 1: 4 v 8",
-        "winners 1: 5 v 7",
-      ]);
-      expect(kinds(league, 16)).toEqual([
-        "consolation 2: 5 v 8",
-        "losers 2: 1 v 2",
-        "losers 2: 6 v 10",
-        "losers 2: 9 v 12",
-        "winners 2: 3 v 7",
-        "winners 2: 4 v 11",
-      ]);
-      expect(kinds(league, 17)).toEqual([
-        "consolation 3: 3 v 11",
-        "losers 3: 6 v 12",
-        "losers 3: 9 v 10",
-        "winners 3: 4 v 7",
-      ]);
-      // The final: team 4's 68 beat team 7's 59.11.
-      expect(side(league, 17, "sleeper:4")).toMatchObject({
-        score: 68,
-        result: "W",
-      });
-      expect(league.weeks.find((w) => w.week === 17)?.byes.sort()).toEqual([
-        "sleeper:1",
-        "sleeper:2",
-        "sleeper:5",
-        "sleeper:8",
-      ]);
+  test("every 2025 playoff game gets its bracket's kind and round (week 17, the final)", async () => {
+    const league = await committed(17);
+    // Hand-read from league_winners_bracket.json and league_losers_bracket.json.
+    expect(kinds(league, 15)).toEqual([
+      "losers 1: 1 v 12",
+      "losers 1: 2 v 10",
+      "winners 1: 4 v 8",
+      "winners 1: 5 v 7",
+    ]);
+    expect(kinds(league, 16)).toEqual([
+      "consolation 2: 5 v 8",
+      "losers 2: 1 v 2",
+      "losers 2: 6 v 10",
+      "losers 2: 9 v 12",
+      "winners 2: 3 v 7",
+      "winners 2: 4 v 11",
+    ]);
+    expect(kinds(league, 17)).toEqual([
+      "consolation 3: 3 v 11",
+      "losers 3: 6 v 12",
+      "losers 3: 9 v 10",
+      "winners 3: 4 v 7",
+    ]);
+    // The final: team 4's 68 beat team 7's 59.11.
+    expect(side(league, 17, "sleeper:4")).toMatchObject({
+      score: 68,
+      result: "W",
+    });
+    expect(league.weeks.find((w) => w.week === 17)?.byes.sort()).toEqual([
+      "sleeper:1",
+      "sleeper:2",
+      "sleeper:5",
+      "sleeper:8",
+    ]);
+  });
+
+  // Sleeper serves a projected bracket before the regular season is scored,
+  // so a losers bracket shows from week 1.
+  test.each(Object.keys(WEEKS))(
+    "the week %s snapshot has a losers bracket",
+    async (week) => {
+      expect((await committed(Number(week))).settings.losersBracket).toBe(true);
     },
   );
 });
