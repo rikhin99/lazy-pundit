@@ -556,6 +556,8 @@ function only(team: number | null, text: string, over = {}) {
   return r.claims.map((c) => [c.text, c.status, c.id]);
 }
 
+const UNMATCHED = "no stat in the evidence pack matches";
+
 describe("a house rule's count", () => {
   const HIGH = {
     id: "high-score",
@@ -634,6 +636,7 @@ describe("a house rule's count", () => {
       "Bench Mob posted a 162 weekly high score in week 2.",
       "Their first high score came in week 2.",
       "His second high score came back in week 4.",
+      "That's 2.0 high scores this season.",
     ]) {
       // a wrong untagged claim carries no id, so read its reason too
       const ruleClaims = judged(text).claims.filter(
@@ -676,6 +679,26 @@ describe("a house rule's count", () => {
       read(judged("A weekly high score of 162.9 for Bench Mob.")),
     ).not.toContainEqual(["162.9", "verified", "rule.high-score.count"]);
   });
+
+  // a wrong untagged claim carries no id, so read its reason
+  test.each([
+    ["That's 2 weekly high scores this season.", "2", "unchecked", UNMATCHED],
+    ["That's 2 high scores this season.", "2", "unchecked", UNMATCHED],
+    [
+      "They have 3 low scores this year.",
+      "3",
+      "loose",
+      "matches w8.margin is 2.71, w8.rank is 3, but the sentence doesn't say which stat",
+    ],
+  ])(
+    "with no rule reading it, a count before a trigger's wording takes no stat cue: %s",
+    (text, claim, status, reason) => {
+      const r = validate(blurb(3, text));
+      expect(r.claims.map((c) => [c.text, c.status, c.reason])).toEqual([
+        [claim, status, reason],
+      ]);
+    },
+  );
 
   test('"weekly high" never cues the season high, with or without rules', () => {
     for (const r of [

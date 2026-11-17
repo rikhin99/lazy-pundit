@@ -387,29 +387,53 @@ function rulePhrase(words: string): string {
 }
 
 /**
- * Each house rule's count: a whole number, number word, or "a"/"another" and
- * an ordinal straight before the rule's name or its trigger's wording ("2
- * weekly high scores", "a third high score"), as the rule's
- * `rule.<id>.count`. Wording two rules share reads either rule's count. A
- * week's number ("week 3 high score") or one past the ranking week ("a 162
- * high score") is no count.
+ * Each count straight before one of `words` in the lowercased `low`, as where
+ * it starts and its token: a whole number, number word, or "a"/"another" and
+ * an ordinal ("2 weekly high scores", "a third high score"). A week's number
+ * ("week 3 high score"), one past the ranking week ("a 162 high score") or a
+ * decimal ("a 162.9 high score", "2.0 high scores") is no count; a decimal is
+ * matched whole so its last digits aren't read as one.
+ */
+function countsBefore(
+  low: string,
+  words: string[],
+  week: number,
+): { start: number; token: string }[] {
+  const re = new RegExp(
+    `(?<![\\w.])(?:(\\d+(?:\\.\\d+)?|${NUMW})|(?<=\\b(?:a|another)\\s+)(${ORDW}))\\s+(?:(?:weekly|season)[- ]+)?(?:${words.map(rulePhrase).join("|")})\\b`,
+    "g",
+  );
+  return [...low.matchAll(re)]
+    .map((m) => ({ start: m.index, token: (m[1] ?? m[2]) as string }))
+    .filter(({ start, token }) => {
+      const weekNamed = /\b(?:week|wk|w)\s*$/.test(low.slice(0, start));
+      return !weekNamed && isCount(token, week);
+    });
+}
+
+/** A number a count can be: written whole, and no more than the weeks played. */
+function isCount(token: string, week: number): boolean {
+  return !token.includes(".") && (parseNum(token) as Num).n <= week;
+}
+
+/**
+ * Each house rule's count (`countsBefore` its name or its trigger's wording),
+ * as the rule's `rule.<id>.count`. Wording two rules share reads either
+ * rule's count.
  */
 function ruleCounts(ctx: Ctx, low: string): Found[] {
   const counts = new Map<number, { token: string; keys: string[] }>();
   for (const rule of ctx.input.houseRules ?? []) {
     const trigger = rule.trigger && TRIGGER_WORDS[rule.trigger];
-    const phrases = [rule.name, ...(trigger ? [trigger] : [])].map(rulePhrase);
-    const re = new RegExp(
-      `(?<![\\w.])(?:(\\d+|${NUMW})|(?<=\\b(?:a|another)\\s+)(${ORDW}))\\s+(?:(?:weekly|season)[- ]+)?(?:${phrases.join("|")})\\b`,
-      "g",
-    );
-    for (const m of low.matchAll(re)) {
-      const token = (m[1] ?? m[2]) as string;
-      const weekNamed = /\b(?:week|wk|w)\s*$/.test(low.slice(0, m.index));
-      if (weekNamed || (parseNum(token) as Num).n > ctx.evidence.week) continue;
-      const count = counts.get(m.index) ?? { token, keys: [] };
+    const words = [rule.name, ...(trigger ? [trigger] : [])];
+    for (const { start, token } of countsBefore(
+      low,
+      words,
+      ctx.evidence.week,
+    )) {
+      const count = counts.get(start) ?? { token, keys: [] };
       count.keys.push(`rule.${rule.id}.count`);
-      counts.set(m.index, count);
+      counts.set(start, count);
     }
   }
   return [...counts].map(([start, { token, keys }]) => ({
@@ -626,6 +650,13 @@ export function extract(ctx: Ctx, s: string): Found[] {
 
   // bare numbers, and "nearly two wins"
   const taken = new Set<number>();
+  // a count before a trigger's wording ("2 high scores") reads no cue: a
+  // league's rule reads it as the rule's count, else it's a cueless number
+  const triggerCounts = new Set(
+    countsBefore(low, Object.values(TRIGGER_WORDS), ctx.evidence.week).map(
+      (c) => c.start,
+    ),
+  );
   for (const m of s.matchAll(
     new RegExp(
       `(?<![\\w.#])(\\d[\\d,]*(?:\\.\\d+)?)(?![\\w.]*\\d)(?!\\s*(?:st|nd|rd|th)\\b)|\\b(${NUMW}) (wins|losses|points)\\b`,
@@ -640,9 +671,10 @@ export function extract(ctx: Ctx, s: string): Found[] {
     const tailStart = m.index + m[0].length;
     const week = weekAt(m.index, tailStart);
     const byMargin = /\bby\s*$/.test(before);
-    const cue = byMargin
-      ? null
-      : nearestCue(low, m.index, tailStart, week, taken);
+    const cue =
+      byMargin || triggerCounts.has(m.index)
+        ? null
+        : nearestCue(low, m.index, tailStart, week, taken);
     if (cue) taken.add(cue.at);
     let key = byMargin ? `w${week}.margin` : (cue?.key ?? null);
     const hedge = hedgeBefore(before);

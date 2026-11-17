@@ -65,6 +65,10 @@ export const PLAIN_PROSE = [
   "Another weekly high score would be nice, and a weekly low would sting.",
   // a number before a house rule's words that isn't a count (#126)
   "Their week 3 high score still stands, and their first low score came early.",
+  // a count before a trigger's wording, in a league with no rule to read it (#129)
+  "That's 2 weekly high scores this season.",
+  "That's 2 high scores this season.",
+  "They have 3 low scores this year.",
   // a bare "and" after the "them" clause of a result, with no claim (#128)
   "Bench Mob beat Sam, leaving them stunned and out of answers.",
 ];
@@ -98,6 +102,9 @@ export const TAGGED_PLAIN = [
  * Add a sentence whenever a change moves which team or week a claim reads.
  */
 export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
+  // a count before a trigger's wording takes no cue; a points value or "scores" as a verb still does
+  [3, "Their 162.9 high score still stands.", ["high"]],
+  [3, "Bench Mob scores 126.89 this week.", ["w8.points"]],
   [
     6,
     "Pete lost to Gus Bus by 55 and sits at 3-5.",
