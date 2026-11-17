@@ -10,4 +10,6 @@ A wrong untagged claim carries no `id`, so a test that a claim isn't read agains
 
 A claim phrase that reads data `blurb()` doesn't pass (house rules) runs `PLAIN_PROSE` again with that data, plus sentences where a number before the phrase isn't the claim (a week, a points value, a past ordinal). In #126 the corpus ran without rules, and the reviews found four misreads.
 
+A rule that widens which team or stat a claim reads adds to `TRUE_UNTAGGED` a sentence matching the new trigger where the old reading is still right. In #128 a bare "and" after "them" began reading the team that lost, and "leaving them 4-4 and sit first" turned wrong; only the spec review's probes found it.
+
 A change that fixes a reading `CUE_PAIRS_MISREAD` in `scripts/claims-diff-report.ts` lists turns `test/claims-diff-report.test.ts` red: take the sentence off that list.
