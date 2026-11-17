@@ -337,13 +337,14 @@ send "\r"
 
 need "Set up another"
 if {$scenario eq "another"} {
-  send "y"; after 200; send "\r"
+  # "y" alone answers a confirm: an Enter after it lands in the next prompt.
+  send "y"
   need "pundit name"
   send $CTRL_C
   finish
 }
 if {$scenario eq "again"} {
-  send "y"; after 200; send "\r"
+  send "y"
   need "pundit name"
   send "\r"
   need "Which platform"
@@ -387,7 +388,7 @@ if {$scenario eq "setup-stakes"} {
   send "\r"
   need "pays \$20, not the \$10 it paid at week 8"
   need "Overwrite"
-  send "y"; after 200; send "\r"
+  send "y"
   need "stakes set"
   finish
 }
