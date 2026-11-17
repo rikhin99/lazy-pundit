@@ -104,6 +104,25 @@ const NAMED_WEEK =
 export const CLAUSE_BREAK =
   /[,;:()—–]|\s-\s|\b(?:and|but|while|though|although|whereas)\b/gi;
 
+/** Where the clause holding `start`..`end` begins and ends in `s`. */
+function clauseAt(s: string, start: number, end: number): [number, number] {
+  let from = 0;
+  let to = s.length;
+  for (const m of s.matchAll(CLAUSE_BREAK)) {
+    if (m.index + m[0].length <= start) from = m.index + m[0].length;
+    else if (m.index >= end) {
+      to = m.index;
+      break;
+    }
+  }
+  return [from, to];
+}
+
+/** How far a match at `mStart`..`mEnd` sits from `start`..`end`: 0 when they overlap. */
+function gap(mStart: number, mEnd: number, start: number, end: number): number {
+  return mEnd <= start ? start - mEnd : mStart >= end ? mStart - end : 0;
+}
+
 /**
  * The week a claim at `start`..`end` reads: of the weeks named in the
  * claim's own clause, the nearest one, else the ranking week.
@@ -114,22 +133,11 @@ function namedWeek(
   end: number,
   rankingWeek: number,
 ): number {
-  let from = 0;
-  let to = s.length;
-  for (const m of s.matchAll(CLAUSE_BREAK)) {
-    if (m.index + m[0].length <= start) from = m.index + m[0].length;
-    else if (m.index >= end) {
-      to = m.index;
-      break;
-    }
-  }
-  const clause = s.slice(from, to);
+  const [from, to] = clauseAt(s, start, end);
   let best = rankingWeek;
   let bestDist = Number.POSITIVE_INFINITY;
-  for (const m of clause.matchAll(NAMED_WEEK)) {
-    const mStart = from + m.index;
-    const mEnd = mStart + m[0].length;
-    const d = mEnd <= start ? start - mEnd : mStart >= end ? mStart - end : 0;
+  for (const m of s.slice(from, to).matchAll(NAMED_WEEK)) {
+    const d = gap(from + m.index, from + m.index + m[0].length, start, end);
     if (d < bestDist) {
       bestDist = d;
       best = (m[1] ?? m[2]) ? Number(m[1] ?? m[2]) : rankingWeek;
@@ -181,6 +189,47 @@ export function ordinalKey(ctx: string, week: number): string | null {
   const c = ctx.toLowerCase();
   for (const [cue, key] of ORDINAL_CUES) if (cue.test(c)) return key(week);
   return null;
+}
+
+/** How far either side of an ordinal its cue can sit. */
+const ORDINAL_REACH = 30;
+
+/**
+ * The stat an ordinal at `start`..`end` of the lowercased `s` reads, from
+ * `ORDINAL_REACH` characters either side of it: the stat cue nearest it in its
+ * own clause, `ORDINAL_CUES` order breaking a tie, so "first" in "second in
+ * points and first in the standings" reads the standings. A ranking cue
+ * ("ranked", "spot") gives place only when the clause holds no stat cue, so
+ * "ranked 2nd in points" reads points. With no cue in its clause, the first
+ * cue in `ORDINAL_CUES` order, as `ordinalKey` reads them.
+ */
+function ordinalCueAt(
+  s: string,
+  start: number,
+  end: number,
+  week: number,
+): string | null {
+  const [clauseFrom, clauseTo] = clauseAt(s, start, end);
+  const from = Math.max(clauseFrom, start - ORDINAL_REACH);
+  const clause = s.slice(from, Math.min(clauseTo, end + ORDINAL_REACH));
+  let best: string | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const [cue, key] of ORDINAL_CUES) {
+    const k = key(week);
+    for (const m of clause.matchAll(new RegExp(cue.source, "g"))) {
+      const d = gap(from + m.index, from + m.index + m[0].length, start, end);
+      // a ranking cue counts only past every stat cue's reach
+      const rank = k === "place" ? d + 2 * ORDINAL_REACH : d;
+      if (rank < bestDist) {
+        bestDist = rank;
+        best = k;
+      }
+    }
+  }
+  const nearby =
+    s.slice(Math.max(0, start - ORDINAL_REACH), start) +
+    s.slice(end, end + ORDINAL_REACH);
+  return best ?? ordinalKey(nearby, week);
 }
 
 /**
@@ -446,8 +495,10 @@ export function extract(ctx: Ctx, s: string): Found[] {
     const before = low.slice(Math.max(0, m.index - 30), m.index);
     if (/^[- ](game|straight|consecutive|tier)/.test(after)) continue;
     const num = parseNum(word) as Num;
-    const key = ordinalKey(
-      before + after,
+    const key = ordinalCueAt(
+      low,
+      m.index,
+      m.index + word.length,
       weekAt(m.index, m.index + word.length),
     );
     const standingWords = /\bin\s*$/.test(before) || /^ place\b/.test(after);

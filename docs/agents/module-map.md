@@ -72,7 +72,7 @@ Read this before opening source files. It says which file owns what. Within a fi
 | `awards.ts` | The ranking week's awards from the evidence pack's `wk.*` league items and the house rules' names, each left out with no candidate | `awards` |
 | `validator.ts` | The validator's entry: claims, auto-tags, swears and, under `noStakes`, stakes mentions for one blurb | `validate`, `applyAutoTags`, `stripTags`, `isHard` |
 | `validator/types.ts` | Validator input/output and `EvidencePack`, `OrderEvidence` types | types |
-| `validator/extract.ts` (519) | Splitting text into units and finding claim shapes, each with the week it reads (the one its clause names, else the ranking week) | `units` |
+| `validator/extract.ts` (571) | Splitting text into units and finding claim shapes, each with the week it reads (the one its clause names, else the ranking week); an ordinal's stat is the cue nearest it in its own clause, a ranking cue only when the clause names no stat | `units` |
 | `validator/judge.ts` (330) | Deciding each claim's status and reason, an untagged claim from its claim's team's stats only | `judge` |
 | `validator/claims-team.ts` | The claim's team of an untagged claim: its clause's subject (a pronoun is the section's team, except "them" or "their" in the clause straight after a result between two teams, which is the team that lost), not a team a result is against or a preposition names; brackets or a "who" clause after a name, a fronted phrase, and a clause naming none carrying on the one before | `claimsTeam` |
 | `validator/evidence.ts` | Resolving an evidence ID; whether words agree with a fact | `resolve`, `agrees` |

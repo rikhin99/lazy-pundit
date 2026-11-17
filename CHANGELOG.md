@@ -2,6 +2,12 @@
 
 Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pundit#semver:^0` (with npm 12 or later, add `--allow-git=all`). Within 0.x, a release may change the files a workspace holds; its entry says how.
 
+## 0.1.2
+
+### Fixed
+
+- `check` reads two ordinals in one sentence each against its own stat: in "Second in points and first in the standings", "first" is checked against the standings. Before, it took the points cue from the clause before it and was marked wrong.
+
 ## 0.1.1
 
 ### Added

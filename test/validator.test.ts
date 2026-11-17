@@ -808,6 +808,61 @@ describe("ordinals split between a stat and place", () => {
     expect(only(2, text)).toEqual([[words, status, id]]);
   });
 
+  describe("two ordinals in one sentence each read the cue in their own clause", () => {
+    // Bench Mob: standing 1, here 2nd in points and 3rd in all-play
+    const ranks = (over: Record<string, number>) => {
+      const evidence = week8Evidence();
+      Object.assign(evidence.teams["sleeper:3"] as object, over);
+      return { evidence };
+    };
+    test.each([
+      [
+        "Second in points and first in the standings, nobody's touching the top spot.",
+        ["Second", "pf_rank"],
+        ["first", "standing"],
+      ],
+      [
+        "1st in the standings and 2nd in points.",
+        ["1st", "standing"],
+        ["2nd", "pf_rank"],
+      ],
+      [
+        "3rd in all-play but 1st in the standings.",
+        ["3rd", "allplay_rank"],
+        ["1st", "standing"],
+      ],
+    ])("%s", (text, a, b) => {
+      expect(only(3, text, ranks({ pf_rank: 2, allplay_rank: 3 }))).toEqual([
+        [a[0], "verified", a[1]],
+        [b[0], "verified", b[1]],
+      ]);
+    });
+
+    // a ranking cue ("ranked", "spot") picks place only when its clause names no stat
+    test.each([
+      ["Ranked 2nd in points.", [["2nd", "pf_rank"]]],
+      ["They're ranked 3rd in all-play.", [["3rd", "allplay_rank"]]],
+      [
+        "Ranked 2nd in points and first in the standings.",
+        [
+          ["2nd", "pf_rank"],
+          ["first", "standing"],
+        ],
+      ],
+      [
+        "Ranked 1st, and 2nd in points.",
+        [
+          ["1st", "place"],
+          ["2nd", "pf_rank"],
+        ],
+      ],
+    ])("%s", (text, want) => {
+      expect(only(3, text, ranks({ pf_rank: 2, allplay_rank: 3 }))).toEqual(
+        want.map(([words, id]) => [words, "verified", id]),
+      );
+    });
+  });
+
   test("an ordinal with no cue is a loose match at best", () => {
     expect(only(2, "Somehow 3rd.")).toEqual([["3rd", "loose", undefined]]);
   });

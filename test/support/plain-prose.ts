@@ -54,6 +54,10 @@ export const PLAIN_PROSE = [
   // "them" or "their" straight after a result (#104)
   "Gus Bus beat Pete, handing them plenty to think about.",
   "Pete lost to Gus Bus, and their kicker took the blame.",
+  // an ordinal whose clause has no cue, beside one that has (#124)
+  "The second time this season they lost on a Monday, and the standings shrugged.",
+  // a cue in the ordinal's clause but over 30 characters from it (#124)
+  "They scored nothing for a quarter of the season before the second half woke up.",
 ];
 
 /**
@@ -194,6 +198,18 @@ export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
     1,
     "Gus Bus beat Pete by 55, handing them a loss, and sits at 4-4.",
     ["w8.result", "w8.margin", "record"],
+  ],
+  // two ordinals in one sentence, each reading the cue in its own clause (#124)
+  [2, "3rd in points and 8th in the standings.", ["pf_rank", "standing"]],
+  [
+    2,
+    "Wendy's Wire are 3rd in all-play, and 8th in the standings.",
+    ["allplay_rank", "standing"],
+  ],
+  [
+    2,
+    "Wendy's Wire sit 8th in the standings (3rd in points) and lost to Frank's FAAB Fund.",
+    ["standing", "pf_rank", "w8.result"],
   ],
 ];
 
