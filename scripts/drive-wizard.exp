@@ -23,6 +23,8 @@
 #                   holds the cookie
 #   espn-retype     the private league with a wrong cookie pasted, rejected, then
 #                   "Type the league ID again", then Ctrl-C at the ID
+#   espn-env-cookie the private league with a wrong cookie in LAZY_PUNDIT_ESPN_S2,
+#                   which ends init with the rejection as the frame's closing line
 #   cancel          Ctrl-C at the first prompt
 #   cancel-folder   Ctrl-C at the folder prompt
 #   rename          rename the first handle to "gus", pick standings
@@ -50,13 +52,14 @@
 # prompt listens.
 
 # The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
-# setup does. drive-wizard-all.sh reads this line.
-set cancelled {bad-id espn-bad-id espn-retype cancel cancel-folder another again}
+# setup does, or with an error, which exits 1 too. drive-wizard-all.sh reads
+# this line.
+set cancelled {bad-id espn-bad-id espn-retype espn-env-cookie cancel cancel-folder another again}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id espn-private espn-retype cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|espn-bad-id|espn-private|espn-retype|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
+if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id espn-private espn-retype espn-env-cookie cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
+  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|espn-bad-id|espn-private|espn-retype|espn-env-cookie|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {
@@ -91,7 +94,7 @@ if {$espn} {
   # ESPN's URLs name the season, which setup takes from the clock.
   set env(LAZY_PUNDIT_NOW) "2025-10-28T15:00:00.000Z"
   catch {unset env(LAZY_PUNDIT_REPLAY_COOKIE)}
-  if {$scenario in {espn-private espn-retype}} {
+  if {$scenario in {espn-private espn-retype espn-env-cookie}} {
     set env(LAZY_PUNDIT_REPLAY_COOKIE) $COOKIE
   }
 } else {
@@ -99,6 +102,7 @@ if {$espn} {
 }
 catch {unset env(ANTHROPIC_API_KEY)}
 catch {unset env(LAZY_PUNDIT_ESPN_S2)}
+if {$scenario eq "espn-env-cookie"} { set env(LAZY_PUNDIT_ESPN_S2) "AEB%2Fwrong" }
 
 # A real width: a terminal of width 0 makes clack wrap one character per line.
 set stty_init "cols 120 rows 40"
@@ -131,6 +135,7 @@ array set writes {
   espn-bad-id nothing
   espn-private lazy-pundit/the-hot-takery-league-2-0
   espn-retype nothing
+  espn-env-cookie nothing
 }
 
 # espn-private's checks once init is done: credentials.yaml at 0600 holding
@@ -214,6 +219,11 @@ if {$espn} {
     finish
   }
   send "900000001\r"
+  if {$scenario eq "espn-env-cookie"} {
+    # The closing line, not a bare one: a run that leaves the frame open hits EOF here.
+    need "└  ESPN rejected the cookie in LAZY_PUNDIT_ESPN_S2"
+    finish
+  }
   if {$scenario in {espn-private espn-retype}} {
     need "is private"
     need "Next?"

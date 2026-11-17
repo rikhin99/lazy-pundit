@@ -4,6 +4,7 @@ import { createInterface } from "node:readline/promises";
 import { styleText } from "node:util";
 import { PasswordPrompt } from "@clack/core";
 import {
+  cancel,
   confirm,
   intro,
   isCancel,
@@ -398,6 +399,19 @@ class SetupCancelled extends Error {}
 
 /** Leagues this run of `init` has written, so a cancel says what it left. */
 let leaguesReady = 0;
+
+/** Whether the wizard's frame is open, so an error that ends it closes it. */
+let frameOpen = false;
+
+function openFrame(title: string): void {
+  intro(title);
+  frameOpen = true;
+}
+
+function closeFrame(message: string): void {
+  outro(message);
+  frameOpen = false;
+}
 
 /** A prompt's answer, or stops setup with nothing more written if the pundit cancels. */
 function answered<T>(answer: T): Exclude<T, symbol> {
@@ -969,7 +983,7 @@ program
       throw new SetupRefusal("init asks questions, so run it in a terminal.");
     }
     const deps = systemDeps();
-    intro("Lazy Pundit setup");
+    openFrame("Lazy Pundit setup");
     while (await setUpLeague(deps)) {
       const another = answered(
         await confirm({
@@ -979,7 +993,7 @@ program
       );
       if (!another) break;
     }
-    outro(
+    closeFrame(
       leaguesReady > 0
         ? "Run lazy-pundit setup in a workspace to see its setup checklist."
         : "Nothing was written.",
@@ -1021,7 +1035,7 @@ program
       );
     }
     const dir = await workspace(deps);
-    intro(`Lazy Pundit setup ${step}`);
+    openFrame(`Lazy Pundit setup ${step}`);
     const rerun = await askRerun(deps, dir, step);
     let confirmed: string[] = [];
     const { written, warnings } = await rerunStep(deps, dir, rerun, (edit) => {
@@ -1032,7 +1046,7 @@ program
     for (const warning of warnings) {
       if (!confirmed.includes(warning)) log.warn(warning);
     }
-    outro(written ? `${step} set.` : `${step} left as it was.`);
+    closeFrame(written ? `${step} set.` : `${step} left as it was.`);
   });
 
 /** One step's answers, asked as `init` asks them, with no Skip the rest. */
@@ -1151,7 +1165,12 @@ try {
     err instanceof SetupRefusal ||
     err instanceof SetupCancelled
   ) {
-    console.error(err.message);
+    // A cancel keeps its look: the cancelled prompt already ended the frame.
+    if (frameOpen && !(err instanceof SetupCancelled)) {
+      cancel(err.message, { output: process.stderr });
+    } else {
+      console.error(err.message);
+    }
     process.exitCode = 1;
   } else {
     throw err;
