@@ -27,6 +27,7 @@ Before the first test, read the case file in `docs/agents/workflow/` for each ca
 - A new `drive-wizard.exp` scenario, or a change to a wizard prompt (`cli.ts`) or a setup step (`init.ts`): `wizard.md`.
 - A change to a style page (`style-pages.ts`): `style-pages.md`.
 - A ticket that says to diagnose before choosing a fix: `diagnose.md`.
+- A change to `scripts/scrub-*.ts` or a committed fixture set: `fixtures.md`.
 - A change to a helper in `test/support/`, or one that adds something to every draft's output: `test-helpers.md`.
 - A change to `package.json`'s `bin`, `files`, `dependencies` or `scripts`, to `src/cli.ts`'s entry, or to `scripts/release.ts`: run `npm run -s install:smoke` (about 20s) before committing, since CI runs it only after the push and the pre-commit hook doesn't.
 
