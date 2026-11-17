@@ -176,8 +176,9 @@ export const NUMBER_CUES: [RegExp, (w: number) => string][] = [
     /\b(scored|scores|dropped|drops|put up|puts up|posted|posts|poured in|hung|lit up for)\b/,
     (w) => `w${w}.points`,
   ],
-  [/\bseason[- ]high\b|(?<!week[- ])\bhigh\b/, () => "high"],
-  [/\bseason[- ]low\b|(?<!week[- ])\blow\b/, () => "low"],
+  // "weekly high" and "week-high" are a week's, never the season's
+  [/\bseason[- ]high\b|(?<!\bweek(?:ly)?[- ])\bhigh\b/, () => "high"],
+  [/\bseason[- ]low\b|(?<!\bweek(?:ly)?[- ])\blow\b/, () => "low"],
   [/\bpoints for\b|\bon the season\b|\bseason total\b|\btotal\b/, () => "pf"],
   [FORM_CUE, () => "form3"],
   [/\baverag|\bper week\b|\bper game\b/, () => "ppg"],
@@ -235,36 +236,74 @@ function ordinalCueAt(
   return best ?? ordinalKey(nearby, week);
 }
 
+/** A number cue: the stat it reads, and where its words start in the sentence. */
+export interface Cue {
+  key: string;
+  at: number;
+}
+
+/** How far before a number its cue can sit, and how far after. */
+const CUE_BEFORE = 30;
+const CUE_AFTER = 25;
+
+/** Where a number's own clause ends, for its form cue. */
+const NUMBER_CLAUSE_END = /[;!?]|\.\s/;
+
 /**
- * The number cue closest to a number: the last one before it, else the first
- * after. An average cue gives way to a form cue in the number's clause.
+ * The number cue for the number at `start`..`end` of the lowercased `s`: the
+ * last one before it, else the first after. The cue before gives way to the
+ * first one after when another number sits between them, or when an earlier
+ * number took it (`taken` holds where each taken cue starts), so in "allowed
+ * 924.43 while scoring 891.03 in total" 891.03 reads points for. An average
+ * cue gives way to a form cue in the number's clause.
  */
 export function nearestCue(
-  before: string,
-  after: string,
+  s: string,
+  start: number,
+  end: number,
   week: number,
-): string | null {
-  let best: string | null = null;
-  let bestDist = Number.POSITIVE_INFINITY;
+  taken: ReadonlySet<number>,
+): Cue | null {
+  const from = Math.max(0, start - CUE_BEFORE);
+  const before = s.slice(from, start);
+  const after = s.slice(end, end + CUE_AFTER);
+  let cueBefore: Cue | null = null;
+  let cueBeforeEnd = Number.NEGATIVE_INFINITY;
+  let cueAfter: Cue | null = null;
   for (const [cue, key] of NUMBER_CUES) {
     for (const m of before.matchAll(new RegExp(cue.source, "g"))) {
-      const d = before.length - (m.index + m[0].length);
-      if (d < bestDist) {
-        bestDist = d;
-        best = key(week);
+      if (m.index + m[0].length > cueBeforeEnd) {
+        cueBeforeEnd = m.index + m[0].length;
+        cueBefore = { key: key(week), at: from + m.index };
       }
     }
-    // a cue after the number counts only when none comes before it
     const m = after.match(cue);
-    if (m && (m.index as number) + 1000 < bestDist) {
-      bestDist = (m.index as number) + 1000;
-      best = key(week);
+    if (m && (!cueAfter || end + (m.index as number) < cueAfter.at)) {
+      cueAfter = { key: key(week), at: end + (m.index as number) };
     }
   }
+  // a week's number ("in week 8") is no number between
+  const between = before
+    .slice(cueBeforeEnd)
+    .replace(/\b(?:week|wk|w)\s*\d+/g, "");
+  const cueSpent =
+    cueBefore !== null && (taken.has(cueBefore.at) || /\d/.test(between));
+  // with no cue after, the spent one still reads: "scored 120 in week 7, but 133.22"
+  const best = cueBefore && !(cueSpent && cueAfter) ? cueBefore : cueAfter;
+  if (best?.key !== "ppg") return best;
   // within the number's own clause
-  const clause = `${before.split(/[;!?]|\.\s/).at(-1)} ${after.split(/[;!?]|\.\s/)[0]}`;
-  if (best === "ppg" && FORM_CUE.test(clause)) return "form3";
-  return best;
+  const tail = before.split(NUMBER_CLAUSE_END).at(-1) as string;
+  const form =
+    [...tail.matchAll(new RegExp(FORM_CUE.source, "g"))]
+      .map((m) => start - tail.length + m.index)
+      .at(-1) ?? formAfter(after, end);
+  return form === undefined ? best : { key: "form3", at: form };
+}
+
+/** Where the first form cue in the number's clause after it starts. */
+function formAfter(after: string, end: number): number | undefined {
+  const m = (after.split(NUMBER_CLAUSE_END)[0] as string).match(FORM_CUE);
+  return m ? end + (m.index as number) : undefined;
 }
 
 export function groupsOf(ctx: Ctx): string[] {
@@ -326,9 +365,65 @@ export function playoffWant(words: string): PlayoffWant | undefined {
   return PLAYOFFS.find(([re]) => words.search(re) >= 0)?.[1];
 }
 
+/**
+ * Each trigger kind's wording as a noun a count can sit before ("2 high
+ * scores"). A rule whose trigger has none here is read by its name alone.
+ */
+export const TRIGGER_WORDS: Record<string, string> = {
+  "high-score": "high score",
+  "low-score": "low score",
+  "last-place": "last-place finish",
+  champion: "championship",
+};
+
+/** A rule's name or trigger wording as a pattern, singular or plural. */
+function rulePhrase(words: string): string {
+  const parts = words
+    .trim()
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return `${parts.join("[- ]+")}(?:e?s)?`;
+}
+
+/**
+ * Each house rule's count: a whole number, number word, or "a"/"another" and
+ * an ordinal straight before the rule's name or its trigger's wording ("2
+ * weekly high scores", "a third high score"), as the rule's
+ * `rule.<id>.count`. Wording two rules share reads either rule's count. A
+ * week's number ("week 3 high score") or one past the ranking week ("a 162
+ * high score") is no count.
+ */
+function ruleCounts(ctx: Ctx, low: string): Found[] {
+  const counts = new Map<number, { token: string; keys: string[] }>();
+  for (const rule of ctx.input.houseRules ?? []) {
+    const trigger = rule.trigger && TRIGGER_WORDS[rule.trigger];
+    const phrases = [rule.name, ...(trigger ? [trigger] : [])].map(rulePhrase);
+    const re = new RegExp(
+      `(?<![\\w.])(?:(\\d+|${NUMW})|(?<=\\b(?:a|another)\\s+)(${ORDW}))\\s+(?:(?:weekly|season)[- ]+)?(?:${phrases.join("|")})\\b`,
+      "g",
+    );
+    for (const m of low.matchAll(re)) {
+      const token = (m[1] ?? m[2]) as string;
+      const weekNamed = /\b(?:week|wk|w)\s*$/.test(low.slice(0, m.index));
+      if (weekNamed || (parseNum(token) as Num).n > ctx.evidence.week) continue;
+      const count = counts.get(m.index) ?? { token, keys: [] };
+      count.keys.push(`rule.${rule.id}.count`);
+      counts.set(m.index, count);
+    }
+  }
+  return [...counts].map(([start, { token, keys }]) => ({
+    start,
+    end: start + token.length,
+    shape: { type: "stat", keys, num: parseNum(token) as Num },
+    week: ctx.evidence.week,
+  }));
+}
+
 export function extract(ctx: Ctx, s: string): Found[] {
-  const out: Found[] = [];
   const low = s.toLowerCase();
+  // first, so a count wins over the bare number or ordinal at its place
+  const out: Found[] = ruleCounts(ctx, low);
   const weekAt = (start: number, end: number) =>
     namedWeek(s, start, end, ctx.evidence.week);
   const add = (
@@ -530,6 +625,7 @@ export function extract(ctx: Ctx, s: string): Found[] {
   }
 
   // bare numbers, and "nearly two wins"
+  const taken = new Set<number>();
   for (const m of s.matchAll(
     new RegExp(
       `(?<![\\w.#])(\\d[\\d,]*(?:\\.\\d+)?)(?![\\w.]*\\d)(?!\\s*(?:st|nd|rd|th)\\b)|\\b(${NUMW}) (wins|losses|points)\\b`,
@@ -543,9 +639,12 @@ export function extract(ctx: Ctx, s: string): Found[] {
     const num = parseNum(token) as Num;
     const tailStart = m.index + m[0].length;
     const week = weekAt(m.index, tailStart);
-    let key = /\bby\s*$/.test(before)
-      ? `w${week}.margin`
-      : nearestCue(before, low.slice(tailStart, tailStart + 25), week);
+    const byMargin = /\bby\s*$/.test(before);
+    const cue = byMargin
+      ? null
+      : nearestCue(low, m.index, tailStart, week, taken);
+    if (cue) taken.add(cue.at);
+    let key = byMargin ? `w${week}.margin` : (cue?.key ?? null);
     const hedge = hedgeBefore(before);
     // "nearly two wins" with no other cue is wins above or below expectation
     if (m[2] && !key && hedge) key = "luck";

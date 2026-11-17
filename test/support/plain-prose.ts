@@ -61,6 +61,10 @@ export const PLAIN_PROSE = [
   // a result verb's "-ing" form with no team after it (#125)
   "Handling the bye weeks was the real test, and nobody enjoys losing to a kicker.",
   "After beating the odds all year, Bench Mob are taking down the decorations.",
+  // a house rule's words with no count before them, in a league with no rules (#126)
+  "Another weekly high score would be nice, and a weekly low would sting.",
+  // a number before a house rule's words that isn't a count (#126)
+  "Their week 3 high score still stands, and their first low score came early.",
 ];
 
 /**
@@ -249,6 +253,19 @@ export const TRUE_UNTAGGED: [number | null, string, (string | null)[]][] = [
     3,
     "After beating Sam by 2.71, Bench Mob sit first in the standings.",
     ["w8.result", "w8.margin", "standing"],
+  ],
+  // a cue is never reused across numbers, and a week's number isn't one (#126)
+  [
+    5,
+    "They scored 110.08 this week and 891.03 on the season.",
+    ["w8.points", "pf"],
+  ],
+  [5, "They scored in week 8: 110.08.", ["w8.points"]],
+  [5, "Lost by 19.95, scoring 891.03 on the season.", ["w8.margin", "pf"]],
+  [
+    5,
+    "Bench Mob posted a season-high 162.9 back in week 2.",
+    ["sleeper:3/high"],
   ],
 ];
 

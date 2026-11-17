@@ -7,13 +7,20 @@ import {
   type ValidationResult,
   validate,
 } from "../src/index.ts";
+import { TRIGGER_KINDS } from "../src/stakes.ts";
+import { TRIGGER_WORDS } from "../src/validator/extract.ts";
 import {
   CLAIM_HEAVY,
   PLAIN_PROSE,
   TAGGED_PLAIN,
   TRUE_UNTAGGED,
 } from "./support/plain-prose.ts";
-import { blurb, corrected, week8Evidence } from "./support/week8-evidence.ts";
+import {
+  blurb,
+  corrected,
+  id,
+  week8Evidence,
+} from "./support/week8-evidence.ts";
 
 /** What the pundit sees per claim: its text and status. */
 function statuses(r: ValidationResult): [string, string][] {
@@ -548,6 +555,140 @@ function only(team: number | null, text: string, over = {}) {
   const r = validate(blurb(team, text, over));
   return r.claims.map((c) => [c.text, c.status, c.id]);
 }
+
+describe("a house rule's count", () => {
+  const HIGH = {
+    id: "high-score",
+    name: "Weekly high score",
+    trigger: "high-score",
+  };
+  const LOW = {
+    id: "low-score",
+    name: "Weekly low score",
+    trigger: "low-score",
+  };
+
+  /**
+   * Team 3's blurb in a league with `rules`. The week-8 pack holds no house
+   * rules, so the counts are set here: Bench Mob (season high 162.9) has 2
+   * weekly high scores, 1 weekly low score and 0 moon shots.
+   */
+  const judged = (text: string, rules = [HIGH]) => {
+    const evidence = week8Evidence();
+    Object.assign(evidence.teams[id(3)] as object, {
+      "rule.high-score.count": 2,
+      "rule.low-score.count": 1,
+      "rule.moon-shot.count": 0,
+    });
+    return validate(blurb(3, text, { evidence, houseRules: rules }));
+  };
+  const read = (r: ValidationResult) =>
+    r.claims.map((c) => [c.text, c.status, c.id ?? null]);
+
+  test("a count before the rule's name is that rule's count, and auto-tagged", () => {
+    const r = judged("That's 2 weekly high scores this season.");
+    expect(read(r)).toEqual([["2", "verified", "rule.high-score.count"]]);
+    expect(r.autoTags).toEqual([
+      { start: 7, end: 8, id: "rule.high-score.count" },
+    ]);
+  });
+
+  test("a wrong count is a hard problem against the rule's count", () => {
+    const r = judged("That's 3 weekly high scores this season.");
+    expect(r.claims.map((c) => [c.text, c.status, c.reason])).toEqual([
+      ["3", "wrong", "rule.high-score.count is 2"],
+    ]);
+    expect(isHard(r.claims[0]?.status ?? "verified")).toBe(true);
+  });
+
+  test("a renamed rule's count reads by its name or its trigger's wording", () => {
+    const topDog = [{ ...HIGH, name: "Top dog" }];
+    for (const text of [
+      "That's 2 top dogs this season.",
+      "That's 2 high scores this season.",
+      "That's two weekly high scores this season.",
+      "That's a second high score this season.",
+    ]) {
+      expect(read(judged(text, topDog)), text).toEqual([
+        [
+          text.match(/\b(2|two|second)\b/)?.[0],
+          "verified",
+          "rule.high-score.count",
+        ],
+      ]);
+    }
+  });
+
+  test("with two rules, the one whose words follow the count", () => {
+    expect(read(judged("Just 1 low score all year.", [HIGH, LOW]))).toEqual([
+      ["1", "verified", "rule.low-score.count"],
+    ]);
+    expect(read(judged("Now 2 weekly high scores.", [HIGH, LOW]))).toEqual([
+      ["2", "verified", "rule.high-score.count"],
+    ]);
+  });
+
+  test("a number before the rule's words that can't be a count isn't one", () => {
+    for (const text of [
+      "Their week 3 high score still stands.",
+      "Bench Mob posted a 162 weekly high score in week 2.",
+      "Their first high score came in week 2.",
+      "His second high score came back in week 4.",
+    ]) {
+      // a wrong untagged claim carries no id, so read its reason too
+      const ruleClaims = judged(text).claims.filter(
+        (c) =>
+          c.id === "rule.high-score.count" ||
+          c.reason.includes("rule.high-score.count"),
+      );
+      expect(ruleClaims, text).toEqual([]);
+    }
+    expect(read(judged("That's a third high score this season."))).toEqual([
+      ["third", "wrong", null],
+    ]);
+  });
+
+  test("two rules on one trigger: its wording reads either count, a name its own", () => {
+    const MOON = { id: "moon-shot", name: "Moon shot", trigger: "high-score" };
+    expect(
+      judged("That's 2 high scores this season.", [MOON, HIGH]).claims.map(
+        (c) => [c.text, c.status],
+      ),
+    ).toEqual([["2", "verified"]]);
+    expect(
+      judged("That's 2 moon shots this season.", [HIGH, MOON]).claims.map(
+        (c) => [c.text, c.status, c.reason],
+      ),
+    ).toEqual([["2", "wrong", "rule.moon-shot.count is 0"]]);
+  });
+
+  test("every trigger the wording names is a trigger stakes.ts knows", () => {
+    for (const kind of Object.keys(TRIGGER_WORDS)) {
+      expect(TRIGGER_KINDS).toContain(kind);
+    }
+  });
+
+  test("a points value beside the rule's words is still points", () => {
+    expect(
+      read(judged("Bench Mob posted a season-high 162.9 back in week 2.")),
+    ).toEqual([["162.9", "verified", "high"]]);
+    expect(
+      read(judged("A weekly high score of 162.9 for Bench Mob.")),
+    ).not.toContainEqual(["162.9", "verified", "rule.high-score.count"]);
+  });
+
+  test('"weekly high" never cues the season high, with or without rules', () => {
+    for (const r of [
+      judged("That's 2 weekly high scores this season.", []),
+      validate(blurb(3, "That's 2 weekly high scores this season.")),
+      validate(blurb(3, "Their week-high 150 came in week 3.")),
+      validate(blurb(3, "Their week high 150 came in week 3.")),
+    ]) {
+      expect(r.claims.map((c) => c.id ?? null)).not.toContain("high");
+      expect(r.claims.filter((c) => c.reason.startsWith("high "))).toEqual([]);
+    }
+  });
+});
 
 describe("cue words pick the stat", () => {
   test.each([
@@ -1401,6 +1542,22 @@ describe("invariants over a corpus", () => {
       for (const team of TEAMS) {
         const hard = validate(blurb(team, text)).claims.filter((c) =>
           isHard(c.status),
+        );
+        expect(hard, `section ${team}`).toEqual([]);
+      }
+    },
+  );
+
+  test.each(PLAIN_PROSE)(
+    "no false hard problem in a league with high- and low-score rules, in any section: %s",
+    (text) => {
+      const houseRules = [
+        { id: "high-score", name: "Weekly high score", trigger: "high-score" },
+        { id: "low-score", name: "Weekly low score", trigger: "low-score" },
+      ];
+      for (const team of TEAMS) {
+        const hard = validate(blurb(team, text, { houseRules })).claims.filter(
+          (c) => isHard(c.status),
         );
         expect(hard, `section ${team}`).toEqual([]);
       }

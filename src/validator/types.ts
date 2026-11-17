@@ -47,6 +47,12 @@ export interface ValidatorInput {
    */
   noStakes?: boolean;
   /**
+   * The league's house rules, by ID, name and trigger kind (`high-score`), so
+   * a count before a rule's name or its trigger's wording ("2 weekly high
+   * scores") reads that rule's `rule.<id>.count`.
+   */
+  houseRules?: { id: string; name: string; trigger?: string }[];
+  /**
    * The evidence and order the text was earlier checked against, when they
    * differ from now, newest evidence first. A claim that held then and fails
    * now is stale.

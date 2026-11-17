@@ -50,7 +50,7 @@ export type LeagueNames = Pick<League, "platform"> & {
 /** The names `validate` takes: what a team goes by, and what may be cited. */
 export type ValidatorNames = Pick<
   ValidatorInput,
-  "nicknames" | "sections" | "noStakes"
+  "nicknames" | "sections" | "noStakes" | "houseRules"
 >;
 
 /**
@@ -431,6 +431,15 @@ export function validatorNames(
       ...stakesSectionNames(stakes),
     },
     ...(stakes.kind === "none" ? { noStakes: true } : {}),
+    ...(stakes.kind === "recorded"
+      ? {
+          houseRules: stakes.houseRules.map((r) => ({
+            id: r.id,
+            name: r.name,
+            ...(r.trigger ? { trigger: r.trigger.kind } : {}),
+          })),
+        }
+      : {}),
   };
 }
 

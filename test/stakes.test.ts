@@ -174,6 +174,33 @@ describe("house-rule triggers", () => {
     ).toEqual([]);
   });
 
+  test("check reads an untagged count before the rule's name as the rule's count", async () => {
+    const ws = await drafted(8, `house-rules:\n${highScore()}`);
+    const said = async (words: string) => {
+      const text = await readFile(ws.path, "utf8");
+      await writeFile(ws.path, text.replace(BEA, `${BEA}${words}\n`));
+      const { problems } = await check(ws.dir, ws.deps);
+      return {
+        file: await readFile(ws.path, "utf8"),
+        problems: problems.filter((p) => p.text === "2" || p.text === "3"),
+      };
+    };
+    // Bye Bye Bea took weeks 3, 4 and 7.
+    const right = await said("That's 3 weekly high scores this season.");
+    expect(right.problems).toEqual([]);
+    expect(right.file).toContain(
+      "That's [3]{ev=rule.high-score.count} weekly high scores this season.",
+    );
+    const wrong = await said("That's 2 weekly high scores this season.");
+    expect(wrong.problems).toEqual([
+      expect.objectContaining({
+        severity: "hard",
+        kind: "wrong",
+        reason: "rule.high-score.count is 3",
+      }),
+    ]);
+  });
+
   test("every tied team triggers, tied with the others", async () => {
     // 130.03 + 3.19 levels Bye Bye Bea with Gus Bus's 133.22.
     const ws = await drafted(

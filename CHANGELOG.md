@@ -8,6 +8,8 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 - `check` reads two ordinals in one sentence each against its own stat: in "Second in points and first in the standings", "first" is checked against the standings. Before, it took the points cue from the clause before it and was marked wrong.
 - `check` reads a result told with "-ing" ("after beating Team B", "after losing to Team B") as the section's team's result, as it reads "beat" and "lost to". Before, it found no result there and judged the clause's other claims, such as "first in the standings", against the opponent.
+- `check` reads a count before a house rule's name or its trigger's wording ("2 weekly high scores", "a third low score") as that rule's count, and tags it when it's right. Before, "weekly high" was read as the season high and the count was marked wrong against it. "Weekly high" and "weekly low" no longer mean the season's high or low.
+- `check` no longer reads one stat word for two numbers: in "They've allowed 924.43 while scoring 891.03 in total", "891.03" is checked against points for, not points against.
 
 ## 0.1.1
 

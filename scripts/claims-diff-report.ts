@@ -64,15 +64,11 @@ export const CUE_PAIRS = [
 ];
 
 /**
- * True cue-pair sentences the validator reads wrong: "891.03" after a form or
- * points-against cue takes that cue, the last before the number, over "on
- * the season" or "in total". A fix turns `test/claims-diff-report.test.ts`
- * red until the sentence comes off this list.
+ * True cue-pair sentences the validator reads wrong. A fix turns
+ * `test/claims-diff-report.test.ts` red until the sentence comes off this
+ * list. Empty since #126, when a cue stopped being reused across numbers.
  */
-export const CUE_PAIRS_MISREAD = [
-  "Averaging 112.71 over the last three, with 891.03 on the season.",
-  "They've allowed 924.43 while scoring 891.03 in total.",
-];
+export const CUE_PAIRS_MISREAD: string[] = [];
 
 const SECTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, null];
 
