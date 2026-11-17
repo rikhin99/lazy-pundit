@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { ANTHROPIC_API, anthropicLlm, type Llm } from "./anthropic.ts";
@@ -39,6 +40,15 @@ export interface Environment {
   nodeVersion: string;
   /** `NO_COLOR`, set and not empty: no bold or colour in the terminal. */
   noColor?: true;
+}
+
+/**
+ * The installed release's version, read from package.json at runtime so it
+ * can't drift: the package root is one level above `src/` and `dist/` alike.
+ */
+export function packageVersion(): string {
+  const url = new URL("../package.json", import.meta.url);
+  return (JSON.parse(readFileSync(url, "utf8")) as { version: string }).version;
 }
 
 /** A clock stopped at `iso`, for a scripted run of a replay. */

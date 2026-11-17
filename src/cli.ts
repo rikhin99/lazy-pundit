@@ -71,6 +71,7 @@ import {
   type PresetName,
   type Problem,
   PublishWriteError,
+  packageVersion,
   payoutsOf,
   payoutsProblem,
   personaDefault,
@@ -112,10 +113,13 @@ import {
   withoutTrailingDots,
 } from "./index.ts";
 
+const VERSION = packageVersion();
+
 /** The `lazy-pundit` bin: it parses args, prompts and prints. The library does the rest. */
 const program = new Command()
   .name("lazy-pundit")
   .description("Power rankings with checked stats for your fantasy league.")
+  .version(VERSION)
   .option("--league <slug>", "act on this league's workspace from anywhere")
   .showHelpAfterError();
 
@@ -1146,6 +1150,7 @@ program
   .description("Check Node, your config and credentials, and each workspace.")
   .action(async () => {
     const result = await doctor(systemDeps());
+    console.log(`lazy-pundit ${VERSION}`);
     for (const c of result.checks) {
       console.log(`${MARKS[c.status]} ${c.subject}: ${c.message}`);
       if (c.fix) console.log(`    Fix: ${c.fix}`);

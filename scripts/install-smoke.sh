@@ -2,8 +2,9 @@
 # Installs HEAD the way a pundit would and runs it: in a throwaway clone,
 # `npm run release` tags a release commit, then `npm i -g` installs it by
 # `#semver:^0` into an empty prefix with a clean HOME, with the npm in use and
-# with npm 12 (which needs --allow-git=all). Each install must list every
-# command in --help, and doctor must exit 0. Only committed work is tested.
+# with npm 12 (which needs --allow-git=all). Each install must print the
+# release's version for --version, list every command in --help, and doctor
+# must exit 0. Only committed work is tested.
 # Nothing is pushed, and the repo's own tags are left alone.
 #
 #   npm run -s install:smoke
@@ -39,7 +40,11 @@ smoke() { # <label> <npm> [flags…]
   "$npm" i -g "$@" --prefix "$prefix" --no-audit --no-fund \
     "git+file://$T/src#semver:^0" >/dev/null 2>&1 ||
     { echo "install-smoke: $label: install failed" >&2; exit 1; }
-  local bin="$prefix/bin/lazy-pundit" help
+  local bin="$prefix/bin/lazy-pundit" help shown
+  shown=$("$bin" --version) ||
+    { echo "install-smoke: $label: --version failed" >&2; exit 1; }
+  [[ $shown == "$VERSION" ]] ||
+    { echo "install-smoke: $label: --version printed '$shown', not $VERSION" >&2; exit 1; }
   help=$("$bin" --help)
   for c in "${COMMANDS[@]}"; do
     grep -qE "^  $c( |$)" <<<"$help" ||
@@ -47,7 +52,7 @@ smoke() { # <label> <npm> [flags…]
   done
   (cd "$T/elsewhere" && "$bin" doctor >/dev/null) ||
     { echo "install-smoke: $label: doctor failed" >&2; exit 1; }
-  echo "install-smoke: $label: installed $VERSION, --help and doctor ran"
+  echo "install-smoke: $label: installed $VERSION, --version, --help and doctor ran"
 }
 
 smoke "npm-$(npm -v)" npm

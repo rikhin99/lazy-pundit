@@ -4,6 +4,10 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 ## 0.1.2
 
+### Added
+
+- `lazy-pundit --version` (or `-V`) prints the installed release's version, and `doctor`'s first line names it ("lazy-pundit 0.1.2"), so a bug report can say which release it's from.
+
 ### Fixed
 
 - `check` reads two ordinals in one sentence each against its own stat: in "Second in points and first in the standings", "first" is checked against the standings. Before, it took the points cue from the clause before it and was marked wrong.

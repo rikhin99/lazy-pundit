@@ -228,7 +228,9 @@ test("doctor prints each check, a fix under each problem, and fails on a broken 
   const { code, stdout } = await cli(home, ["doctor"], "", home);
 
   expect(code).toBe(1);
-  expect(stdout).toContain("✓ Node: v");
+  const [first, second] = stdout.split("\n");
+  expect(first).toBe(`lazy-pundit ${await versionInPackageJson()}`);
+  expect(second).toMatch(/^✓ Node: v/);
   expect(stdout).toContain(
     `· workspace hot-takery: ${gone} is gone, so it was dropped from config.yaml.`,
   );
@@ -557,4 +559,22 @@ test("--help lists table", async () => {
   const { stdout } = await cli(tmpdir(), ["--help"]);
 
   expect(stdout).toMatch(/^ {2}table .*Stats table/m);
+});
+
+/** The version in package.json, read from its text as a tester would. */
+async function versionInPackageJson() {
+  const text = await readFile(join(CLI, "..", "..", "package.json"), "utf8");
+  return (JSON.parse(text) as { version: string }).version;
+}
+
+test("--version and -V print package.json's version, and --help lists them", async () => {
+  const version = await versionInPackageJson();
+
+  for (const flag of ["--version", "-V"]) {
+    const { code, stdout } = await cli(tmpdir(), [flag]);
+    expect(code).toBe(0);
+    expect(stdout).toBe(`${version}\n`);
+  }
+  const { stdout } = await cli(tmpdir(), ["--help"]);
+  expect(stdout).toMatch(/^ {2}-V, --version /m);
 });

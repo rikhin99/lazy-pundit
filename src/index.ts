@@ -26,7 +26,12 @@ export {
   type DemandTestWeek,
   stats,
 } from "./demand-test.ts";
-export { type Deps, type Environment, systemDeps } from "./deps.ts";
+export {
+  type Deps,
+  type Environment,
+  packageVersion,
+  systemDeps,
+} from "./deps.ts";
 export {
   type DoctorCheck,
   type DoctorResult,
