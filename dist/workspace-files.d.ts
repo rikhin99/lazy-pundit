@@ -1,0 +1,21 @@
+import { type VersionKey } from "./front-matter.ts";
+/**
+ * Writes a workspace Markdown file. Refuses text whose front matter lacks this
+ * build's version under `versionKey` (`format` unless the file names its own,
+ * such as `league.md`'s `league`), so every file the tool writes can be read
+ * back. With `exclusive`, an existing file is left alone and EEXIST is thrown.
+ */
+export declare function writeWorkspaceFile(path: string, text: string, opts?: {
+    exclusive?: boolean;
+    versionKey?: VersionKey;
+}): Promise<void>;
+/**
+ * Writes a `.gitignore` in `dir`, which keeps local files out of a repository.
+ * Git reads it as it is, so it carries no format version.
+ */
+export declare function writeGitignore(dir: string, ...patterns: string[]): Promise<void>;
+/**
+ * Writes a league-facing output (the plain text, style pages). These are
+ * pasted or screenshotted as they are, so they carry no format version.
+ */
+export declare function writeOutput(path: string, text: string): Promise<void>;
