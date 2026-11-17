@@ -57,6 +57,10 @@ const REFUSED: Record<string, object> = {
     tool_name: "Bash",
     tool_input: { command: "git log --oneline -3" },
   },
+  "echo-equals.sh": {
+    tool_name: "Bash",
+    tool_input: { command: "git status; echo =====; git log -1" },
+  },
   "plain-prose-reminder.sh": {
     tool_name: "Edit",
     session_id: `refused-${basename(TMP)}`,
@@ -234,6 +238,36 @@ describe("the repo's hooks", () => {
     expect(edit("src", "validator", "judge.ts")).toBe(0);
     expect(edit("src", "validator", "claims-team.ts")).toBe(2);
     expect(edit("src", "validator", "extract.ts")).toBe(0);
+  });
+
+  // In #127 the claims diff came in, read only from ticket-workflow.md.
+  test("plain-prose-reminder.sh points to the claims diff", () => {
+    const run = spawnSync(
+      join(ROOT, ".claude", "hooks", "plain-prose-reminder.sh"),
+      {
+        input: JSON.stringify({
+          tool_name: "Edit",
+          session_id: `claims-diff-${basename(TMP)}`,
+          tool_input: {
+            file_path: join(ROOT, "src", "validator", "extract.ts"),
+          },
+        }),
+        encoding: "utf8",
+      },
+    );
+    expect(run.stderr).toContain("npm run -s claims:diff");
+  });
+
+  // In #127 an `echo =====` between two commands stopped the run: zsh reads
+  // a word starting with `=` as a command's path.
+  test.each([
+    ["git status; echo =====; git log -1", 2],
+    ["echo ===", 2],
+    ["echo '====='; git status", 0],
+    ["echo ---; git status", 0],
+    ["node -e 'a === b'", 0],
+  ])("echo-equals.sh on %s exits %i", (command, status) => {
+    expect(runHook("echo-equals.sh", command).status).toBe(status);
   });
 
   test("denylist-gh.sh lets everything through without a denylist", () => {

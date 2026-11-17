@@ -31,10 +31,9 @@ export interface Case {
  * true for Baron Von Trade, section 5 (all-play 6th, points
  * against 2nd, form 5th, week 7th, points 4th, standings 9th; 19.95 margin,
  * 110.08 scored, high 120.02, low 97.02, 891.03 for, 112.71 over three,
- * 111.38 a week, 924.43 against, luck -1.09). Add one when a cue is added.
- * At 635177e the validator reads "891.03" wrong in the two sentences that
- * put it after a form or points-against cue (the last cue before a number
- * wins), so a change there shows as a fix, not a regression.
+ * 111.38 a week, 924.43 against, luck -1.09), but "seed", which the pack
+ * doesn't hold. Add one when a cue is added. `CUE_PAIRS_MISREAD` lists those
+ * the validator reads wrong.
  */
 export const CUE_PAIRS = [
   // a ranking cue beside each stat cue
@@ -62,6 +61,17 @@ export const CUE_PAIRS = [
   "Averaging 112.71 over the last three, with 891.03 on the season.",
   "They've allowed 924.43 while scoring 891.03 in total.",
   "Bad luck has cost them 1.09 wins after they scored 110.08.",
+];
+
+/**
+ * True cue-pair sentences the validator reads wrong: "891.03" after a form or
+ * points-against cue takes that cue, the last before the number, over "on
+ * the season" or "in total". A fix turns `test/claims-diff-report.test.ts`
+ * red until the sentence comes off this list.
+ */
+export const CUE_PAIRS_MISREAD = [
+  "Averaging 112.71 over the last three, with 891.03 on the season.",
+  "They've allowed 924.43 while scoring 891.03 in total.",
 ];
 
 const SECTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, null];

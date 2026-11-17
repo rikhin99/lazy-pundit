@@ -2,12 +2,14 @@ import { describe, expect, test } from "vitest";
 import {
   type Check,
   CUE_PAIRS,
+  CUE_PAIRS_MISREAD,
   claimsDiff,
   corpus,
 } from "../scripts/claims-diff-report.ts";
 import { type CheckedClaim, validate } from "../src/index.ts";
 import { NUMBER_CUES, ORDINAL_CUES } from "../src/validator/extract.ts";
 import { TRUE_UNTAGGED } from "./support/plain-prose.ts";
+import { blurb } from "./support/week8-evidence.ts";
 
 const claim = (over: Partial<CheckedClaim>): CheckedClaim => ({
   text: "8th",
@@ -93,6 +95,19 @@ describe("the claims diff", () => {
 });
 
 describe("the cue-pair sentences", () => {
+  // A fix to a misread turns its sentence red here: take it off the list.
+  test.each(CUE_PAIRS)("true for section 5: %s", (text) => {
+    const statuses = validate(blurb(5, text)).claims.map((c) => c.status);
+    expect(statuses.length).toBeGreaterThan(0);
+    if (CUE_PAIRS_MISREAD.includes(text)) {
+      expect(statuses).toContain("wrong");
+    } else {
+      expect(statuses.filter((s) => s !== "verified")).toEqual(
+        text.includes("seed") ? ["unchecked"] : [],
+      );
+    }
+  });
+
   const cues = [...ORDINAL_CUES, ...NUMBER_CUES].map(([re]) => re);
   const stat = ORDINAL_CUES.filter(([, key]) => key(8) !== "place");
   const ranking = ORDINAL_CUES.find(([, key]) => key(8) === "place")?.[0];

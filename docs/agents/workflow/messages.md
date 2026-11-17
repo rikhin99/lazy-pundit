@@ -1,0 +1,5 @@
+# A new error or warning
+
+Read when a ticket adds an error or warning, or a new state reaches an existing one: a new reason, transport or environment variable (`ticket-workflow.md`, step 2).
+
+Name a test for each state that reaches it (an entry changed or removed, a first draft or a republish) and check the fix the message names in each, at every caller. Set each state up in a scratch run before writing its test, since an earlier read can stop it short: in #118, a folder at `week-NN.published.md` meant to fail the frozen copy's write stopped at `checkDraft`'s read of it, seen only when the test wouldn't go green. A scratch run reads the whole message, fix included, not just the lines a grep matches. In #76 the Log-edit warning said "put the entry back as it was", which fits no removed entry; the standards review caught it, as it did in #74 and #91. In #83 the replay's new reason reached `doctor`'s "Check your connection" and init's "lazy-pundit doctor checks it again", which fit no replay; a grep of the run hid the fix line, and neither review counted an existing message.

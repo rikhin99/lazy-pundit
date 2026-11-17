@@ -17,7 +17,7 @@ Read during review. Each rule is a judgement call; the mechanical rules are test
 ## Names
 
 - Code and comments use `GLOSSARY.md` terms. A glossary _Avoid_ term appears only as a platform's own field name (`owner_id`), never as our identifier or prose: say _manager_, _place_, _team_, _matchup_. `test/glossary-terms.test.ts` enforces the terms in its `ENFORCED` list; the reviewer judges those in `REVIEWED`, such as _player_ for a manager or _roster_ for a team, and prose in strings outside `src/prompt.ts`.
-- A domain noun the diff introduces (a file, a setting, a role, a command) has a `GLOSSARY.md` entry, and the code names it with that term. Source: `docs/agents/ticket-workflow.md`, step 1.
+- A domain noun the diff introduces (a file, a setting, a role, a command) has a `GLOSSARY.md` entry, and the code names it with that term. It covers nouns the operator meets in output, files and commands; words for the code's own workings or for dev tooling (a cue in the validator's tables, a test corpus, a dev script) need no entry. Source: `docs/agents/ticket-workflow.md`, step 1.
 - Team identity follows ADR 0001: `<platform>:<team id>`, scoped to one season.
 
 ## Tests
