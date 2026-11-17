@@ -2,22 +2,22 @@
 # Runs every drive-wizard.exp scenario, read from that script's own list, and
 # fails when any one exits with another code than it should (9 when it timed
 # out, 8 when the wizard ended early, 7 when its workspace isn't where that
-# script's `writes` list says): 1 for one in that script's `cancelled`
+# script's `writes` list says): 1 for one in that script's `exits_one`
 # list, which ends with Ctrl-C or an error, and 0 for every other. `folder`
 # gets a new temp folder. Run it with `npm run -s drive:wizard:all`; CI runs it too.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 script="$here/drive-wizard.exp"
-scenarios=$(sed -n 's/^if {\$scenario ni {\(.*\)}} {$/\1/p' "$script")
-cancelled=$(sed -n 's/^set cancelled {\(.*\)}$/\1/p' "$script")
-if [ -z "$scenarios" ] || [ -z "$cancelled" ]; then
+scenarios=$(sed -n 's/^set scenarios {\(.*\)}$/\1/p' "$script")
+exits_one=$(sed -n 's/^set exits_one {\(.*\)}$/\1/p' "$script")
+if [ -z "$scenarios" ] || [ -z "$exits_one" ]; then
   echo "Couldn't read the scenario lists from $script." >&2
   exit 2
 fi
 
 expected_exit() {
-  case " $cancelled " in
+  case " $exits_one " in
     *" $1 "*) echo 1 ;;
     *) echo 0 ;;
   esac

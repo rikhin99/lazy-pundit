@@ -51,15 +51,20 @@
 # the explanation and earlier redraws, so the answer can arrive before the
 # prompt listens.
 
-# The scenarios that end with Ctrl-C, so the wizard exits 1, as a cancelled
-# setup does, or with an error, which exits 1 too. drive-wizard-all.sh reads
-# this line.
-set cancelled {bad-id espn-bad-id espn-retype espn-env-cookie cancel cancel-folder another again}
+# Every scenario, in the order drive-wizard-all.sh runs them. It reads this line.
+set scenarios {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id espn-private espn-retype espn-env-cookie cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}
+# The scenarios that exit 1: those ending with Ctrl-C, as a cancelled setup
+# does, and those ending with an error. drive-wizard-all.sh reads this line.
+set exits_one {bad-id espn-bad-id espn-retype espn-env-cookie cancel cancel-folder another again}
 
 set scenario [lindex $argv 0]
 set folder [lindex $argv 1]
-if {$scenario ni {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id espn-private espn-retype espn-env-cookie cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}} {
-  puts stderr "Usage: drive-wizard.exp full|folder <path>|relative|dot|dot-keep|next-to|bad-id|yahoo|espn|espn-bad-id|espn-private|espn-retype|espn-env-cookie|cancel|cancel-folder|rename|skip-rest|key|another|again|stakes|family|setup-lore|setup-stakes"
+if {$scenario ni $scenarios} {
+  set usage {}
+  foreach s $scenarios {
+    lappend usage [expr {$s eq "folder" ? "folder <path>" : $s}]
+  }
+  puts stderr "Usage: drive-wizard.exp [join $usage |]"
   exit 2
 }
 if {$scenario eq "folder" && $folder eq ""} {

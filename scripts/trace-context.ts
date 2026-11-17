@@ -79,11 +79,19 @@ function turnsOf(log: string): Turn[] {
   return [...turns.values()];
 }
 
+/**
+ * A write to a test: a file under `test/`, or a `drive-wizard.exp` scenario,
+ * the test a wizard-only change starts from.
+ */
+export function isTestWrite(c: Turn["calls"][number]): boolean {
+  return (
+    /Write|Edit/.test(c.tool) &&
+    /(^|\/)(test\/|scripts\/drive-wizard\.exp$)/.test(c.target)
+  );
+}
+
 const STAGES: [string, (c: Turn["calls"][number]) => boolean][] = [
-  [
-    "first test written",
-    (c) => /Write|Edit/.test(c.tool) && /(^|\/)test\//.test(c.target),
-  ],
+  ["first test written", isTestWrite],
   ["review starts", (c) => c.tool === "Agent" && /review/i.test(c.target)],
   ["commit", (c) => c.tool === "Bash" && isRepoCommit(c.target)],
   ["sweep starts", (c) => c.tool === "Agent" && /sweep/i.test(c.target)],

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { isRepoCommit } from "../scripts/trace-context.ts";
+import { isRepoCommit, isTestWrite } from "../scripts/trace-context.ts";
 
 const SCRATCH = "/private/tmp/claude-501/x/scratchpad";
 
@@ -17,4 +17,21 @@ test("a commit in a scratch clone or a scratchpad script doesn't", () => {
   expect(isRepoCommit("git -C src/clone commit -m x")).toBe(false);
   expect(isRepoCommit(`bash ${SCRATCH}/run.sh; git commit -m x`)).toBe(false);
   expect(isRepoCommit("git log --oneline")).toBe(false);
+});
+
+test("a test is a write under test/ or to a wizard scenario", () => {
+  const repo = "/Users/x/lazy-pundit";
+  expect(
+    isTestWrite({ tool: "Edit", target: `${repo}/test/cli.test.ts` }),
+  ).toBe(true);
+  expect(isTestWrite({ tool: "Write", target: "test/new.test.ts" })).toBe(true);
+  expect(
+    isTestWrite({ tool: "Edit", target: `${repo}/scripts/drive-wizard.exp` }),
+  ).toBe(true);
+  expect(isTestWrite({ tool: "Edit", target: `${repo}/src/cli.ts` })).toBe(
+    false,
+  );
+  expect(
+    isTestWrite({ tool: "Read", target: `${repo}/scripts/drive-wizard.exp` }),
+  ).toBe(false);
 });
