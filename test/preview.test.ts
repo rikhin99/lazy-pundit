@@ -261,7 +261,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
 const REMINDER =
   "League: correction timing: Scored. Corrections may land through Thursday";
 
-test("the page leads with the Problems panel, then the share tabs on Plain text", async () => {
+test("the page leads with the problems list, then the share tabs on Plain text", async () => {
   const { preview } = await previewing();
 
   const html = await page(preview.url);

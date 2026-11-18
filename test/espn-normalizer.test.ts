@@ -488,7 +488,7 @@ describe("the ESPN normalizer on the Family League 2025", () => {
     expect(everyone).not.toContain("espn:4");
   });
 
-  test("a co-owned team has each owner as a manager, named from the members", async () => {
+  test("a team two members run on ESPN has each of them as a manager, named from the members", async () => {
     const league = await committed(FAMILY, 15);
     const team = league.teams.find((t) => t.id === "espn:3");
     expect(team?.managers).toHaveLength(2);

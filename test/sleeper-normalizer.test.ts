@@ -183,7 +183,7 @@ describe("Sleeper playoff weeks", () => {
     expect(side(league, 15, "sleeper:4")?.tiebreak).toBeUndefined();
   });
 
-  test("every 2025 playoff game gets its bracket's kind and round (week 17, the final)", async () => {
+  test("every 2025 playoff matchup gets its bracket's kind and round (week 17, the final)", async () => {
     const league = await committed(17);
     // Hand-read from league_winners_bracket.json and league_losers_bracket.json.
     expect(kinds(league, 15)).toEqual([

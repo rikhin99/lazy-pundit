@@ -220,6 +220,45 @@ test("code and comments use glossary terms, not their Avoid terms", async () => 
   expect(offences).toEqual([]);
 });
 
+/** A `test(…)` or `describe(…)` call's title: the behaviour in domain words. */
+const TITLE =
+  /\b(?:test|describe)(?:\.\w+)*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+/** A platform's own words a title quotes, as the wizard asks for them. */
+const PLATFORM_PHRASES = [/sleeper username/g];
+
+test("test titles use glossary terms, not their Avoid terms", async () => {
+  const glossary = await glossaryAvoidTerms();
+  // A glossary term may hold another's _Avoid_ word: "tone control".
+  const headings = [
+    ...(await readFile(join(ROOT, "GLOSSARY.md"), "utf8")).matchAll(
+      /^\*\*(.+?)\*\*:/gm,
+    ),
+  ].map((m) => new RegExp(`\\b${(m[1] as string).toLowerCase()}s?\\b`, "g"));
+  const entries = await readdir(join(ROOT, "test"), { withFileTypes: true });
+  const offences: string[] = [];
+  for (const e of entries) {
+    if (!e.isFile() || !e.name.endsWith(".test.ts")) continue;
+    if (e.name.startsWith("scratch-")) continue;
+    const text = await readFile(join(e.parentPath, e.name), "utf8");
+    for (const [, , title] of text.matchAll(TITLE)) {
+      const words = [...headings, ...PLATFORM_PHRASES]
+        .reduce(
+          (w, phrase) => w.replace(phrase, " "),
+          (title as string).toLowerCase(),
+        )
+        .replace(/-/g, " ");
+      for (const t of ENFORCED) {
+        const hit = words.match(wordPattern(t))?.[0];
+        if (hit) {
+          offences.push(`test/${e.name}: "${hit}", say ${glossary.get(t)}`);
+        }
+      }
+    }
+  }
+  expect(offences).toEqual([]);
+});
+
 /** What pundits read about the tool, outside `src/`. */
 const PUNDIT_DOCS = ["README.md", "CHANGELOG.md"];
 
