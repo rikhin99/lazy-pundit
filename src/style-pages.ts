@@ -43,15 +43,16 @@ function splitIntro(intro: string | undefined): {
  * `text` (a blurb or the week intro, tags stripped) with each whole occurrence
  * of its stat line `generated` taken out, trimmed. Whole means it starts its
  * line or follows a sentence's end, and ends its line or comes before a new
- * sentence; with words of the pundit's run on to it, it's an edited stat
- * line, which stays. A line that held only the stat line goes, so the lines
- * around it stay one paragraph, as written.
+ * sentence, with or without the `.`, `!`, `?` or `…` marks (such as "?!") the
+ * pundit added to end it, which go with it; with words of the pundit's run on to it, it's an
+ * edited stat line, which stays. A line that held only the stat line goes, so
+ * the lines around it stay one paragraph, as written.
  */
 function withoutStatLine(text: string, generated: string | undefined): string {
   const statLine = stripTags(generated ?? "").trim();
   if (!statLine) return text;
   const whole = new RegExp(
-    `(?<=^|[.!?…]\\s+)${statLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s*$|\\s+[\\p{Lu}\\p{N}"“'‘(])`,
+    `(?<=^|[.!?…]\\s+)${statLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[.!?…]*(?=\\s*$|\\s+[\\p{Lu}\\p{N}"“'‘(])`,
     "gu",
   );
   return text

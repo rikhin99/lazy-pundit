@@ -290,6 +290,14 @@ ${highScore()}rivalry-weeks:
       "before the pundit's sentence on its line",
       (s: string) => `${s} ${SENTENCE}`,
     ],
+    [
+      "with a full stop added, before the pundit's sentence on its line",
+      (s: string) => `${s}. ${SENTENCE}`,
+    ],
+    [
+      "with a full stop added, after the pundit's sentence on its line",
+      (s: string) => `${SENTENCE} ${s}.`,
+    ],
   ])(
     "the intro's untouched stat line %s is left off both pages, keeping the sentence",
     async (_, intro) => {
@@ -360,6 +368,22 @@ ${highScore()}rivalry-weeks:
       "on the line after the pundit's sentence",
       (s: string) => `${COOKING}\n${s}`,
     ],
+    [
+      "with a full stop added, before the pundit's sentence on its line",
+      (s: string) => `${s}. ${COOKING}`,
+    ],
+    [
+      "with an exclamation mark added, on the line before the pundit's sentence",
+      (s: string) => `${s}!\n${COOKING}`,
+    ],
+    [
+      "with ?! added, before the pundit's sentence on its line",
+      (s: string) => `${s}?! ${COOKING}`,
+    ],
+    [
+      "with ... added, before the pundit's sentence on its line",
+      (s: string) => `${s}... ${COOKING}`,
+    ],
   ])(
     "a team's untouched stat line %s is left out of its row's quote on both pages",
     async (_, edit) => {
@@ -387,6 +411,7 @@ ${highScore()}rivalry-weeks:
     ["alone", (s: string) => s],
     ["with whitespace around it", (s: string) => `  ${s}  `],
     ["twice, on two lines", (s: string) => `${s}\n${s}`],
+    ["with a full stop added", (s: string) => `${s}.`],
     ["in a tag", (s: string) => `[${stripTags(s)}]{ev=streak}`],
   ])(
     "a team's untouched stat line %s shows whole, unquoted, on both pages",
