@@ -1,4 +1,6 @@
-import type { Award } from "./awards.ts";
+import { type Award, awards } from "./awards.ts";
+import type { CheckedDraft } from "./check.ts";
+import { draftData } from "./draft-data.ts";
 import { formatRecord, type League, type TeamId } from "./league.ts";
 import { type MovementBaseline, movementMark } from "./movement.ts";
 import { credit, movementSince, weekTitle } from "./plain-text.ts";
@@ -17,6 +19,35 @@ export interface StylePageInput {
    * intro, and each team's, as its blurb. Tags and all.
    */
   statLines: { intro: string; teams: Record<string, string> };
+}
+
+/**
+ * What the style pages render for a checked draft, with the week's awards:
+ * the one builder `publish` and the preview page share, so the two can't
+ * drift. The stat lines `draft` writes with no LLM come along, so a page can
+ * tell prose from them.
+ */
+export function stylePageInput(checked: CheckedDraft): StylePageInput {
+  const { league, stakes, ranking } = checked;
+  const generated = draftData(
+    league,
+    ranking.meta.week,
+    stakes,
+    ranking.meta.in_progress_week,
+  );
+  return {
+    ranking,
+    league,
+    order: checked.order,
+    baseline: checked.baseline,
+    awards: awards(checked.evidence.league, league, stakes),
+    statLines: {
+      intro: generated.intro,
+      teams: Object.fromEntries(
+        Object.entries(generated.teams).map(([id, t]) => [id, t.statLine]),
+      ),
+    },
+  };
 }
 
 /**
@@ -284,7 +315,8 @@ ${body}
 `;
 }
 
-function esc(text: string): string {
+/** Text escaped for HTML, in an element or a quoted attribute. */
+export function esc(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

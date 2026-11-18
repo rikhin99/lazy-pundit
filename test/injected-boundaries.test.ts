@@ -9,6 +9,8 @@ const PRODUCTION_BOUNDARIES = new Set([
   "transport.ts",
   "clock.ts",
   "clipboard.ts",
+  // Serves the preview page on 127.0.0.1; it listens and never requests.
+  "preview.ts",
 ]);
 
 const FORBIDDEN: [string, RegExp][] = [

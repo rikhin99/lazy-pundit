@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { awards } from "./awards.ts";
 import {
   type CheckedDraft,
   checkDraft,
@@ -9,7 +8,6 @@ import {
   type Problem,
 } from "./check.ts";
 import type { Deps } from "./deps.ts";
-import { draftData } from "./draft-data.ts";
 import { rawFrontMatterValue, WorkspaceFileError } from "./front-matter.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
@@ -22,7 +20,11 @@ import {
 } from "./ranking-file.ts";
 import { freshDataWarnings } from "./refresh.ts";
 import { houseRuleOutcomes, logRecord } from "./stakes.ts";
-import { renderBroadcast, renderTabloid } from "./style-pages.ts";
+import {
+  renderBroadcast,
+  renderTabloid,
+  stylePageInput,
+} from "./style-pages.ts";
 import { writeOutput, writeWorkspaceFile } from "./workspace-files.ts";
 
 export interface PublishOptions {
@@ -220,34 +222,13 @@ export async function publish(
 
 /**
  * Each publish style's page, rendered from the frozen copy (the checked draft
- * with its edition) with the week's awards, by its file name
- * `week-NN.<style>.html`. The stat lines `draft` writes with no LLM come
- * along, so a page can tell prose from them.
+ * with its edition), by its file name `week-NN.<style>.html`.
  */
 function stylePages(
   stem: string,
   checked: CheckedDraft,
 ): [style: string, file: string, html: string][] {
-  const { league, stakes, ranking } = checked;
-  const generated = draftData(
-    league,
-    ranking.meta.week,
-    stakes,
-    ranking.meta.in_progress_week,
-  );
-  const input = {
-    ranking,
-    league,
-    order: checked.order,
-    baseline: checked.baseline,
-    awards: awards(checked.evidence.league, league, stakes),
-    statLines: {
-      intro: generated.intro,
-      teams: Object.fromEntries(
-        Object.entries(generated.teams).map(([id, t]) => [id, t.statLine]),
-      ),
-    },
-  };
+  const input = stylePageInput(checked);
   return [
     ["Tabloid", `${stem}.tabloid.html`, renderTabloid(input)],
     ["Broadcast", `${stem}.broadcast.html`, renderBroadcast(input)],

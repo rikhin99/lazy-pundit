@@ -6,6 +6,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 ### Added
 
+- `lazy-pundit preview` serves a page on your own machine (it prints the address, `http://127.0.0.1:4790` or the next free port) showing what the league would get if you published now: the Plain text, Tabloid and Broadcast tabs, each under a "Draft: not published yet" strip, with `check`'s problems list and lore's warnings above them. It follows each save of the draft and changes nothing: it doesn't tag claims, fetch, publish or copy. Open it in VS Code's Simple Browser beside the draft, or in any browser; Ctrl-C stops it.
 - `lazy-pundit --version` (or `-V`) prints the installed release's version, and `doctor`'s first line names it ("lazy-pundit 0.1.2"), so a bug report can say which release it's from.
 
 ### Changed
@@ -77,7 +78,7 @@ The first release, for Sleeper leagues.
 
 - ESPN leagues (and Yahoo).
 - `revise`, the LLM revision of one blurb or the intro.
-- `preview`, the local editing view beside the draft.
+- The editing view: `preview`'s Check tab, each blurb with its claims marked, beside the draft.
 - An interactive Stats table.
 - `season add` and `handles`, for carrying a workspace into a new season.
 - Week-0 (preseason) drafts.

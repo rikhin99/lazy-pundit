@@ -158,6 +158,12 @@ export {
   startingOrder,
 } from "./power-score.ts";
 export {
+  type Preview,
+  type PreviewOptions,
+  startPreview,
+} from "./preview.ts";
+export { problemLine, problemsHeading } from "./problems-list.ts";
+export {
   type PublishOptions,
   type PublishResult,
   PublishWriteError,

@@ -76,6 +76,8 @@ import {
   payoutsProblem,
   personaDefault,
   platformStop,
+  problemLine,
+  problemsHeading,
   proposedHandles,
   proposedNicknames,
   publish,
@@ -103,6 +105,7 @@ import {
   spendCapNote,
   spendCapProblem,
   spendCapWarning,
+  startPreview,
   stats,
   statsTable,
   statsTableLook,
@@ -139,48 +142,14 @@ const MARKS: Record<DoctorCheck["status"], string> = {
   fail: "✗",
 };
 
-const KINDS: Record<Problem["kind"], string> = {
-  wrong: "wrong",
-  stale: "stale",
-  "unknown-id": "unknown ID",
-  loose: "loose",
-  unchecked: "unchecked",
-  swear: "word list",
-  "no-stakes": "bragging rights only",
-  "unreadable-tag": "unreadable tag",
-  moved: "you moved this team",
-  "small-sample": "small sample",
-  "failed-fetch": "fetch failed",
-  provisional: "provisional",
-  "correction-timing": "correction timing",
-  "cant-compare": "can't compare",
-  "correction-missing": "correction not in the draft",
-};
-
 /** The problems list as the library ordered it: one line per item. */
 function printProblems(problems: Problem[]): void {
-  for (const p of problems) {
-    const mark = p.severity === "hard" ? "✗" : "·";
-    const cause = p.cause ? `, after a ${p.cause}` : "";
-    const gate = p.gate ? ", gate failure" : "";
-    if (p.line === null) {
-      console.log(`  ${mark} ${p.section}: ${KINDS[p.kind]}: ${p.reason}`);
-      continue;
-    }
-    console.log(
-      `  ${mark} line ${p.line} ${p.section}: "${p.text}" ${KINDS[p.kind]}${cause}${gate}: ${p.reason}`,
-    );
-  }
+  for (const p of problems) console.log(`  ${problemLine(p)}`);
 }
 
 /** A heading and the list, or a note that there's nothing to fix. */
 function report(problems: Problem[]): void {
-  if (problems.length === 0) {
-    console.log("No problems.");
-    return;
-  }
-  const hard = problems.filter((p) => p.severity === "hard").length;
-  console.log(`Problems: ${hard} hard, ${problems.length - hard} soft`);
+  console.log(problemsHeading(problems));
   printProblems(problems);
 }
 
@@ -281,6 +250,22 @@ program
       );
     }
     report(result.problems);
+  });
+
+program
+  .command("preview")
+  .description(
+    "Serve a local page showing what you'd share if you published now; it follows each save of the draft.",
+  )
+  .action(async () => {
+    const deps = systemDeps();
+    const preview = await startPreview(await workspace(deps), deps);
+    console.log(
+      `Open ${preview.url} in VS Code's Simple Browser or any browser`,
+    );
+    process.once("SIGINT", () => {
+      void preview.stop().then(() => process.exit(0));
+    });
   });
 
 program

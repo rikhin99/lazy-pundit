@@ -8,6 +8,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -128,18 +129,7 @@ async function cli(
   home?: string,
   over: NodeJS.ProcessEnv = {},
 ) {
-  const h = home ?? (await mkdtemp(join(tmpdir(), "lazy-pundit-home-")));
-  const env: NodeJS.ProcessEnv = {
-    ...Object.fromEntries(
-      INHERITED.filter((k) => process.env[k]).map((k) => [k, process.env[k]]),
-    ),
-    LAZY_PUNDIT_CLIPBOARD: "off",
-    LAZY_PUNDIT_REPLAY: join(FIXTURES, WEEKS["8"] as string),
-    HOME: h,
-    XDG_CONFIG_HOME: join(h, ".config"),
-    XDG_CACHE_HOME: join(h, ".cache"),
-    ...over,
-  };
+  const env = await cliEnv(home, over);
   return new Promise<{ code: number | null; stdout: string; stderr: string }>(
     (resolve) => {
       const child = spawn(process.execPath, [CLI, ...args], { cwd, env });
@@ -155,6 +145,25 @@ async function cli(
       child.stdin.end(input);
     },
   );
+}
+
+/** The CLI's environment, as `cli` describes it. */
+async function cliEnv(
+  home?: string,
+  over: NodeJS.ProcessEnv = {},
+): Promise<NodeJS.ProcessEnv> {
+  const h = home ?? (await mkdtemp(join(tmpdir(), "lazy-pundit-home-")));
+  return {
+    ...Object.fromEntries(
+      INHERITED.filter((k) => process.env[k]).map((k) => [k, process.env[k]]),
+    ),
+    LAZY_PUNDIT_CLIPBOARD: "off",
+    LAZY_PUNDIT_REPLAY: join(FIXTURES, WEEKS["8"] as string),
+    HOME: h,
+    XDG_CONFIG_HOME: join(h, ".config"),
+    XDG_CACHE_HOME: join(h, ".cache"),
+    ...over,
+  };
 }
 
 /** A temp home whose config.yaml lists `workspaces` by slug. */
@@ -577,4 +586,94 @@ test("--version and -V print package.json's version, and --help lists them", asy
   }
   const { stdout } = await cli(tmpdir(), ["--help"]);
   expect(stdout).toMatch(/^ {2}-V, --version /m);
+});
+
+const OPEN_LINE =
+  /^Open http:\/\/127\.0\.0\.1:(\d+) in VS Code's Simple Browser or any browser$/;
+
+/**
+ * Runs `preview` in `cwd` until its first line, checks the page answers at
+ * the URL it prints, then interrupts it as Ctrl-C would and gives its port
+ * and how it ended.
+ */
+async function previewRun(cwd: string, args: string[], home?: string) {
+  const child = spawn(process.execPath, [CLI, ...args], {
+    cwd,
+    env: await cliEnv(home),
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stderr.on("data", (d) => {
+    stderr += d;
+  });
+  const closed = new Promise<number | null>((resolve) =>
+    child.on("close", (code) => resolve(code)),
+  );
+  const firstLine = await new Promise<string>((resolve, reject) => {
+    child.stdout.on("data", (d) => {
+      stdout += d;
+      if (stdout.includes("\n")) resolve(stdout);
+    });
+    child.on("close", () => reject(new Error(`exited: ${stdout}${stderr}`)));
+  });
+  const [line] = firstLine.split("\n");
+  const port = Number(OPEN_LINE.exec(line as string)?.[1]);
+  const answer = Number.isNaN(port)
+    ? 0
+    : (await fetch(`http://127.0.0.1:${port}`)).status;
+  child.kill("SIGINT");
+  const code = await closed;
+  return { line, port, answer, code, stdout, stderr };
+}
+
+/** Whether nothing holds `port` on 127.0.0.1. */
+function portFree(port: number): Promise<boolean> {
+  const server = createServer();
+  return new Promise((resolve) => {
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => server.close(() => resolve(true)));
+  });
+}
+
+test("preview prints where its page is, serves it until Ctrl-C, then frees the port", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+
+  const run = await previewRun(dir, ["preview"]);
+
+  expect(run.line).toMatch(OPEN_LINE);
+  expect(run.port).toBeGreaterThanOrEqual(4790);
+  expect(run.answer).toBe(200);
+  expect(run.stdout).toBe(`${run.line}\n`);
+  expect(run.code).toBe(0);
+  expect(await portFree(run.port)).toBe(true);
+});
+
+test("preview with --league serves that workspace's page from any folder", async () => {
+  const { dir, deps } = await fearTheTurtle(8);
+  await draft(dir, deps);
+  const home = await homeListing({ "fear-the-turtle": dir });
+
+  const run = await previewRun(
+    home,
+    ["--league", "fear-the-turtle", "preview"],
+    home,
+  );
+
+  expect(run.line).toMatch(OPEN_LINE);
+  expect(run.answer).toBe(200);
+  expect(run.code).toBe(0);
+  expect(await portFree(run.port)).toBe(true);
+});
+
+test("preview outside a workspace without --league stops with check's message", async () => {
+  const outside = await mkdtemp(join(tmpdir(), "lazy-pundit-outside-"));
+
+  const { code, stdout, stderr } = await cli(outside, ["preview"]);
+
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toMatch(
+    /^No workspace\.md in .*lazy-pundit-outside-\w+ or any folder above it\. Run the command inside a league workspace, or pass --league <slug>\.\n$/,
+  );
 });

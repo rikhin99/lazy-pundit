@@ -21,6 +21,30 @@ export function renderPlainText(
   order: Record<TeamId, OrderEvidence>,
   baseline: MovementBaseline | undefined,
 ): string {
+  const blocks = plainTextBlocks(ranking, league, order, baseline);
+  return `${blocks.map((b) => b.text).join("\n\n")}\n`;
+}
+
+/**
+ * One block of the plain text, with what it's about: a team's entry by its
+ * team ID, the week intro as `intro`, or null for the header, a group's label
+ * and the credit.
+ */
+export interface PlainTextBlock {
+  entry: TeamId | "intro" | null;
+  text: string;
+}
+
+/**
+ * The plain text's blocks in order. Joined by a blank line they're the plain
+ * text, so the preview page can mark each entry where it starts.
+ */
+export function plainTextBlocks(
+  ranking: RankingFile,
+  league: League,
+  order: Record<TeamId, OrderEvidence>,
+  baseline: MovementBaseline | undefined,
+): PlainTextBlock[] {
   const teams = new Map<string, League["teams"][number]>(
     league.teams.map((t) => [t.id, t]),
   );
@@ -32,13 +56,15 @@ export function renderPlainText(
   ];
   const since = movementSince(week, baseline);
   if (since) header.push(since);
-  const blocks: string[] = [header.join("\n")];
-  if (ranking.intro) blocks.push(stripTags(ranking.intro));
+  const blocks: PlainTextBlock[] = [{ entry: null, text: header.join("\n") }];
+  if (ranking.intro) {
+    blocks.push({ entry: "intro", text: stripTags(ranking.intro) });
+  }
 
   let place = 0;
   for (const entry of ranking.entries) {
     if (entry.kind === "group") {
-      blocks.push(`— ${entry.label.toUpperCase()} —`);
+      blocks.push({ entry: null, text: `— ${entry.label.toUpperCase()} —` });
       continue;
     }
     place += 1;
@@ -48,11 +74,14 @@ export function renderPlainText(
     const mark =
       showMovement && move !== undefined ? ` ${movementMark(move)}` : "";
     const line = `${place}. ${team.name} · ${formatRecord(team.standing)}${mark}`;
-    blocks.push(entry.blurb ? `${line}\n${stripTags(entry.blurb)}` : line);
+    blocks.push({
+      entry: team.id,
+      text: entry.blurb ? `${line}\n${stripTags(entry.blurb)}` : line,
+    });
   }
 
-  blocks.push(credit(league));
-  return `${blocks.join("\n\n")}\n`;
+  blocks.push({ entry: null, text: credit(league) });
+  return blocks;
 }
 
 /** A published ranking's week: "after Week 8", or "Preseason" for week 0. */

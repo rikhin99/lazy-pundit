@@ -64,6 +64,7 @@ lazy-pundit draft     # fetch the league; write pundits/<you>/<season>/week-NN.m
 lazy-pundit table     # the Stats table: each team in the draft's order, its starting place and stats
                       # now edit week-NN.md: reorder the ## team sections, rewrite the intro and blurbs
 lazy-pundit check     # list the draft's problems and tag the claims it can check
+lazy-pundit preview   # serve a page showing what you'd share if you published now; it follows each save
 lazy-pundit publish   # freeze week-NN.published.md, write week-NN.txt and copy it to the clipboard,
                       # and write the style pages week-NN.tabloid.html and week-NN.broadcast.html
 ```
