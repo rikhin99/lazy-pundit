@@ -318,6 +318,23 @@ function injuries(
   if (hurt.length > 0) ev.injured = list(hurt.map((p) => p.name));
 }
 
+/** An injured player as the editing view and the Stats table list them. */
+export interface Injury {
+  name: string;
+  status: string;
+  /** Null when the platform gives none. */
+  bodyPart: string | null;
+}
+
+/** The team's injured starters and bench players in `league`, `[]` when nobody is hurt. */
+export function teamInjuries(league: League, team: TeamId): Injury[] {
+  return injuredPlayers(league, team).map((p) => ({
+    name: p.name,
+    status: p.injuryStatus as string,
+    bodyPart: p.injuryBodyPart,
+  }));
+}
+
 export function injuredPlayers(league: League, team: TeamId) {
   const roster = league.teams.find((t) => t.id === team)?.roster ?? [];
   return roster

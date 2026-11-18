@@ -226,6 +226,7 @@ export {
   type StatsTableSort,
   sortProblem,
   statsTable,
+  statsTableFrom,
   statsTableLook,
 } from "./stats-table.ts";
 export { deleteTranscripts } from "./transcripts.ts";

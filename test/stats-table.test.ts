@@ -1,6 +1,7 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { describe, expect, test } from "vitest";
+import { checkDraft } from "../src/check.ts";
 import {
   check,
   draft,
@@ -10,6 +11,7 @@ import {
   type StatsTableRow,
   sortProblem,
   statsTable,
+  statsTableFrom,
   statsTableLook,
 } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
@@ -74,13 +76,25 @@ describe("the Stats table", () => {
     );
     // Hand-checked from the week-10 fixture: 9-1, 1239.93 points over 10
     // weeks, weeks 8-10 of 126.89, 113.3 and 143.82, nine straight wins.
-    expect(table.rows.find((r) => r.team === "sleeper:3")).toMatchObject({
+    // The all-play record, luck, points for and injuries are draftData's for
+    // this draft: its stats (allplay, luck, pf) and its injuries list.
+    expect(table.rows.find((r) => r.team === "sleeper:3")).toEqual({
+      place: 1,
+      start: 1,
+      team: "sleeper:3",
       name: "Bench Mob",
       record: "9-1",
       rank: 1,
       ppg: 123.99,
+      allPlay: "80-30",
       form: 128,
+      luck: 1.73,
       streak: "W9",
+      pointsFor: 1239.93,
+      injuries: [
+        { name: "Alec Pierce", status: "IR", bodyPart: "Heel" },
+        { name: "Tyjae Spears", status: "Questionable", bodyPart: "Knee" },
+      ],
     });
     expect(table.rows.find((r) => r.team === "sleeper:9")).toMatchObject({
       name: "Hail Mary Hustle",
@@ -89,6 +103,7 @@ describe("the Stats table", () => {
       ppg: 105.57,
       form: 103.28,
       streak: "W1",
+      pointsFor: 1055.72,
     });
   });
 
@@ -114,6 +129,28 @@ describe("the Stats table", () => {
     ]);
   });
 
+  test("built from a draft already checked, it's the table statsTable reads", async () => {
+    const { dir, path, starting } = await week10();
+    const text = await readFile(path, "utf8");
+    const [first, second] = starting as [string, string];
+    // Swap the first two sections, so Place and Start differ.
+    await writeFile(
+      path,
+      text
+        .replace(`{team=${first}}`, "{team=FIRST}")
+        .replace(`{team=${second}}`, `{team=${first}}`)
+        .replace("{team=FIRST}", `{team=${second}}`),
+    );
+
+    const checked = await checkDraft(dir, { autoTag: false });
+
+    expect(statsTableFrom(checked)).toEqual(await statsTable(dir));
+    expect(statsTableFrom(checked, { sort: "ppg" })).toEqual(
+      await statsTable(dir, { sort: "ppg" }),
+    );
+    expect(statsTableFrom(checked).rows[0]?.team).toBe(second);
+  });
+
   test("a stat a team doesn't have yet is left out of its row", async () => {
     const ws = await fearTheTurtle(1);
     ws.deps.transport = patchingTransport(ws.deps.transport, {
@@ -127,10 +164,11 @@ describe("the Stats table", () => {
 
     expect(week).toBe(0);
     // Before any scored week the standings are empty too, so no team has a
-    // single stat.
+    // single stat; injuries are always listed, if only as none.
     expect(rows).toHaveLength(12);
     for (const row of rows) {
       expect(Object.keys(row).sort()).toEqual([
+        "injuries",
         "name",
         "place",
         "start",
@@ -280,6 +318,8 @@ const TABLE: StatsTable = {
       form: 128,
       luck: 1.36,
       streak: "W9",
+      pointsFor: 1239.93,
+      injuries: [{ name: "Alec Pierce", status: "IR", bodyPart: "Heel" }],
     },
     {
       place: 2,
@@ -293,8 +333,16 @@ const TABLE: StatsTable = {
       form: 133.2,
       luck: -0.05,
       streak: "L1",
+      pointsFor: 1254,
+      injuries: [],
     },
-    { place: 3, start: 3, team: "sleeper:9", name: "Hail Mary Hustle" },
+    {
+      place: 3,
+      start: 3,
+      team: "sleeper:9",
+      name: "Hail Mary Hustle",
+      injuries: [],
+    },
   ],
 };
 

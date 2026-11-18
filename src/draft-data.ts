@@ -1,4 +1,9 @@
-import { buildEvidencePack, injuredPlayers, list } from "./evidence-pack.ts";
+import {
+  buildEvidencePack,
+  type Injury,
+  list,
+  teamInjuries,
+} from "./evidence-pack.ts";
 import type { League, TeamId } from "./league.ts";
 import type { PlayoffStatus } from "./playoff-status.ts";
 import {
@@ -30,7 +35,7 @@ export interface StatSet {
   pf?: number;
   form3?: number;
   luck?: number;
-  injuries: { name: string; status: string; bodyPart: string | null }[];
+  injuries: Injury[];
 }
 
 /**
@@ -64,11 +69,7 @@ export function draftData(
       stats: {
         ...pick(ev, "record", "streak", "allplay"),
         ...pickNumbers(ev, "pf", "form3", "luck"),
-        injuries: injuredPlayers(league, team.id).map((p) => ({
-          name: p.name,
-          status: p.injuryStatus as string,
-          bodyPart: p.injuryBodyPart,
-        })),
+        injuries: teamInjuries(league, team.id),
       },
     };
   }

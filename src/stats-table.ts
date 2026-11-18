@@ -1,6 +1,10 @@
-import { checkDraft } from "./check.ts";
+import { type CheckedDraft, checkDraft } from "./check.ts";
 import type { Environment } from "./deps.ts";
-import { buildEvidencePack } from "./evidence-pack.ts";
+import {
+  buildEvidencePack,
+  type Injury,
+  teamInjuries,
+} from "./evidence-pack.ts";
 import type { TeamId } from "./league.ts";
 import type { PowerScoreRecord } from "./power-score.ts";
 import type { EvidenceValue, OrderEvidence } from "./validator/types.ts";
@@ -24,6 +28,10 @@ export interface StatsTableRow {
   form?: number;
   luck?: number;
   streak?: string;
+  /** Its points for through the ranking week. */
+  pointsFor?: number;
+  /** Its injured starters and bench players in the draft's snapshot, `[]` when nobody is hurt. */
+  injuries: Injury[];
 }
 
 /** The Stats table for the latest draft: the rows and what its header names. */
@@ -94,9 +102,20 @@ export async function statsTable(
   workspaceDir: string,
   opts: { sort?: StatsTableSort } = {},
 ): Promise<StatsTable> {
-  const { ranking, league, order } = await checkDraft(workspaceDir, {
-    autoTag: false,
-  });
+  return statsTableFrom(
+    await checkDraft(workspaceDir, { autoTag: false }),
+    opts,
+  );
+}
+
+/**
+ * The Stats table for a draft its caller has already checked, as `statsTable`
+ * gives it, so a caller that shows the problems list too checks it once.
+ */
+export function statsTableFrom(
+  { ranking, league, order }: CheckedDraft,
+  opts: { sort?: StatsTableSort } = {},
+): StatsTable {
   const week = ranking.meta.week;
   // Through the ranking week alone, so an in-progress week a draft let in
   // adds nothing.
@@ -120,6 +139,8 @@ export async function statsTable(
         ...number("form", ev.form3),
         ...number("luck", ev.luck),
         ...text("streak", ev.streak),
+        ...number("pointsFor", ev.pf),
+        injuries: teamInjuries(league, team),
       };
     })
     .sort((a, b) => a.place - b.place);
@@ -176,7 +197,8 @@ export function statsTableLook(
   };
 }
 
-const MISSING = "—";
+/** The mark for a stat a team doesn't have yet. */
+export const MISSING = "—";
 
 /** Each column: its heading, its cell for a row, and whether it aligns right. */
 const COLUMNS: {
@@ -248,12 +270,12 @@ function cut(text: string, width: number): string {
 }
 
 /** A number to two decimal places, or the missing mark. */
-function decimal(n: number | undefined): string {
+export function decimal(n: number | undefined): string {
   return n === undefined ? MISSING : n.toFixed(2);
 }
 
 /** 1st, 2nd, 3rd, 4th, … 11th, 12th, 13th, 21st. */
-function ordinal(n: number): string {
+export function ordinal(n: number): string {
   const teen = n % 100 >= 11 && n % 100 <= 13;
   const suffix = teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${suffix}`;
