@@ -33,6 +33,30 @@ async function withIntro(
   return intro;
 }
 
+/** A sentence of the pundit's own, added to a team's blurb. */
+const COOKING = "They are cooking.";
+
+/** The first team's stat line, tags stripped, as the pages show it whole. */
+const TOP_STAT_LINE =
+  "2nd in points · won 9 straight · beat Bye Bye Bea by 23.9 · Clinched a playoff spot";
+
+/**
+ * Replaces the first team's blurb, the stat line `draft` wrote with no LLM,
+ * with `edit` of it (tags and all).
+ */
+async function withTopBlurb(
+  path: string,
+  edit: (statLine: string) => string,
+): Promise<void> {
+  const text = await readFile(path, "utf8");
+  const statLine = text.match(/\n## [^\n]+\{team=[^}]+\}\n(.+)\n/)?.[1];
+  expect(stripTags(statLine ?? "")).toBe(TOP_STAT_LINE);
+  await writeFile(
+    path,
+    text.replace(statLine as string, edit(statLine as string)),
+  );
+}
+
 /**
  * Fear The Turtle drafted at `week` without an LLM, with `league.md`'s
  * `fields` and `handles` linked, if given.
@@ -318,6 +342,103 @@ ${highScore()}rivalry-weeks:
       "Nobody saw it coming.",
     );
   });
+
+  test.each([
+    [
+      "before the pundit's sentence on its line",
+      (s: string) => `${s} ${COOKING}`,
+    ],
+    [
+      "after the pundit's sentence on its line",
+      (s: string) => `${COOKING} ${s}`,
+    ],
+    [
+      "on the line before the pundit's sentence",
+      (s: string) => `${s}\n${COOKING}`,
+    ],
+    [
+      "on the line after the pundit's sentence",
+      (s: string) => `${COOKING}\n${s}`,
+    ],
+  ])(
+    "a team's untouched stat line %s is left out of its row's quote on both pages",
+    async (_, edit) => {
+      const ws = await drafted(10);
+      await withTopBlurb(ws.path, edit);
+      await published(ws.dir, ws.deps);
+
+      const page = await tabloid(ws.dir, 10);
+      expect(partOf(page, "quote")).toBe(`“${COOKING}”`);
+      expect(partOf(page, "statline")).not.toBe(TOP_STAT_LINE);
+      const show = await broadcast(ws.dir, 10);
+      expect(partOf(show, "quote")).toBe(COOKING);
+      expect(partOf(show, "statline")).not.toBe(TOP_STAT_LINE);
+      // The plain text keeps the blurb as written.
+      const plain = await readFile(
+        join(rankingsDir(ws.dir), "week-10.txt"),
+        "utf8",
+      );
+      expect(plain).toContain(COOKING);
+      expect(plain).toContain("won 9 straight");
+    },
+  );
+
+  test.each([
+    ["alone", (s: string) => s],
+    ["with whitespace around it", (s: string) => `  ${s}  `],
+    ["twice, on two lines", (s: string) => `${s}\n${s}`],
+    ["in a tag", (s: string) => `[${stripTags(s)}]{ev=streak}`],
+  ])(
+    "a team's untouched stat line %s shows whole, unquoted, on both pages",
+    async (_, edit) => {
+      const ws = await drafted(10);
+      await withTopBlurb(ws.path, edit);
+      // One tag over the whole stat line cites the wrong evidence, so publish anyway.
+      await publish(ws.dir, ws.deps, { yes: true });
+      for (const html of [
+        await tabloid(ws.dir, 10),
+        await broadcast(ws.dir, 10),
+      ]) {
+        expect(partOf(html, "statline")).toBe(TOP_STAT_LINE);
+        expect(partOf(html, "quote")).toBeUndefined();
+      }
+    },
+  );
+
+  test.each([
+    [
+      "one value changed",
+      (s: string) => `${s.replace("23.9", "24.9")} ${COOKING}`,
+      // A stat line has no full stop, so the first sentence runs on into the pundit's.
+      `${TOP_STAT_LINE.replace("23.9", "24.9")} ${COOKING}`,
+    ],
+    [
+      "words added after it",
+      (s: string) => `${s} and climbing. ${COOKING}`,
+      `${TOP_STAT_LINE} and climbing.`,
+    ],
+    [
+      "a word added before it",
+      (s: string) => `Big ${s}. ${COOKING}`,
+      `Big ${TOP_STAT_LINE}.`,
+    ],
+    [
+      // Without the full stop, only the start boundary keeps it prose.
+      "a word added before it, on its own line",
+      (s: string) => `Big ${s}\n${COOKING}`,
+      `Big ${TOP_STAT_LINE} ${COOKING}`,
+    ],
+  ])(
+    "a team stat line the pundit edited (%s) is prose: the row quotes the blurb's first sentence",
+    async (_, edit, quote) => {
+      const ws = await drafted(10);
+      await withTopBlurb(ws.path, edit);
+      // A changed value no longer matches its evidence, so publish anyway.
+      await publish(ws.dir, ws.deps, { yes: true });
+      expect(partOf(await tabloid(ws.dir, 10), "quote")).toBe(`“${quote}”`);
+      expect(partOf(await broadcast(ws.dir, 10), "quote")).toBe(quote);
+    },
+  );
 
   test("correction lines go in a correction note, never the headline; with nothing else, there's no headline", async () => {
     const ws = await drafted(10);

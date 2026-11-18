@@ -19,14 +19,6 @@ export interface StylePageInput {
   statLines: { intro: string; teams: Record<string, string> };
 }
 
-/** Whether `written` is still `generated`, whatever its tags. */
-function unchanged(written: string, generated: string | undefined): boolean {
-  return (
-    generated !== undefined &&
-    stripTags(written).trim() === stripTags(generated).trim()
-  );
-}
-
 /**
  * The week intro split for the style pages: each line citing a
  * `w<N>.correction` item goes to the correction note, and the rest is the
@@ -48,21 +40,21 @@ function splitIntro(intro: string | undefined): {
 }
 
 /**
- * `intro` (tags stripped) with each whole occurrence of the week intro's stat
- * line `generated` taken out, trimmed. Whole means it starts its line or
- * follows a sentence's end, and ends its line or comes before a new sentence;
- * with words of the pundit's run on to it, it's an edited stat line, which
- * stays. A line that held only the stat line goes, so the lines around it
- * stay one paragraph, as written.
+ * `text` (a blurb or the week intro, tags stripped) with each whole occurrence
+ * of its stat line `generated` taken out, trimmed. Whole means it starts its
+ * line or follows a sentence's end, and ends its line or comes before a new
+ * sentence; with words of the pundit's run on to it, it's an edited stat
+ * line, which stays. A line that held only the stat line goes, so the lines
+ * around it stay one paragraph, as written.
  */
-function withoutStatLine(intro: string, generated: string | undefined): string {
+function withoutStatLine(text: string, generated: string | undefined): string {
   const statLine = stripTags(generated ?? "").trim();
-  if (!statLine) return intro;
+  if (!statLine) return text;
   const whole = new RegExp(
     `(?<=^|[.!?…]\\s+)${statLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s*$|\\s+[\\p{Lu}\\p{N}"“'‘(])`,
     "gu",
   );
-  return intro
+  return text
     .split("\n")
     .flatMap((line) => {
       if (line.search(whole) < 0) return [line];
@@ -88,8 +80,11 @@ interface PlaceRow {
   /** Movement, absent at week 0 or with nothing to compare to. */
   move: number | "new" | undefined;
   /**
-   * The blurb's first sentence as a quote, or a stat line `draft` wrote with
-   * no LLM, whole: it has no sentence to quote. Absent for an empty blurb.
+   * The first sentence of the blurb as a quote, after each whole, untouched
+   * occurrence of the stat line `draft` wrote for the team with no LLM is
+   * taken out (as for the week intro); a stat line the pundit edited is prose
+   * and stays. When nothing is left, that stat line, whole: it has no
+   * sentence to quote. Absent for an empty blurb.
    */
   line: { kind: "quote" | "statline"; text: string } | undefined;
 }
@@ -132,6 +127,8 @@ function stylePageParts(input: StylePageInput): StylePageParts {
     const team = teams.get(entry.team);
     if (!team) throw new Error(`No team ${entry.team} in the league`);
     const blurb = stripTags(entry.blurb).trim();
+    const statLine = statLines.teams[team.id];
+    const prose = withoutStatLine(blurb, statLine);
     rows.push({
       kind: "team",
       place,
@@ -140,9 +137,13 @@ function stylePageParts(input: StylePageInput): StylePageParts {
       move: week > 0 ? order[team.id]?.move : undefined,
       line: !blurb
         ? undefined
-        : unchanged(blurb, statLines.teams[team.id])
-          ? { kind: "statline", text: blurb }
-          : { kind: "quote", text: firstSentence(blurb)[0] },
+        : prose
+          ? { kind: "quote", text: firstSentence(prose)[0] }
+          : {
+              kind: "statline",
+              // Nothing left means the blurb was only `statLine`.
+              text: stripTags(statLine ?? "").trim(),
+            },
     });
   }
 
