@@ -502,7 +502,11 @@ The share of the LLM's words, as its LLM prose file holds them, that the frozen 
 ## Surfaces
 
 **Editing view**:
-What the pundit sees while ranking: the starting order, the stats behind it, and every flag and claim problem, gathered in one problems list. In Stage 1 it's a local preview page beside the Markdown file the pundit edits, plus the same list in the terminal.
+What the pundit sees while ranking: the starting order, the stats behind it, and every flag and claim problem, gathered in one problems list. In Stage 1 it's the preview page's Check tab, plus the same list in the terminal.
+
+**Preview page**:
+The local page beside the draft that shows the published ranking as it would go out if published now, in each of its forms, with the problems list above it and the editing view beside it. It follows each save of the draft. It changes nothing and publishes nothing.
+_Avoid_: Draft page, live view
 
 **Stats table**:
 The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against.
