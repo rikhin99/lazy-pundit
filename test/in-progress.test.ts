@@ -66,7 +66,7 @@ describe("drafting while a week is in progress", () => {
     const { path } = await draft(dir, deps);
     await addToGus(path, "They have [133.22]{ev=w8.points} so far.");
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       expect.objectContaining({ kind: "unknown-id", id: "w8.points" }),
@@ -111,7 +111,7 @@ describe("--include-in-progress", () => {
       "They have [133.22]{ev=w8.points} so far, up by [50]{ev=w8.margin}.",
     );
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual({
       severity: "soft",
@@ -141,7 +141,7 @@ describe("--include-in-progress", () => {
       "They scored 133.22 points in week 8. In week 8 they scored 120 points.",
     );
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       expect.objectContaining({
@@ -169,7 +169,7 @@ describe("--include-in-progress", () => {
       "In week 7 they scored 87.86 and in week 8 they scored 133.22. They scored 120 in week 7, but 133.22 in week 8.",
     );
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     const gus = problems.filter((p) => p.section === "Gus Bus");
     expect(gus).toEqual([
@@ -188,7 +188,7 @@ describe("--include-in-progress", () => {
     const { path } = await draft(dir, deps, { includeInProgress: true });
     await addToGus(path, "It ended 133.22-78.22 in week 8.");
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       expect.objectContaining({
@@ -205,7 +205,7 @@ describe("--include-in-progress", () => {
     const { path } = await draft(dir, deps, { includeInProgress: true });
     await addToGus(path, "They beat Pylon Patrol in week 8.");
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       expect.objectContaining({

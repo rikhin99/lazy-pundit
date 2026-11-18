@@ -73,10 +73,10 @@ function lineOf(text: string, needle: string): number {
 
 describe("check", () => {
   test("a new draft checks clean and is left as it is", async () => {
-    const { dir, deps, path, read } = await drafted();
+    const { dir, path, read } = await drafted();
     const before = await read();
 
-    const result = await check(dir, deps);
+    const result = await check(dir);
 
     expect(result).toMatchObject({
       week: 8,
@@ -87,11 +87,11 @@ describe("check", () => {
   });
 
   test("a pundit edit with a wrong number is a hard problem on its file line, and the file is left as it is", async () => {
-    const { dir, deps, edit, read } = await drafted();
+    const { dir, edit, read } = await drafted();
     await edit((t) => t.replace(GUS, `${GUS}They won by 50 this week.\n`));
     const before = await read();
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     // Gus Bus beat Pylon Patrol 133.22 to 78.22 in week 8: a margin of 55.
     expect(problems).toEqual([
@@ -120,7 +120,7 @@ describe("check", () => {
     expect(edited).not.toBe(text);
     await writeFile(path, edited);
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems.filter((p) => p.severity === "hard")).toEqual([
       expect.objectContaining({
@@ -134,10 +134,10 @@ describe("check", () => {
   });
 
   test("a clear untagged claim is auto-tagged in the file, words unchanged", async () => {
-    const { dir, deps, edit, read } = await drafted();
+    const { dir, edit, read } = await drafted();
     await edit((t) => t.replace(GUS, `${GUS}They won by 55 this week.\n`));
 
-    const result = await check(dir, deps);
+    const result = await check(dir);
 
     expect(result.problems).toEqual([CORRECTION_TIMING]);
     expect(result.autoTagged).toBe(1);
@@ -145,16 +145,16 @@ describe("check", () => {
     expect(text).toContain(`${GUS}They won by [55]{ev=w8.margin} this week.\n`);
 
     // Checking again finds the tag already there.
-    expect((await check(dir, deps)).autoTagged).toBe(0);
+    expect((await check(dir)).autoTagged).toBe(0);
     expect(await read()).toBe(text);
   });
 
   test("a #3 claim goes stale with cause reorder when the pundit moves the team", async () => {
-    const { dir, deps, edit, read } = await drafted();
+    const { dir, edit, read } = await drafted();
     // Starting order: Bench Mob, Bye Bye Bea, Red Zone Rascals (#3), ...
     const RASCALS = "## Red Zone Rascals {team=sleeper:8}\n";
     await edit((t) => t.replace(RASCALS, `${RASCALS}Sitting at #3 for now.\n`));
-    expect(await check(dir, deps)).toMatchObject({
+    expect(await check(dir)).toMatchObject({
       problems: [CORRECTION_TIMING],
       autoTagged: 1,
     });
@@ -170,7 +170,7 @@ describe("check", () => {
       return rest.slice(0, next) + section + rest.slice(next);
     });
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toEqual([
       expect.objectContaining({
@@ -346,7 +346,7 @@ describe("an untagged claim naming a week", () => {
     const text = await readFile(path, "utf8");
     if (!text.includes(heading)) throw new Error(`no ${heading}`);
     await writeFile(path, text.replace(heading, `${heading}${words}\n`));
-    return (await check(ws.dir, ws.deps)).problems;
+    return (await check(ws.dir)).problems;
   }
 
   test("is unchecked, naming the week, when the evidence pack doesn't hold it", async () => {
@@ -450,9 +450,9 @@ describe("a draft whose snapshot is missing", () => {
   test.each(["snapshots folder", "manifest", "blob"] as const)(
     "with its %s gone, check names the draft, the snapshot and the fix",
     async (gone) => {
-      const { dir, deps, message } = await missing(gone);
+      const { dir, message } = await missing(gone);
 
-      const failed = check(dir, deps);
+      const failed = check(dir);
 
       await expect(failed).rejects.toThrow(WorkspaceFileError);
       await expect(failed).rejects.toThrow(message);
@@ -530,9 +530,9 @@ describe("a draft whose snapshot is damaged", () => {
   test.each(Object.keys(shapes) as (keyof typeof shapes)[])(
     "with %s, check names the draft, the snapshot and the fix",
     async (shape) => {
-      const { dir, deps, message } = await damaged(shape);
+      const { dir, message } = await damaged(shape);
 
-      const failed = check(dir, deps);
+      const failed = check(dir);
 
       await expect(failed).rejects.toThrow(WorkspaceFileError);
       await expect(failed).rejects.toThrow(message);
@@ -585,9 +585,9 @@ describe("a draft whose front matter publish and refresh can't edit", () => {
   test.each(SHAPES)(
     "front matter %s: check names the draft and the fix",
     async (_, shape) => {
-      const { dir, deps } = await reshaped(shape);
+      const { dir } = await reshaped(shape);
 
-      const failed = check(dir, deps);
+      const failed = check(dir);
 
       await expect(failed).rejects.toThrow(WorkspaceFileError);
       await expect(failed).rejects.toThrow(MESSAGE);
@@ -612,12 +612,12 @@ describe("a draft whose front matter publish and refresh can't edit", () => {
   );
 
   test("a key's comment, blank line or a nested map's indented lines are fine", async () => {
-    const { dir, deps, edit } = await drafted();
+    const { dir, edit } = await drafted();
     await edit((t) =>
       t.replace("\n---\n", "\n\n# mine\nnotes:\n  a: 1 # aside\n---\n"),
     );
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(withoutReminder(problems)).toEqual([]);
   });
@@ -648,9 +648,9 @@ describe("front matter that isn't valid YAML", () => {
   test.each(SHAPES)(
     "%s: check names the draft and what to check",
     async (_, shape) => {
-      const { dir, deps } = await reshaped(shape);
+      const { dir } = await reshaped(shape);
 
-      const failed = check(dir, deps);
+      const failed = check(dir);
 
       await expect(failed).rejects.toThrow(WorkspaceFileError);
       await expect(failed).rejects.toThrow(MESSAGE);
@@ -675,12 +675,12 @@ describe("front matter that isn't valid YAML", () => {
   );
 
   test("workspace.md with one key indented gets the same hint, naming workspace.md", async () => {
-    const { dir, deps } = await drafted();
+    const { dir } = await drafted();
     const file = join(dir, "workspace.md");
     const before = await readFile(file, "utf8");
     await writeFile(file, indentKey("pundit", "  ")(before));
 
-    await expect(check(dir, deps)).rejects.toThrow(message("workspace.md"));
+    await expect(check(dir)).rejects.toThrow(message("workspace.md"));
   });
 
   /** Extra lines after the front matter's last key. */
@@ -732,9 +732,9 @@ describe("front matter that isn't valid YAML", () => {
       [COLON],
     ],
   ] as const)("%s: check names each fix", async (_, shape, hints) => {
-    const { dir, deps } = await reshaped(shape);
+    const { dir } = await reshaped(shape);
 
-    await expect(check(dir, deps)).rejects.toMatchObject({
+    await expect(check(dir)).rejects.toMatchObject({
       message: [BARE, ...hints].join("; "),
     });
   });
@@ -746,19 +746,19 @@ describe("front matter that isn't valid YAML", () => {
       withLines("items:", "- a: 1", "- a: @x"),
     ],
   ])("%s gives no hint", async (_, shape) => {
-    const { dir, deps } = await reshaped(shape);
+    const { dir } = await reshaped(shape);
 
-    await expect(check(dir, deps)).rejects.toMatchObject({ message: BARE });
+    await expect(check(dir)).rejects.toMatchObject({ message: BARE });
   });
 
   test("lore.md with a value with a colon gets the colon hint, naming lore.md", async () => {
-    const { dir, deps } = await drafted();
+    const { dir } = await drafted();
     await writeFile(
       join(dir, "lore.md"),
       "---\nlore: 1\nnotes: half: time\n---\n## Running jokes\n- Kept.\n",
     );
 
-    await expect(check(dir, deps)).rejects.toMatchObject({
+    await expect(check(dir)).rejects.toMatchObject({
       message: `lore.md: the front matter isn't valid YAML; ${COLON}`,
     });
   });

@@ -288,7 +288,7 @@ describe("refresh", () => {
     const { dir, deps } = await drafted();
     await refresh(dir, later(deps, GUS_CORRECTED));
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     const gus = problems.find((p) => p.team === "sleeper:1" && p.text === "55");
     expect(gus).toMatchObject({ kind: "stale", cause: "refresh" });
@@ -302,7 +302,7 @@ describe("refresh", () => {
     await refresh(dir, later(deps, GUS_CORRECTED));
     await rm(join(dir, ".snapshots", was), { recursive: true });
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     const gus = problems.find((p) => p.team === "sleeper:1" && p.text === "55");
     expect(gus).toMatchObject({ kind: "wrong" });
@@ -315,7 +315,7 @@ describe("refresh", () => {
     await refresh(dir, later(deps, GUS_CORRECTED));
     await writeFile(await deleteOwnBlob(dir, was), "not gzip");
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       earlierCantCompare(was, "it's damaged in the snapshots folder"),
@@ -332,7 +332,7 @@ describe("refresh", () => {
       await rm(join(dir, ".snapshots", id), { recursive: true });
     }
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems.filter((p) => p.kind === "cant-compare")).toEqual(
       ids.map((id) => earlierCantCompare(id, GONE)),
@@ -350,7 +350,7 @@ describe("refresh", () => {
     await refresh(dir, later(deps, { [WEEK_8]: statCorrection(1, 3) }));
     await rm(join(dir, ".snapshots", original), { recursive: true });
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       expect.objectContaining({
@@ -393,7 +393,7 @@ describe("refresh", () => {
     const stale = { kind: "stale", cause: "refresh", text: "56.8" };
     expect(second.newlyStale).toContainEqual(expect.objectContaining(stale));
     expect(second.problems).toContainEqual(expect.objectContaining(stale));
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
     expect(problems).toContainEqual(expect.objectContaining(stale));
   });
 

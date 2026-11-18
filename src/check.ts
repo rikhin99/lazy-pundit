@@ -1,7 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { corrections, uncarriedCorrections } from "./corrections.ts";
-import type { Deps } from "./deps.ts";
 import { draftData } from "./draft-data.ts";
 import {
   refuseUneditableFrontMatter,
@@ -129,10 +128,7 @@ export interface CheckResult {
  * pack and the order as it stands, writing auto-tags back without changing
  * a word. Problems are reported, never fixed.
  */
-export async function check(
-  workspaceDir: string,
-  _deps: Deps,
-): Promise<CheckResult> {
+export async function check(workspaceDir: string): Promise<CheckResult> {
   const { week, path, problems, autoTagged, warnings } =
     await checkDraft(workspaceDir);
   return { week, path, problems, autoTagged, warnings };

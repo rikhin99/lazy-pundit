@@ -238,7 +238,7 @@ describe("swearing", () => {
 
     expect(llm.requests).toHaveLength(1);
     expect(withoutReminder(result.problems)).toEqual([]);
-    expect(withoutReminder((await check(dir, deps)).problems)).toEqual([]);
+    expect(withoutReminder((await check(dir)).problems)).toEqual([]);
   });
 
   test("off, the same word in a pundit edit only warns", async () => {
@@ -249,7 +249,7 @@ describe("swearing", () => {
     const text = await readFile(path, "utf8");
     await writeFile(path, text.replace("What a week.", "What a damn week."));
 
-    const result = await check(dir, deps);
+    const result = await check(dir);
 
     const line = text.split("\n").indexOf("## Intro {intro}") + 2;
     expect(withoutReminder(result.problems)).toEqual([

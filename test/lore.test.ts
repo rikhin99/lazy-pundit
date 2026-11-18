@@ -22,7 +22,6 @@ import {
   fearTheTurtle,
   frontMatter,
   type Json,
-  operator,
   type Patch,
   patchingTransport,
   statCorrection,
@@ -91,7 +90,7 @@ async function draftedWithLore(lore: string) {
 
 /** Each problem in the blurb as its words and kind. */
 async function claimProblems(dir: string) {
-  const { problems } = await check(dir, await operator());
+  const { problems } = await check(dir);
   return withoutReminder(problems)
     .filter((p) => p.kind !== "moved")
     .map((p) => [p.text, p.kind]);
@@ -111,7 +110,7 @@ function freshClash(nickname: string, section: string, team: string) {
 
 /** The warnings of `check` that are nickname clashes. */
 async function snapshotClashes(dir: string): Promise<string[]> {
-  const { warnings } = await check(dir, await operator());
+  const { warnings } = await check(dir);
   return warnings.filter((w) => w.includes("points at both"));
 }
 
@@ -743,7 +742,7 @@ describe("the personal-data warning", () => {
       "## Running jokes\n- Bo: 555-123-4567\n",
     );
     const expected = expect.stringMatching(/line 5 \(phone number\)/);
-    expect((await check(dir, deps)).warnings).toContainEqual(expected);
+    expect((await check(dir)).warnings).toContainEqual(expected);
     expect((await refresh(dir, deps)).warnings).toContainEqual(expected);
     const seen: string[] = [];
     const published = await publish(dir, deps, {

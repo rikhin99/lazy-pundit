@@ -120,18 +120,18 @@ describe("movement", () => {
   });
 
   test("a movement claim is checked against the baseline, and goes stale when a reorder makes it false", async () => {
-    const { dir, deps, edit, read } = await week8AfterWeek7();
+    const { dir, edit, read } = await week8AfterWeek7();
     const GUS = "## Gus Bus {team=sleeper:1}\n";
     await edit((t) => t.replace(GUS, `${GUS}Gus Bus climbs 2 spots.\n`));
 
-    const checked = await check(dir, deps);
+    const checked = await check(dir);
     expect(withoutReminder(checked.problems)).toEqual([]);
     expect(checked.autoTagged).toBe(1);
     expect(await read()).toContain("Gus Bus [climbs 2 spots]{ev=move}.");
 
     // Gus Bus drops below Tank Brigade, to 7th: up 1 since week 7, not 2.
     await edit((t) => moveSection(t, "Tank Brigade", "Gus Bus"));
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems).toContainEqual(
       expect.objectContaining({
@@ -145,11 +145,11 @@ describe("movement", () => {
   });
 
   test("each team the pundit moved is a soft problem showing its starting place", async () => {
-    const { dir, deps, edit, read } = await week8AfterWeek7();
+    const { dir, edit, read } = await week8AfterWeek7();
     await edit((t) => moveSection(t, "Tank Brigade", "Gus Bus"));
     const text = await read();
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(withoutReminder(problems)).toEqual([
       expect.objectContaining({

@@ -59,7 +59,7 @@ describe("a drastic correction", () => {
     expect(intro.split("\n")[0]).toBe(FLIPPED);
     expect(intro).toContain("Week high:");
     expect(withoutReminder(result.problems)).toEqual([]);
-    const checked = await check(ws.dir, ws.deps);
+    const checked = await check(ws.dir);
     expect(withoutReminder(checked.problems)).toEqual([]);
   });
 
@@ -88,7 +88,7 @@ describe("a drastic correction", () => {
       path,
       text.replace("## Intro {intro}\n", `## Intro {intro}\n${FLIPPED}\n`),
     );
-    const checked = await check(ws.dir, ws.deps);
+    const checked = await check(ws.dir);
     expect(checked.problems.map((p) => p.kind)).not.toContain(
       "correction-missing",
     );
@@ -114,7 +114,7 @@ describe("a drastic correction", () => {
     ]);
     const text = await readFile(result.path, "utf8");
     await writeFile(result.path, text.replace(`${FLIPPED}\n`, ""));
-    const checked = await check(ws.dir, ws.deps);
+    const checked = await check(ws.dir);
     expect(checked.problems.filter((p) => p.section === "Intro")).toEqual([]);
   });
 
@@ -264,7 +264,7 @@ describe("a drastic correction", () => {
     await rm(join(ws.dir, ".snapshots", id), { recursive: true });
 
     await draft(ws.dir, atWeek(ws.deps, 8));
-    const result = await check(ws.dir, ws.deps);
+    const result = await check(ws.dir);
 
     expect(withoutReminder(result.problems).map((p) => p.reason)).toEqual([
       `can't compare with \`${id}\`, the week 7 ranking's snapshot: it's missing from the snapshots folder, so a drastic correction to week 7 or earlier won't show`,

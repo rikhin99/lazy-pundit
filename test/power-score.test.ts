@@ -337,14 +337,14 @@ describe("the small-sample flag", () => {
   test("check lists it too, and refresh", async () => {
     const { dir, deps } = await fearTheTurtle(1);
     await draft(dir, deps);
-    expect(flags((await check(dir, deps)).problems)).toHaveLength(1);
+    expect(flags((await check(dir)).problems)).toHaveLength(1);
     expect(flags((await refresh(dir, deps)).problems)).toHaveLength(1);
   });
 
   test("it never reaches the published outputs, and asks nothing at publish", async () => {
     const { dir, deps, clipboard } = await fearTheTurtle(1);
     const { path } = await draft(dir, deps);
-    const flag = flags((await check(dir, deps)).problems)[0];
+    const flag = flags((await check(dir)).problems)[0];
 
     const result = await published(dir, deps);
 

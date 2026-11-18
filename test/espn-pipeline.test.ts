@@ -78,7 +78,7 @@ describe("an ESPN league through draft and publish", () => {
     const text = await readFile(drafted.path, "utf8");
     expect(text).toContain("starting_order: [espn:2, espn:1, espn:8");
     // The draft's snapshot is an ESPN one, and the check reads it back.
-    const checked = await check(dir, deps);
+    const checked = await check(dir);
     expect(checked.week).toBe(14);
 
     const result = await publish(dir, deps, { yes: true });

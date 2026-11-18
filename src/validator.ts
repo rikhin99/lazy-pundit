@@ -131,19 +131,21 @@ export function validate(input: ValidatorInput): ValidationResult {
     end: (toInput[end - 1] as number) + 1,
   });
 
+  /** A claim's words: trailing punctuation reads as the sentence's, not the claim's. */
+  const words = (text: string) => text.replace(/[,;:.!?]+$/, "");
   const found: Claim[] = [];
   for (const tag of tags) {
+    const text = words(tag.inner);
     found.push({
-      text: tag.inner,
+      text,
       start: tag.plainStart,
-      end: tag.plainEnd,
+      end: tag.plainStart + text.length,
       tag,
     });
   }
   for (const { s, start } of units(plain)) {
     for (const f of extract(ctx, s)) {
-      // Trailing punctuation reads as the sentence's, not the claim's.
-      const text = s.slice(f.start, f.end).replace(/[,;:.!?]+$/, "");
+      const text = words(s.slice(f.start, f.end));
       const a = start + f.start;
       const b = a + text.length;
       if (tags.some((t) => a < t.plainEnd && t.plainStart < b)) continue;

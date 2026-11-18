@@ -1671,6 +1671,18 @@ describe("a claim's span", () => {
     });
   });
 
+  test("of a tagged claim drops punctuation inside the brackets from its words, not from the tag's place", () => {
+    const tag = "[127,]{ev=w8.points}";
+    expect(only(`They scored ${tag} and won.`).claim).toMatchObject({
+      text: "127",
+      start: 12,
+      end: 12 + tag.length,
+      tagged: true,
+      status: "verified",
+      id: "w8.points",
+    });
+  });
+
   test("keeps a comma between digits", () => {
     expect(only("They have 1,240 points for.").claim).toMatchObject({
       text: "1,240",

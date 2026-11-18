@@ -66,7 +66,7 @@ async function claimProblems(
 ) {
   const text = await readFile(ws.path, "utf8");
   await writeFile(ws.path, text.replace(heading, `${heading}${words}\n`));
-  const { problems } = await check(ws.dir, ws.deps);
+  const { problems } = await check(ws.dir);
   return problems.filter((p) =>
     /^(wk\.)?(rule|stakes|platform)\./.test(p.id ?? ""),
   );
@@ -114,7 +114,7 @@ async function problemsOf(
 ) {
   const text = await readFile(ws.path, "utf8");
   await writeFile(ws.path, text.replace(heading, `${heading}${words}\n`));
-  const { problems } = await check(ws.dir, ws.deps);
+  const { problems } = await check(ws.dir);
   return problems
     .filter((p) => p.kind === kind)
     .map((p) => [p.text, p.severity]);
@@ -179,7 +179,7 @@ describe("house-rule triggers", () => {
     const said = async (words: string) => {
       const text = await readFile(ws.path, "utf8");
       await writeFile(ws.path, text.replace(BEA, `${BEA}${words}\n`));
-      const { problems } = await check(ws.dir, ws.deps);
+      const { problems } = await check(ws.dir);
       return {
         file: await readFile(ws.path, "utf8"),
         problems: problems.filter((p) => p.text === "2" || p.text === "3"),
@@ -471,7 +471,7 @@ describe("a changed outcome", () => {
     const warning =
       "league.md: Weekly high score (high-score) pays $20, not the $10 it paid at week 7: winnings to date count $20 for every week. To keep $10 for earlier weeks, split the rule with until: and from:.";
 
-    expect((await check(ws.dir, deps)).warnings).toContainEqual(warning);
+    expect((await check(ws.dir)).warnings).toContainEqual(warning);
     expect((await refresh(ws.dir, deps)).warnings).toContainEqual(warning);
     // The claims citing the winnings are now wrong, so publish asks first.
     const result = await publish(ws.dir, deps, { yes: true });
@@ -484,7 +484,7 @@ describe("a changed outcome", () => {
     await published(ws.dir, ws.deps);
     await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
 
-    expect((await check(ws.dir, ws.deps)).warnings).toContainEqual(
+    expect((await check(ws.dir)).warnings).toContainEqual(
       expect.stringContaining("not the $10 it paid at week 8"),
     );
   });
@@ -507,7 +507,7 @@ describe("a changed outcome", () => {
     await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
     await publish(ws.dir, ws.deps, { yes: true });
 
-    const { warnings } = await check(ws.dir, ws.deps);
+    const { warnings } = await check(ws.dir);
 
     expect(warnings.filter((w) => /pays/.test(w))).toEqual([]);
     const copy = frontMatter(await readFile(publishedPathOf(ws), "utf8"));
@@ -520,7 +520,7 @@ describe("a changed outcome", () => {
     await writeFile(publishedPath, "not a ranking\n");
     await writeLeagueFile(ws.dir, `house-rules:\n${highScore("$20")}`);
 
-    const { warnings } = await check(ws.dir, ws.deps);
+    const { warnings } = await check(ws.dir);
 
     expect(warnings.filter((w) => /pays/.test(w))).toEqual([]);
   });
@@ -644,7 +644,7 @@ describe("the Log is only appended to", () => {
       BODY.replace("The Rascals cashed in.", "The Rascals cashed in twice."),
     );
 
-    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([
+    expect(logEdits((await check(ws.dir)).warnings)).toEqual([
       'league.md: the Log entry {week=5}{rule=high-score} "The Rascals cashed in." was changed or removed after week 7 was published, so what that week could cite no longer stands as it was. The Log is only appended to: put the entry back as it was and write any change as a new entry, or publish to record the Log as it now stands.',
     ]);
   });
@@ -661,7 +661,7 @@ describe("the Log is only appended to", () => {
       ),
     ];
 
-    expect(logEdits((await check(ws.dir, deps)).warnings)).toEqual(named);
+    expect(logEdits((await check(ws.dir)).warnings)).toEqual(named);
     expect(logEdits((await refresh(ws.dir, deps)).warnings)).toEqual(named);
     expect(
       logEdits((await publish(ws.dir, deps, { yes: true })).warnings),
@@ -698,7 +698,7 @@ describe("the Log is only appended to", () => {
       `${BODY.replace("{week=7} Bo", "{week=7}{pinned} Bo")}- {week=6} Wendy paid up late.\n`,
     );
 
-    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([]);
+    expect(logEdits((await check(ws.dir)).warnings)).toEqual([]);
   });
 
   test("an entry for a week after the published one isn't recorded, so editing it gives no warning", async () => {
@@ -706,7 +706,7 @@ describe("the Log is only appended to", () => {
       BODY.replace("Gus collected.", "Gus collected, eventually."),
     );
 
-    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([]);
+    expect(logEdits((await check(ws.dir)).warnings)).toEqual([]);
   });
 
   test("removing one of two identical entries warns once", async () => {
@@ -719,7 +719,7 @@ describe("the Log is only appended to", () => {
     await published(ws.dir, ws.deps);
     await writeLeagueFile(ws.dir, FIELDS, BODY);
 
-    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toHaveLength(1);
+    expect(logEdits((await check(ws.dir)).warnings)).toHaveLength(1);
   });
 
   test("publishing again records the Log as it then stands", async () => {
@@ -728,7 +728,7 @@ describe("the Log is only appended to", () => {
     );
     await publish(ws.dir, ws.deps, { yes: true });
 
-    expect(logEdits((await check(ws.dir, ws.deps)).warnings)).toEqual([]);
+    expect(logEdits((await check(ws.dir)).warnings)).toEqual([]);
   });
 
   test("a frozen copy published before the Log was recorded loads with no Log warning", async () => {
@@ -737,7 +737,7 @@ describe("the Log is only appended to", () => {
     expect(text).toMatch(/^log_entries: /m);
     await writeFile(ws.publishedPath, text.replace(/^log_entries: .*\n/m, ""));
 
-    const { warnings } = await check(ws.dir, ws.deps);
+    const { warnings } = await check(ws.dir);
 
     expect(logEdits(warnings)).toEqual([]);
   });

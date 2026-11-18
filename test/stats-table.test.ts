@@ -226,11 +226,11 @@ describe("the Stats table", () => {
   ])(
     "%s is refused with check's message, and nothing is written",
     async (_, edit) => {
-      const { dir, deps, path } = await week10();
+      const { dir, path } = await week10();
       const broken = edit(await readFile(path, "utf8"));
       await writeFile(path, broken);
       const files = await readdir(dirname(path));
-      const checked = await check(dir, deps).then(
+      const checked = await check(dir).then(
         () => undefined,
         (e: Error) => e.message,
       );

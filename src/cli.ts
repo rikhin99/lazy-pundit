@@ -241,8 +241,7 @@ program
   .command("check")
   .description("Check the latest draft's claims and add tags to clear ones.")
   .action(async () => {
-    const deps = systemDeps();
-    const result = await check(await workspace(deps), deps);
+    const result = await check(await workspace(systemDeps()));
     printWarnings(result.warnings);
     if (result.autoTagged > 0) {
       console.log(

@@ -279,7 +279,7 @@ describe("playoff words in a draft", () => {
       ),
     );
 
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
 
     expect(problems.map((p) => [p.kind, p.text, p.reason])).toContainEqual([
       "wrong",
@@ -291,7 +291,7 @@ describe("playoff words in a draft", () => {
   test("a draft in a week with clinches and eliminations checks clean", async () => {
     const { dir, deps } = await fearTheTurtle(14);
     await draft(dir, deps);
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
     expect(withoutReminder(problems).map((p) => [p.text, p.reason])).toEqual(
       [],
     );
@@ -305,7 +305,7 @@ describe("playoff words in a draft", () => {
       path,
       text.replace(/(\{team=sleeper:3\}\n)/, "$1They have clinched a spot. "),
     );
-    expect(withoutReminder((await check(dir, deps)).problems)).toEqual([]);
+    expect(withoutReminder((await check(dir)).problems)).toEqual([]);
   });
 });
 

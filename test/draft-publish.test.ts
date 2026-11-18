@@ -280,7 +280,7 @@ describe("draft", () => {
 
     // Team C is 4-4.
     await writeFile(path, text.replace(heading, `${heading}At 5-3.\n`));
-    const { problems } = await check(dir, deps);
+    const { problems } = await check(dir);
     expect(withoutReminder(problems)).toEqual([
       expect.objectContaining({ section: "Team C", text: "5-3" }),
     ]);
@@ -292,7 +292,7 @@ describe("draft", () => {
         .replace(heading, "## Team C  {team=sleeper:10}\n")
         .replace("[Team C]{ev=w8.opponent}", "[Team C ]{ev=w8.opponent}"),
     );
-    expect(withoutReminder((await check(dir, deps)).problems)).toEqual([]);
+    expect(withoutReminder((await check(dir)).problems)).toEqual([]);
   });
 
   test.each([
@@ -776,7 +776,7 @@ describe("a frozen copy of an earlier week that can't be read", () => {
     await draft(dir, deps);
     await writeFile(frozen, good.replace("format: 1", "format: 0"));
 
-    await expect(check(dir, deps)).rejects.toThrow(refusal);
+    await expect(check(dir)).rejects.toThrow(refusal);
     await expect(refresh(dir, deps)).rejects.toThrow(refusal);
     await expect(publish(dir, deps)).rejects.toThrow(refusal);
     // Not hidden behind "week-09.md already exists".
