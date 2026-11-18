@@ -109,6 +109,30 @@ describe("check", () => {
     expect(await read()).toBe(before);
   });
 
+  test("a wrong claim's problems-list text ends before a comma after it", async () => {
+    const { dir, deps } = await fearTheTurtle(10);
+    const { path } = await draft(dir, deps);
+    const text = await readFile(path, "utf8");
+    const edited = text.replace(
+      /(## Bench Mob \{team=sleeper:\d+\}\n)/,
+      "$1Bench Mob won by 50, and more.\n",
+    );
+    expect(edited).not.toBe(text);
+    await writeFile(path, edited);
+
+    const { problems } = await check(dir, deps);
+
+    expect(problems.filter((p) => p.severity === "hard")).toEqual([
+      expect.objectContaining({
+        section: "Bench Mob",
+        line: 28,
+        text: "50",
+        kind: "wrong",
+        reason: "w10.margin is 23.9",
+      }),
+    ]);
+  });
+
   test("a clear untagged claim is auto-tagged in the file, words unchanged", async () => {
     const { dir, deps, edit, read } = await drafted();
     await edit((t) => t.replace(GUS, `${GUS}They won by 55 this week.\n`));

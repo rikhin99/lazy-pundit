@@ -22,6 +22,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 - `check` reads a clause joined by a bare "and" right after a result's "them" as being about the team that lost: in "Team A beat Team B, leaving them 4-4 and fifth in the standings", "fifth" is checked against Team B. Before, it was checked against Team A and marked wrong. With ", and" the clause is still about the sentence's subject.
 - In a league with no house rule for it, `check` no longer marks a count like "2 high scores" or "3 low scores" wrong against the week's points or the season's high or low. It can't tell which stat such a count means, so it leaves it unchecked or loose.
 - The Tabloid and Broadcast style pages leave a team's untouched stat line out of its row's quote, as they do for the week intro: when a blurb is the stat line plus a sentence of the pundit's own, the row now quotes that sentence. Before, the quote could be the stat line run on into the pundit's sentence. Punctuation added to end a stat line (".", "!", "?!", "..."), there or in the intro, no longer makes it count as edited; other edits to a stat line still count as the pundit's prose.
+- `check` quotes a claim without the punctuation after it: "won by 50, and more" is listed as `"50"`, not `"50,"`. A comma inside a number ("1,240") stays.
 
 ## 0.1.1
 

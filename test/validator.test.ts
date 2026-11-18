@@ -365,7 +365,7 @@ describe("grounding prototype scenarios, pundit prose", () => {
     const judged = (text: string) =>
       validate(blurb(6, text)).claims.map((c) => [c.text, c.status, c.id]);
     expect(judged("Gus Bus beat us by 55, and we sit at 3-5.")).toEqual([
-      ["55,", "verified", "sleeper:1/w8.margin"],
+      ["55", "verified", "sleeper:1/w8.margin"],
       ["3-5", "verified", "record"],
     ]);
     expect(judged("While Bench Mob sit at 7-1, we are 3-5.")).toEqual([
@@ -1635,4 +1635,47 @@ describe("invariants over a corpus", () => {
       }
     },
   );
+});
+
+describe("a claim's span", () => {
+  /** The one claim the validator reports for this blurb of team 3's. */
+  const only = (text: string) => {
+    const r = validate(blurb(3, text));
+    expect(r.claims).toHaveLength(1);
+    return { claim: r.claims[0], autoTags: r.autoTags };
+  };
+
+  test("ends before a comma straight after a number, as its auto-tag does", () => {
+    const { claim, autoTags } = only("They scored 127, and won.");
+    expect(claim).toMatchObject({
+      text: "127",
+      start: 12,
+      end: 15,
+      status: "verified",
+      id: "w8.points",
+    });
+    expect(autoTags).toEqual([{ start: 12, end: 15, id: "w8.points" }]);
+  });
+
+  test("ends before trailing punctuation on a wrong claim, with or without a space after", () => {
+    expect(only("Bench Mob won by 50, and more.").claim).toMatchObject({
+      text: "50",
+      start: 17,
+      end: 19,
+      status: "wrong",
+    });
+    expect(only("They won by 50,and more.").claim).toMatchObject({
+      text: "50",
+      start: 12,
+      end: 14,
+    });
+  });
+
+  test("keeps a comma between digits", () => {
+    expect(only("They have 1,240 points for.").claim).toMatchObject({
+      text: "1,240",
+      start: 10,
+      end: 15,
+    });
+  });
 });

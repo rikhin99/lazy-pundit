@@ -142,11 +142,13 @@ export function validate(input: ValidatorInput): ValidationResult {
   }
   for (const { s, start } of units(plain)) {
     for (const f of extract(ctx, s)) {
+      // Trailing punctuation reads as the sentence's, not the claim's.
+      const text = s.slice(f.start, f.end).replace(/[,;:.!?]+$/, "");
       const a = start + f.start;
-      const b = start + f.end;
+      const b = a + text.length;
       if (tags.some((t) => a < t.plainEnd && t.plainStart < b)) continue;
       found.push({
-        text: s.slice(f.start, f.end),
+        text,
         start: a,
         end: b,
         untagged: {
