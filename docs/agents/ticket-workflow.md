@@ -29,7 +29,7 @@ Before the first test, read the case file in `docs/agents/workflow/` for each ca
 - A ticket that says to diagnose before choosing a fix: `diagnose.md`.
 - A change to `scripts/scrub-*.ts` or a committed fixture set: `fixtures.md`.
 - A change to a helper in `test/support/`, or one that adds something to every draft's output: `test-helpers.md`.
-- A change to `package.json`'s `bin`, `files`, `dependencies` or `scripts`, to `src/cli.ts`'s entry, or to `scripts/release.ts`: run `npm run -s install:smoke` (about 20s) before committing, since CI runs it only after the push and the pre-commit hook doesn't.
+- A change to `package.json`'s `bin`, `files`, `dependencies` or `scripts`, to `src/cli.ts`'s entry, to `scripts/release.ts` or `scripts/install-smoke.sh`: run `npm run -s install:smoke` (about 20s) right after the commit, before the sweep. It installs HEAD, so a run before the commit tests the code without your change. On a failure, fix it and amend: nothing is pushed yet. CI runs it only after the push, and the pre-commit hook doesn't.
 
 A pasted `/implement` arrives as text, and the skill can't be loaded with the Skill tool, so read `~/.claude/plugins/cache/mattpocock/mattpocock-skills/*/skills/engineering/implement/SKILL.md` directly. In #56 part (b), searching for it with `find` cost 7.4k.
 
