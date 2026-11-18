@@ -44,6 +44,7 @@ import {
 } from "./stakes.ts";
 import {
   applyAutoTags,
+  type CheckedClaim,
   type ClaimStatus,
   type EvidencePack,
   isHard,
@@ -158,6 +159,21 @@ export interface CheckedDraft extends CheckResult {
    * another team's name in the draft's snapshot and so was left out.
    */
   clashWarnings: string[];
+  /** Each claim with a problem, provisional ones included, where its words are. */
+  problemClaims: ProblemClaim[];
+}
+
+/**
+ * A claim with a problem, at its words in its section (the intro or a team's
+ * blurb) as the league reads it, tags removed. Auto-tags never move these
+ * offsets, since they add no word.
+ */
+export interface ProblemClaim {
+  /** The section's team, or null for the intro. */
+  team: TeamId | null;
+  start: number;
+  end: number;
+  severity: Problem["severity"];
 }
 
 /**
@@ -214,7 +230,7 @@ export async function checkDraft(
       `${clashText(c)} in ${name}'s snapshot, so this check counts it for ${c.team} only. Remove it from ${c.section} to clear this; \`draft\`, and \`refresh\` onto changed data, stop on it while the platform has that name`,
   );
   const earlier = await earlierEvidence(ws, ranking, stakes);
-  const { problems, autoTags } = reviewProse({
+  const { problems, autoTags, problemClaims } = reviewProse({
     text: written,
     ranking,
     league,
@@ -267,6 +283,7 @@ export async function checkDraft(
     evidence,
     ...(baseline ? { baseline } : {}),
     clashWarnings,
+    problemClaims,
   };
 }
 
@@ -350,6 +367,7 @@ function reviewProse(input: {
 }): {
   problems: Problem[];
   autoTags: { start: number; end: number; id: string }[];
+  problemClaims: ProblemClaim[];
 } {
   const { text: written, ranking, league, evidence, order, before } = input;
   const names = teamNames(league);
@@ -374,6 +392,7 @@ function reviewProse(input: {
 
   const problems: Problem[] = [];
   const autoTags: { start: number; end: number; id: string }[] = [];
+  const problemClaims: ProblemClaim[] = [];
   // Provisional while the week the draft let in is still unscored in its data.
   const recorded = ranking.meta.in_progress_week;
   const inProgress = league.weeks.some((w) => w.week === recorded && !w.scored)
@@ -396,6 +415,17 @@ function reviewProse(input: {
       team: s.team,
       section: s.team ? (names.get(s.team) ?? s.team) : "Intro",
     };
+    const plain = stripTags(s.text);
+    const claimAt = (c: CheckedClaim, severity: Problem["severity"]) => {
+      // A claim starts outside any tag, so the text before it strips whole.
+      const from = stripTags(s.text.slice(0, c.start)).length;
+      const to = from + stripTags(s.text.slice(c.start, c.end)).length;
+      // Its words drop the trailing punctuation the span may still hold.
+      const words = plain.slice(from, to).indexOf(c.text);
+      const start = words < 0 ? from : from + words;
+      const end = words < 0 ? to : start + c.text.length;
+      problemClaims.push({ team: s.team, start, end, severity });
+    };
     for (const c of result.claims) {
       if (c.status === "verified") {
         // An untagged score cites its two halves through its auto-tags.
@@ -415,9 +445,11 @@ function reviewProse(input: {
             reason: `week ${inProgress} is still in progress, so this can change once it's scored`,
             id,
           });
+          claimAt(c, "soft");
         }
         continue;
       }
+      claimAt(c, isHard(c.status) ? "hard" : "soft");
       problems.push({
         ...at,
         severity: isHard(c.status) ? "hard" : "soft",
@@ -454,7 +486,7 @@ function reviewProse(input: {
       autoTags.push({ ...t, start: s.start + t.start, end: s.start + t.end });
     }
   }
-  return { problems, autoTags };
+  return { problems, autoTags, problemClaims };
 }
 
 /** Why a word-list hit is a problem. */

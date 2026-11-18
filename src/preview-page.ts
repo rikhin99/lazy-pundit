@@ -1,12 +1,22 @@
-import type { CheckedDraft, Problem } from "./check.ts";
-import { plainTextBlocks } from "./plain-text.ts";
+import type { CheckedDraft, Problem, ProblemClaim } from "./check.ts";
+import type { Injury } from "./evidence-pack.ts";
+import type { TeamId } from "./league.ts";
+import { movementMark } from "./movement.ts";
+import { movementSince, plainTextBlocks } from "./plain-text.ts";
 import { problemLine, problemsHeading } from "./problems-list.ts";
+import {
+  decimal,
+  STAT_COLUMNS,
+  type StatsTableRow,
+  statsTableFrom,
+} from "./stats-table.ts";
 import {
   esc,
   renderBroadcast,
   renderTabloid,
   stylePageInput,
 } from "./style-pages.ts";
+import { stripTags } from "./validator.ts";
 
 /**
  * The preview page for a draft as `checkDraft` read it: the problems list,
@@ -22,10 +32,17 @@ export function previewPage(checked: CheckedDraft): string {
       : `<span id="${entryId(b.entry)}">${esc(b.text)}</span>`,
   );
   const input = stylePageInput(checked);
+  const strip = `<p class="strip">Draft: not published yet</p>\n`;
   const tabs: [name: string, label: string, content: string][] = [
-    ["plain", "Plain text", `<pre>${blocks.join("\n\n")}\n</pre>`],
-    ["tabloid", "Tabloid", frame("Tabloid", renderTabloid(input))],
-    ["broadcast", "Broadcast", frame("Broadcast", renderBroadcast(input))],
+    ["plain", "Plain text", `${strip}<pre>${blocks.join("\n\n")}\n</pre>`],
+    ["tabloid", "Tabloid", strip + frame("Tabloid", renderTabloid(input))],
+    [
+      "broadcast",
+      "Broadcast",
+      strip + frame("Broadcast", renderBroadcast(input)),
+    ],
+    // The editing view: what the league never sees, so no strip.
+    ["check", "Check", checkTab(checked)],
   ];
   const buttons = tabs.map(
     ([name, label], i) =>
@@ -34,7 +51,6 @@ export function previewPage(checked: CheckedDraft): string {
   const panels = tabs.map(
     ([name, , content], i) =>
       `<section role="tabpanel" id="tab-${name}"${i === 0 ? "" : " hidden"}>
-<p class="strip">Draft: not published yet</p>
 ${content}
 </section>`,
   );
@@ -61,7 +77,7 @@ function problemsList(problems: Problem[], warnings: string[]): string {
     const item =
       p.line === null
         ? words
-        : `<a href="#${entryId(p.team ?? "intro")}" data-entry>${words}</a>`;
+        : `<a href="#${checkId(p.team ?? "intro")}" data-entry>${words}</a>`;
     return `<li class="${p.severity}">${item}</li>`;
   });
   const list = lines.length > 0 ? `\n<ul>${lines.join("")}</ul>` : "";
@@ -73,7 +89,101 @@ function problemsList(problems: Problem[], warnings: string[]): string {
 
 /** The Plain text tab's anchor for a team's entry or the intro. */
 function entryId(entry: string): string {
-  return `entry-${entry.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+  return `entry-${anchor(entry)}`;
+}
+
+/** The Check tab's anchor for a team's block or the intro's. */
+function checkId(entry: string): string {
+  return `check-${anchor(entry)}`;
+}
+
+function anchor(entry: string): string {
+  return entry.replace(/[^A-Za-z0-9_-]/g, "-");
+}
+
+/**
+ * The Check tab, the editing view: the power-score method, then the week
+ * intro and each team in the draft's order as the league reads them, each
+ * claim with a problem underlined, a team's place beside its starting place
+ * and its stats.
+ */
+function checkTab(checked: CheckedDraft): string {
+  const { ranking, order, baseline, problemClaims } = checked;
+  const { week } = ranking.meta;
+  const table = statsTableFrom(checked);
+  const rows = new Map(table.rows.map((r) => [r.team, r]));
+  const marked = (team: TeamId | null, text: string) =>
+    underlined(
+      stripTags(text),
+      problemClaims.filter((c) => c.team === team),
+    );
+  const head = [
+    `<p class="method">Power-score method: ${esc(table.method)}</p>`,
+  ];
+  const since = movementSince(week, baseline);
+  if (since) head.push(`<p class="since">${esc(since)}</p>`);
+  const blocks: string[] = [];
+  if (ranking.intro) {
+    blocks.push(`<article class="entry intro" id="${checkId("intro")}"><div class="body"><h2>Week intro</h2>
+<p class="blurb">${marked(null, ranking.intro)}</p></div></article>`);
+  }
+  for (const entry of ranking.entries) {
+    if (entry.kind === "group") {
+      blocks.push(`<h3 class="group">${esc(entry.label)}</h3>`);
+      continue;
+    }
+    const team = entry.team as TeamId;
+    const row = rows.get(team);
+    if (!row) throw new Error(`No team ${team} in the league`);
+    const move = order[team]?.move;
+    const mark =
+      week > 0 && move !== undefined
+        ? ` <span class="mark">${esc(movementMark(move))}</span>`
+        : "";
+    const blurb = entry.blurb
+      ? `\n<p class="blurb">${marked(team, entry.blurb)}</p>`
+      : "";
+    blocks.push(`<article class="entry" id="${checkId(team)}"><div class="places"><span class="place" title="Place">${row.place}</span><span class="start" title="Starting place">start ${row.start}</span></div>
+<div class="body"><h2>${esc(row.name)}${mark}</h2>${blurb}</div>
+${statsPanel(row)}</article>`);
+  }
+  return `<header class="check">${head.join("")}</header>
+${blocks.join("\n")}`;
+}
+
+/**
+ * `text` with each claim's words underlined, solid for a hard problem and
+ * dashed for a soft one. A claim overlapping one before it is left plain.
+ */
+function underlined(text: string, claims: ProblemClaim[]): string {
+  let out = "";
+  let at = 0;
+  for (const c of [...claims].sort((a, b) => a.start - b.start)) {
+    if (c.start < at || c.end <= c.start) continue;
+    out += `${esc(text.slice(at, c.start))}<u class="${c.severity}">${esc(text.slice(c.start, c.end))}</u>`;
+    at = c.end;
+  }
+  return out + esc(text.slice(at));
+}
+
+/** A team's stats panel: each stat as the Stats table prints it, then points for and injuries. */
+function statsPanel(row: StatsTableRow): string {
+  const stats: [label: string, values: string[]][] = [
+    ...STAT_COLUMNS.map((c): [string, string[]] => [c.heading, [c.cell(row)]]),
+    ["Points for", [decimal(row.pointsFor)]],
+    // An empty list is a known answer, not a stat still to come.
+    ["Injuries", row.injuries.length > 0 ? row.injuries.map(injury) : ["none"]],
+  ];
+  const items = stats.map(
+    ([label, values]) =>
+      `<dt>${label}</dt>${values.map((v) => `<dd>${esc(v)}</dd>`).join("")}`,
+  );
+  return `<dl class="stats">${items.join("")}</dl>`;
+}
+
+/** "Alec Pierce (IR, Heel)", or "(IR)" alone without a body part. */
+function injury({ name, status, bodyPart }: Injury): string {
+  return `${name} (${bodyPart ? `${status}, ${bodyPart}` : status})`;
 }
 
 /** A style page whole, in a frame of its own so its styles stay inside it. */
@@ -118,6 +228,26 @@ body{margin:0 auto;max-width:900px;padding:12px 16px 32px;background:var(--bg);c
 pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
 pre :target{background:var(--strip)}
 iframe{display:block;width:100%;min-height:400px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.check{margin:8px 0;font-size:13px;color:var(--muted)}
+.check p{margin:0}
+.entry{display:grid;grid-template-columns:44px minmax(0,1fr) 190px;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
+.entry.intro{grid-template-columns:minmax(0,1fr)}
+.entry h2{font-size:15px;margin:0 0 4px}
+.entry .mark{font-weight:400;color:var(--muted)}
+.places{display:flex;flex-direction:column;align-items:center}
+.place{font:800 22px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.start{font-size:11px;color:var(--muted);white-space:nowrap}
+.blurb{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.blurb u{text-decoration-thickness:2px;text-underline-offset:3px}
+.blurb u.hard{text-decoration-line:underline;text-decoration-style:solid;text-decoration-color:var(--hard)}
+.blurb u.soft{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-color:var(--warn)}
+.stats{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 8px;margin:0;font-size:12px}
+.stats dt{grid-column:1;color:var(--muted)}
+.stats dd{grid-column:2;margin:0;overflow-wrap:anywhere}
+.group{margin:14px 0 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+:target{scroll-margin-top:8px}
+.entry:target{background:var(--strip)}
+@media (max-width:640px){.entry{grid-template-columns:44px minmax(0,1fr)}.entry .stats{grid-column:2}}
 .unreadable{padding:12px;border:1px solid var(--hard);border-radius:8px;color:var(--hard);overflow-wrap:anywhere}
 `;
 
@@ -148,7 +278,7 @@ const SCRIPT = `
   for (const a of document.querySelectorAll("a[data-entry]")) {
     a.addEventListener("click", (e) => {
       e.preventDefault();
-      show("plain", true);
+      show("check", true);
       const id = a.getAttribute("href").slice(1);
       history.replaceState(null, "", "#" + id);
       document.getElementById(id)?.scrollIntoView({ block: "start" });

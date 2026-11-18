@@ -200,15 +200,19 @@ export function statsTableLook(
 /** The mark for a stat a team doesn't have yet. */
 export const MISSING = "—";
 
-/** Each column: its heading, its cell for a row, and whether it aligns right. */
-const COLUMNS: {
+/** A column: its heading, its cell for a row, and whether it aligns right. */
+interface Column {
   heading: string;
   cell: (r: StatsTableRow) => string;
   right?: true;
-}[] = [
-  { heading: "#", cell: (r) => String(r.place), right: true },
+}
+
+/**
+ * The columns after a row's place and name: its starting place and stats, as
+ * the terminal prints them and the Check tab's stats panel shows them.
+ */
+export const STAT_COLUMNS: Column[] = [
   { heading: "Start", cell: (r) => String(r.start), right: true },
-  { heading: "Team", cell: (r) => r.name },
   { heading: "Record", cell: (r) => r.record ?? MISSING },
   {
     heading: "Rank",
@@ -219,6 +223,14 @@ const COLUMNS: {
   { heading: "Form", cell: (r) => decimal(r.form), right: true },
   { heading: "Luck", cell: (r) => decimal(r.luck), right: true },
   { heading: "Streak", cell: (r) => r.streak ?? MISSING },
+];
+
+/** Each column of the terminal's table. */
+const COLUMNS: Column[] = [
+  { heading: "#", cell: (r) => String(r.place), right: true },
+  ...STAT_COLUMNS.slice(0, 1),
+  { heading: "Team", cell: (r) => r.name },
+  ...STAT_COLUMNS.slice(1),
 ];
 
 const TEAM = COLUMNS.findIndex((c) => c.heading === "Team");
