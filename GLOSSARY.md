@@ -451,7 +451,7 @@ A claim with no evidence to check it against, such as a tier claim in a ranking 
 
 **Problems list**:
 Everything in a draft the pundit should see before publishing: each claim that isn't verified, each word-list hit and each flag, placed at its team and line unless it's a league item. Every surface shows the same list, hard problems first.
-_Avoid_: Errors, issues, warnings (for the whole list)
+_Avoid_: Errors, issues, warnings (for the whole list), Problems panel
 
 **Blurb problem**:
 A problem the validator finds in a blurb or the week intro: a claim that isn't verified (provisional claims included), a word-list hit, a stakes mention under no stakes or an unreadable tag. League items and moved teams aren't blurb problems. A frozen copy records how many hard and soft ones it was published with.

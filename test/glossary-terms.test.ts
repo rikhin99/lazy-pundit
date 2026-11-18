@@ -14,6 +14,7 @@ const SRC = join(ROOT, "src");
 const ENFORCED = [
   "draft page",
   "live view",
+  "problems panel",
   "game",
   "owner",
   "username",
