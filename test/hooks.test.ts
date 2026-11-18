@@ -147,6 +147,13 @@ describe("the repo's hooks", () => {
     ],
     ["gh issue view 66 --json body && gh issue view 64 --json body", 2],
     ["gh issue view 66 2>&1 > /tmp/66.md && gh issue view 64 2>&1", 2],
+    // In #123 a ticket's whole thread came in as JSON (7.2k with the workflow).
+    ["gh issue view 123 --json title,body,labels,comments", 2],
+    [
+      "gh issue view 123 --json title,body,comments --jq '.title, .body, (.comments[-1].body // \"\")'",
+      0,
+    ],
+    ["gh issue view 123 --json body,labels", 0],
   ])("ticket-brief.sh on %s exits %i", (command, status) => {
     expect(runHook("ticket-brief.sh", command).status).toBe(status);
   });
@@ -218,8 +225,22 @@ describe("the repo's hooks", () => {
     ["grep -n '^##' CHANGELOG.md", 0],
     ["grep -n espn docs/agents/module-map.md | cut -c1-200", 0],
     ["grep -rn handle src", 0],
+    [
+      "awk -v t='checkLeague' '{i=index($0,t); if(i) print NR\": \"substr($0,(i>150?i-150:1),300)}' docs/agents/module-map.md",
+      0,
+    ],
   ])("long-line-docs.sh on %s exits %i", (command, status) => {
     expect(runHook("long-line-docs.sh", command).status).toBe(status);
+  });
+
+  // In #123's retro, the -o window it suggested failed three times in ugrep.
+  test("long-line-docs.sh suggests a window ugrep can't refuse", () => {
+    const { stderr } = runHook(
+      "long-line-docs.sh",
+      "grep -n -i handle docs/agents/module-map.md",
+    );
+    expect(stderr).toContain("awk -v t='<term>'");
+    expect(stderr).not.toContain("grep -o");
   });
 
   // In #100 and #102 the standards review's one hard finding was a validator

@@ -17,6 +17,14 @@ fi
 
 [ -n "$agent" ] && exit 0
 
+# Without --jq, a view's comments come as the whole thread's JSON (#123's
+# retro: 7.2k with the workflow doc); the brief is the latest comment.
+if printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--json +[^ ]*comments' &&
+  ! printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--jq'; then
+  echo "Read the ticket and its brief (the latest comment) with \`gh issue view <n> --json title,body,comments --jq '.title, .body, (.comments[-1].body // \"\")'\`, not the whole thread's JSON." >&2
+  exit 2
+fi
+
 brief="Ask an Explore subagent for a short brief on the neighbouring tickets (what each one owns that this ticket touches), rather than reading them here."
 if printf '%s' "$cmd" | grep -Eq '(^|[;&|(] *)(for|while) ' &&
   printf '%s' "$cmd" | grep -Eq 'gh +issue +view'; then
