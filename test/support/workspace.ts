@@ -402,10 +402,20 @@ export async function patched(
   return normalizeSleeper(await readSnapshot(dir, id));
 }
 
-/** Publishes and expects it to go through. */
+/**
+ * Publishes and expects it to go through; held back, it throws naming what
+ * stopped it and each problem, so a failing test says why.
+ */
 export async function published(dir: string, deps: Deps) {
   const result = await publish(dir, deps);
-  if (!result.published) throw new Error("held back to editing");
+  if (!result.published) {
+    const lines = result.problems.map(
+      (p) => `${p.severity} ${p.section}: "${p.text}" (${p.kind}) ${p.reason}`,
+    );
+    throw new Error(
+      `held back to editing by ${result.stoppedBy} problems:\n${lines.join("\n")}`,
+    );
+  }
   return result;
 }
 

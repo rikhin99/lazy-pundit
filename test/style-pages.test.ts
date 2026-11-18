@@ -759,3 +759,14 @@ ${highScore()}rivalry-weeks:
     for (const mark of marks) expect(text).toContain(mark);
   });
 });
+
+describe("the published test helper", () => {
+  test("a publish held back by a hard problem names the problem", async () => {
+    const ws = await drafted(10);
+    // One tag over the whole stat line cites the wrong evidence.
+    await withTopBlurb(ws.path, (s) => `[${stripTags(s)}]{ev=streak}`);
+    await expect(published(ws.dir, ws.deps)).rejects.toThrow(
+      /held back to editing by hard problems:\n.*Bench Mob/,
+    );
+  });
+});
