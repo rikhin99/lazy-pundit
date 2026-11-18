@@ -2,7 +2,7 @@ import { type Award, awards } from "./awards.ts";
 import type { CheckedDraft } from "./check.ts";
 import { draftData } from "./draft-data.ts";
 import { formatRecord, type League, type TeamId } from "./league.ts";
-import { type MovementBaseline, movementMark } from "./movement.ts";
+import { type MovementBaseline, movementMark, shownMove } from "./movement.ts";
 import { credit, movementSince, weekTitle } from "./plain-text.ts";
 import type { RankingFile } from "./ranking-file.ts";
 import { type OrderEvidence, stripTags } from "./validator.ts";
@@ -166,7 +166,7 @@ function stylePageParts(input: StylePageInput): StylePageParts {
       place,
       name: team.name,
       record: formatRecord(team.standing),
-      move: week > 0 ? order[team.id]?.move : undefined,
+      move: shownMove(week, order, team.id),
       line: !blurb
         ? undefined
         : prose

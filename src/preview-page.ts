@@ -1,7 +1,7 @@
 import type { CheckedDraft, Problem, ProblemClaim } from "./check.ts";
 import type { Injury } from "./evidence-pack.ts";
 import type { TeamId } from "./league.ts";
-import { movementMark } from "./movement.ts";
+import { movementMark, shownMove } from "./movement.ts";
 import { movementSince, plainTextBlocks } from "./plain-text.ts";
 import { problemLine, problemsHeading } from "./problems-list.ts";
 import {
@@ -135,11 +135,11 @@ function checkTab(checked: CheckedDraft): string {
     const team = entry.team as TeamId;
     const row = rows.get(team);
     if (!row) throw new Error(`No team ${team} in the league`);
-    const move = order[team]?.move;
+    const move = shownMove(week, order, team);
     const mark =
-      week > 0 && move !== undefined
-        ? ` <span class="mark">${esc(movementMark(move))}</span>`
-        : "";
+      move === undefined
+        ? ""
+        : ` <span class="mark">${esc(movementMark(move))}</span>`;
     const blurb = entry.blurb
       ? `\n<p class="blurb">${marked(team, entry.blurb)}</p>`
       : "";

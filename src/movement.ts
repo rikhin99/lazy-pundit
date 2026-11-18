@@ -69,6 +69,18 @@ export function orderEvidence(
   return order;
 }
 
+/**
+ * A team's movement as a ranking shows it, or none at week 0, before the
+ * season, when there's nothing to move from.
+ */
+export function shownMove(
+  week: number,
+  order: Record<TeamId, OrderEvidence>,
+  team: TeamId,
+): number | "new" | undefined {
+  return week > 0 ? order[team]?.move : undefined;
+}
+
 /** Movement as the league reads it after a team's record: (▲2), (▼1), (—), (new). */
 export function movementMark(move: number | "new"): string {
   if (move === "new") return "(new)";

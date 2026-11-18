@@ -6,6 +6,11 @@ import { check, draft, publish, type TeamId } from "../src/index.ts";
 import { moveOf } from "../src/movement.ts";
 import { renderPlainText } from "../src/plain-text.ts";
 import {
+  renderBroadcast,
+  renderTabloid,
+  stylePageInput,
+} from "../src/style-pages.ts";
+import {
   atWeek,
   frontMatter,
   onStandings,
@@ -228,7 +233,8 @@ describe("movement", () => {
 
   test("a preseason ranking shows no movement", async () => {
     const { dir } = await week8AfterWeek7();
-    const { ranking, league, order, baseline } = await checkDraft(dir);
+    const checked = await checkDraft(dir);
+    const { ranking, league, order, baseline } = checked;
 
     const preseason = { ...ranking, meta: { ...ranking.meta, week: 0 } };
     const text = renderPlainText(preseason, league, order, baseline);
@@ -236,6 +242,9 @@ describe("movement", () => {
     expect(text).toContain("Preseason · by");
     expect(text).not.toContain("Movement since");
     expect(teamLines(text)[0]).toBe("1. Bench Mob · 7-1");
+    const input = stylePageInput({ ...checked, ranking: preseason });
+    expect(renderTabloid(input)).not.toContain('class="move ');
+    expect(renderBroadcast(input)).not.toContain('class="move ');
   });
 
   test("a team missing from the baseline is new", () => {

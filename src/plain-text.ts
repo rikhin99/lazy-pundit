@@ -1,5 +1,5 @@
 import { formatRecord, type League, type TeamId } from "./league.ts";
-import { type MovementBaseline, movementMark } from "./movement.ts";
+import { type MovementBaseline, movementMark, shownMove } from "./movement.ts";
 import type { RankingFile } from "./ranking-file.ts";
 import { type OrderEvidence, stripTags } from "./validator.ts";
 
@@ -49,7 +49,6 @@ export function plainTextBlocks(
     league.teams.map((t) => [t.id, t]),
   );
   const { week, pundit } = ranking.meta;
-  const showMovement = week > 0;
   const header = [
     `🏈 ${league.name.toUpperCase()} POWER RANKINGS`,
     `${weekTitle(week)} · by ${pundit}`,
@@ -70,9 +69,8 @@ export function plainTextBlocks(
     place += 1;
     const team = teams.get(entry.team as TeamId);
     if (!team) throw new Error(`No team ${entry.team} in the league`);
-    const move = order[team.id]?.move;
-    const mark =
-      showMovement && move !== undefined ? ` ${movementMark(move)}` : "";
+    const move = shownMove(week, order, team.id);
+    const mark = move === undefined ? "" : ` ${movementMark(move)}`;
     const line = `${place}. ${team.name} · ${formatRecord(team.standing)}${mark}`;
     blocks.push({
       entry: team.id,
