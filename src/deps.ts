@@ -27,6 +27,8 @@ export interface Deps {
   workspacesDir: string;
   /** The operator's home folder, which a typed `~` stands for. */
   homeDir: string;
+  /** The folder the command was run from, which places init's default folder. */
+  cwd: string;
   /** What the environment overrides or reports. */
   env: Environment;
 }
@@ -146,6 +148,7 @@ export function systemDeps(): Deps {
     ),
     workspacesDir: join(home, "lazy-pundit"),
     homeDir: home,
+    cwd: process.cwd(),
     env: {
       ...(env.ANTHROPIC_API_KEY
         ? { anthropicApiKey: env.ANTHROPIC_API_KEY }

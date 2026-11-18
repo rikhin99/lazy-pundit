@@ -8,7 +8,10 @@
 #   dot             the folder typed as <home>/ws., the fix without the dot taken
 #   dot-keep        the same, with <home>/ws. kept as typed
 #   next-to         config.yaml already lists a workspace at <home>/elsewhere/league-a,
-#                   so the folder left empty is <home>/elsewhere/fear-the-turtle
+#                   and init runs from its rankings folder, so the folder left
+#                   empty is next to it, <home>/elsewhere/fear-the-turtle
+#   here            init runs from <home>/leagues, so the folder left empty is
+#                   <home>/leagues/fear-the-turtle
 #   bad-id          an unknown league ID, re-asked, then Ctrl-C
 #   yahoo           pick a platform that stops the wizard
 #   espn            ESPN, replaying Hot Takery's week 8 (read as a public league, so no
@@ -52,7 +55,7 @@
 # prompt listens.
 
 # Every scenario, in the order drive-wizard-all.sh runs them. It reads this line.
-set scenarios {full folder relative dot dot-keep next-to bad-id yahoo espn espn-bad-id espn-private espn-retype espn-env-cookie cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}
+set scenarios {full folder relative dot dot-keep next-to here bad-id yahoo espn espn-bad-id espn-private espn-retype espn-env-cookie cancel cancel-folder rename skip-rest key another again stakes family setup-lore setup-stakes}
 # The scenarios that exit 1: those ending with Ctrl-C, as a cancelled setup
 # does, and those ending with an error. drive-wizard-all.sh reads this line.
 set exits_one {bad-id espn-bad-id espn-retype espn-env-cookie cancel cancel-folder another again}
@@ -135,6 +138,7 @@ array set writes {
   dot ws
   dot-keep ws.
   next-to elsewhere/fear-the-turtle
+  here leagues/fear-the-turtle
   cancel-folder nothing
   espn ws
   espn-bad-id nothing
@@ -198,12 +202,18 @@ set DOWN "\033\[B"
 set CTRL_C "\x03"
 
 if {$scenario eq "next-to"} {
-  # A workspace for another league, listed but never made, so the league
-  # match skips it.
+  # A workspace for another league, listed but holding no workspace.md, so
+  # the league match skips it; init runs from a folder inside it.
   file mkdir "$home/.config/lazy-pundit"
   set config [open "$home/.config/lazy-pundit/config.yaml" w]
   puts $config "format: 1\nworkspaces:\n  league-a: $home/elsewhere/league-a"
   close $config
+  file mkdir "$home/elsewhere/league-a/rankings"
+  cd "$home/elsewhere/league-a/rankings"
+}
+if {$scenario eq "here"} {
+  file mkdir "$home/leagues"
+  cd "$home/leagues"
 }
 
 spawn node "$repo/src/cli.ts" init
@@ -262,7 +272,8 @@ if {$espn} {
   send "900000000000000001\r"
 }
 
-if {$scenario eq "next-to"} { need "next to your last one" }
+if {$scenario eq "next-to"} { need "the workspace you're in" }
+if {$scenario eq "here"} { need "in the folder you're in" }
 need "Workspace folder"
 if {$scenario eq "cancel-folder"} { send $CTRL_C; finish }
 if {$scenario eq "folder"} {

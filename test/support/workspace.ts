@@ -300,6 +300,7 @@ export async function operator(): Promise<Deps> {
     configDir: join(home, ".config", "lazy-pundit"),
     workspacesDir: join(home, "lazy-pundit"),
     homeDir: home,
+    cwd: home,
     env: { nodeVersion: "v24.0.0" },
   };
 }

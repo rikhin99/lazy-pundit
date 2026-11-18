@@ -1,5 +1,5 @@
-import { mkdir, readdir, rm } from "node:fs/promises";
-import { dirname, isAbsolute, join } from "node:path";
+import { mkdir, readdir, realpath, rm } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { stringify } from "yaml";
 import { checkAnthropicKey } from "./anthropic.ts";
 import {
@@ -995,27 +995,66 @@ export async function setupChecklist(
 }
 
 /**
+ * Why the folder question's default is where it is, for the wizard to say:
+ * the current folder is inside a listed workspace, so the default sits next
+ * to it, or the default is in the current folder itself.
+ */
+export type DefaultFolderReason =
+  | { workspaceYoureIn: string }
+  | { currentFolder: string };
+
+/**
  * The folder a league's workspace gets when the folder question is left
- * empty: next to the last workspace `config.yaml` lists, in a folder named
- * after its slug, or in the workspaces folder with none listed. `nextTo` is
- * that last workspace, so the wizard can say why.
+ * empty, named after its slug: next to the listed workspace the current
+ * folder is in, in the workspaces folder from the home folder or above it,
+ * or else in the current folder. `reason` says which, except for the
+ * workspaces folder.
  */
 export async function defaultWorkspaceFolder(
-  deps: Pick<Deps, "configDir" | "workspacesDir">,
+  deps: Pick<Deps, "configDir" | "workspacesDir" | "homeDir" | "cwd">,
   league: LeagueCheck,
-): Promise<{ dir: string; nextTo?: string }> {
+): Promise<{ dir: string; reason?: DefaultFolderReason }> {
   const listed = (await readConfig(deps))?.workspaces ?? {};
   return defaultFolder(deps, listed, freeSlug(listed, league.name));
 }
 
-function defaultFolder(
-  deps: Pick<Deps, "workspacesDir">,
+async function defaultFolder(
+  deps: Pick<Deps, "workspacesDir" | "homeDir" | "cwd">,
   listed: Record<string, string>,
   slug: string,
-): { dir: string; nextTo?: string } {
-  const last = Object.values(listed).at(-1);
-  if (last === undefined) return { dir: join(deps.workspacesDir, slug) };
-  return { dir: join(dirname(last), slug), nextTo: last };
+): Promise<{ dir: string; reason?: DefaultFolderReason }> {
+  const cwd = await realOrResolved(deps.cwd);
+  let youreIn: { listed: string; real: string } | undefined;
+  for (const dir of Object.values(listed)) {
+    const real = await realOrResolved(dir);
+    if (within(real, cwd) && real.length > (youreIn?.real.length ?? -1)) {
+      youreIn = { listed: dir, real };
+    }
+  }
+  if (youreIn !== undefined) {
+    return {
+      dir: join(dirname(youreIn.listed), slug),
+      reason: { workspaceYoureIn: youreIn.listed },
+    };
+  }
+  if (within(cwd, await realOrResolved(deps.homeDir))) {
+    return { dir: join(deps.workspacesDir, slug) };
+  }
+  return {
+    dir: join(deps.cwd, slug),
+    reason: { currentFolder: deps.cwd },
+  };
+}
+
+/** A folder's real path, through any links, or its resolved path if it's missing. */
+async function realOrResolved(dir: string): Promise<string> {
+  return realpath(dir).catch(() => resolve(dir));
+}
+
+/** Whether `inner` is `outer` or a folder inside it. */
+function within(outer: string, inner: string): boolean {
+  const rel = relative(outer, inner);
+  return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
 /**
@@ -1043,7 +1082,7 @@ function inHome(deps: Pick<Deps, "homeDir">, typed: string): string {
  * right after the folder question rather than after every other step.
  */
 export async function checkWorkspace(
-  deps: Pick<Deps, "configDir" | "workspacesDir" | "homeDir">,
+  deps: Pick<Deps, "configDir" | "workspacesDir" | "homeDir" | "cwd">,
   answers: { punditName: string; league: LeagueCheck; dir?: string },
 ): Promise<{ slug: string; dir: string }> {
   const { league } = answers;
@@ -1059,7 +1098,7 @@ export async function checkWorkspace(
   }
   const listed = (await readConfig(deps))?.workspaces ?? {};
   const slug = freeSlug(listed, league.name);
-  const dir = chosen ?? defaultFolder(deps, listed, slug).dir;
+  const dir = chosen ?? (await defaultFolder(deps, listed, slug)).dir;
   await refuseLeagueInWorkspace(
     [...Object.values(listed), dir],
     league,
@@ -1228,7 +1267,10 @@ const WRITTEN = [
  * file `writeStepFiles` adds goes in `WRITTEN`.
  */
 export async function setUpWorkspace(
-  deps: Pick<Deps, "configDir" | "workspacesDir" | "homeDir" | "clock" | "env">,
+  deps: Pick<
+    Deps,
+    "configDir" | "workspacesDir" | "homeDir" | "cwd" | "clock" | "env"
+  >,
   answers: {
     punditName: string;
     league: LeagueCheck;

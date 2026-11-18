@@ -8,6 +8,10 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 - `lazy-pundit --version` (or `-V`) prints the installed release's version, and `doctor`'s first line names it ("lazy-pundit 0.1.2"), so a bug report can say which release it's from.
 
+### Changed
+
+- `init`'s folder question offers a folder by where you run it: next to the workspace you're in, `~/lazy-pundit/<league>` from your home folder or above it, and otherwise a new folder in the one you're in, and it says which. Before, it offered a folder next to the last workspace you set up, wherever you ran it.
+
 ### Fixed
 
 - `check` reads two ordinals in one sentence each against its own stat: in "Second in points and first in the standings", "first" is checked against the standings. Before, it took the points cue from the clause before it and was marked wrong.

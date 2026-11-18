@@ -882,10 +882,13 @@ async function askFolder(
   league: LeagueCheck,
 ): Promise<{ slug: string; dir: string }> {
   const emptyAnswer = await defaultWorkspaceFolder(deps, league);
-  if (emptyAnswer.nextTo !== undefined) {
+  const { reason } = emptyAnswer;
+  if (reason !== undefined && "workspaceYoureIn" in reason) {
     log.info(
-      `A new workspace goes next to your last one, ${emptyAnswer.nextTo}.`,
+      `A new workspace goes next to ${reason.workspaceYoureIn}, the workspace you're in.`,
     );
+  } else if (reason !== undefined) {
+    log.info("A new workspace goes in the folder you're in.");
   }
   for (;;) {
     const typed = answered(

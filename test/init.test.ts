@@ -4,6 +4,7 @@ import {
   readdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -435,16 +436,19 @@ test("a second pundit for a listed league is refused, with nothing changed", asy
   expect(await readdir(deps.workspacesDir)).toEqual(["fear-the-turtle"]);
 });
 
-test("a different league with the same name gets its own slug", async () => {
+test("a different league with the same name, set up from the same folder, gets its own slug", async () => {
   const deps = atWeek(await operator(), 8);
   const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const here = join(deps.homeDir, "leagues");
+  await mkdir(here);
+  deps.cwd = here;
   await setUpWorkspace(deps, { punditName: "Rikhin", league });
   const { slug, dir } = await setUpWorkspace(deps, {
     punditName: "Rikhin",
     league: { ...league, leagueId: "555" },
   });
   expect(slug).toBe("fear-the-turtle-2");
-  expect(dir).toBe(join(deps.workspacesDir, "fear-the-turtle-2"));
+  expect(dir).toBe(join(here, "fear-the-turtle-2"));
 });
 
 test("listing a workspace keeps an existing config.yaml's comments and name", async () => {
@@ -512,33 +516,95 @@ test("a chosen folder is used; a relative one or one in use is refused with noth
   );
 });
 
-test("a second league's workspace defaults to a folder next to the last one listed", async () => {
+test("a new workspace defaults to a folder in the current folder, outside home's ancestors and any workspace", async () => {
   const deps = atWeek(await operator(), 8);
   const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
-  const home = dirname(deps.workspacesDir);
-  expect(await defaultWorkspaceFolder(deps, league)).toEqual({
-    dir: join(deps.workspacesDir, "fear-the-turtle"),
+  const here = join(deps.homeDir, "leagues");
+  await mkdir(here);
+  deps.cwd = here;
+  await listWorkspace(deps, {
+    name: "Rikhin",
+    slug: "league-a",
+    dir: join(deps.homeDir, "elsewhere", "league-a"),
   });
-
-  for (const [slug, parent] of [
-    ["league-z", "first"],
-    ["league-a", "elsewhere"],
-  ] as const) {
-    await listWorkspace(deps, {
-      name: "Rikhin",
-      slug,
-      dir: join(home, parent, slug),
-    });
-  }
-  const dir = join(home, "elsewhere", "fear-the-turtle");
+  const dir = join(here, "fear-the-turtle");
   expect(await defaultWorkspaceFolder(deps, league)).toEqual({
     dir,
-    nextTo: join(home, "elsewhere", "league-a"),
+    reason: { currentFolder: here },
   });
   expect(await checkWorkspace(deps, { punditName: "Rikhin", league })).toEqual({
     slug: "fear-the-turtle",
     dir,
   });
+});
+
+test("from inside a listed workspace, a new workspace defaults to a folder next to it", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const parent = join(deps.homeDir, "leagues");
+  const workspace = join(parent, "league-a");
+  await mkdir(join(workspace, "rankings"), { recursive: true });
+  await listWorkspace(deps, {
+    name: "Rikhin",
+    slug: "league-a",
+    dir: workspace,
+  });
+  await listWorkspace(deps, {
+    name: "Rikhin",
+    slug: "league-z",
+    dir: join(deps.homeDir, "elsewhere", "league-z"),
+  });
+  const dir = join(parent, "fear-the-turtle");
+  for (const cwd of [workspace, join(workspace, "rankings")]) {
+    deps.cwd = cwd;
+    expect(await defaultWorkspaceFolder(deps, league)).toEqual({
+      dir,
+      reason: { workspaceYoureIn: workspace },
+    });
+    expect(
+      await checkWorkspace(deps, { punditName: "Rikhin", league }),
+    ).toEqual({ slug: "fear-the-turtle", dir });
+  }
+});
+
+test.skipIf(process.platform === "win32")(
+  "a workspace listed through a link still counts as the one you're in",
+  async () => {
+    const deps = atWeek(await operator(), 8);
+    const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+    const real = join(deps.homeDir, "leagues");
+    await mkdir(join(real, "league-a"), { recursive: true });
+    await symlink(real, join(deps.homeDir, "link"));
+    const workspace = join(deps.homeDir, "link", "league-a");
+    await listWorkspace(deps, {
+      name: "Rikhin",
+      slug: "league-a",
+      dir: workspace,
+    });
+    deps.cwd = join(real, "league-a");
+    expect(await defaultWorkspaceFolder(deps, league)).toEqual({
+      dir: join(deps.homeDir, "link", "fear-the-turtle"),
+      reason: { workspaceYoureIn: workspace },
+    });
+  },
+);
+
+test("from the home folder or above it, a new workspace defaults to the workspaces folder", async () => {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  await listWorkspace(deps, {
+    name: "Rikhin",
+    slug: "league-a",
+    dir: join(deps.homeDir, "elsewhere", "league-a"),
+  });
+  const dir = join(deps.workspacesDir, "fear-the-turtle");
+  for (const cwd of [deps.homeDir, dirname(deps.homeDir), "/"]) {
+    deps.cwd = cwd;
+    expect(await defaultWorkspaceFolder(deps, league)).toEqual({ dir });
+    expect(
+      await checkWorkspace(deps, { punditName: "Rikhin", league }),
+    ).toEqual({ slug: "fear-the-turtle", dir });
+  }
 });
 
 test("a folder typed with ~ is in the home folder; any other relative one is refused", async () => {
