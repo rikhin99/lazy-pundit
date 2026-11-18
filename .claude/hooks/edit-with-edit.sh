@@ -13,7 +13,7 @@
 # scratchpad), runs, even when the text it writes quotes a src/ path, such as
 # "$repo/src/cli.ts" in scripts/drive-wizard.exp.
 cmd=$(jq -r '.tool_input.command // ""')
-msg="Edit src/ and test/ files with the Edit tool: it fails loudly on a miss, unlike an in-place shell edit. Send each change as its own Edit call, all in one message; to rewrite most of a file, Write it whole."
+msg="Edit src/ and test/ files with the Edit tool: it fails loudly on a miss, unlike an in-place shell edit. Send each change as its own Edit call, all in one message; for one exact change repeated across files (a call site's arguments), \`npm run -s replace -- '<old>' '<new>' <file>...\`; to rewrite most of a file, Write it whole."
 if printf '%s\n' "$cmd" | awk '{ gsub(/&&|\|\|/, "\n"); print }' |
   grep -E '(sed|perl) +-[a-zA-Z0-9]*i' |
   grep -Eq '(^|[ "'"'"'/])(src|test)/'; then

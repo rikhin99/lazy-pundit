@@ -1,13 +1,14 @@
 /**
  * Mutation check: changes one place in a source file (uncommitted changes
- * included), runs one test
- * file, prints which tests went red with each one's first failure line (or
- * "survived"), and puts the file back,
- * Ctrl-C included. `<old>` must occur exactly once in the file. Exits 0 when
- * the mutation goes red, 1 when it survives, 2 on a usage problem, 3 when the
- * test file didn't load (nothing was tested).
+ * included), runs one test file, prints which tests went red with each one's
+ * first failure line (the first five, then a count) or "survived", and puts
+ * the file back, Ctrl-C included. `<old>` must occur exactly once in the
+ * file. A fifth argument runs only the tests whose names match it (vitest's
+ * `-t`), for a guard where one test matters. Exits 0 when the mutation goes
+ * red, 1 when it survives, 2 on a usage problem, 3 when the test file didn't
+ * load or no test ran (nothing was tested).
  *
- *   npm run -s mutate -- src/sleeper/fetcher.ts '<old>' '<new>' test/fetch-sleeper.test.ts
+ *   npm run -s mutate -- src/sleeper/fetcher.ts '<old>' '<new>' test/fetch-sleeper.test.ts ['<test name>']
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -20,14 +21,16 @@ function stop(message: string): never {
   process.exit(2);
 }
 
-const [file, oldText, newText, testFile] = process.argv.slice(2);
+const [file, oldText, newText, testFile, testName] = process.argv.slice(2);
 if (
   file === undefined ||
   oldText === undefined ||
   newText === undefined ||
   testFile === undefined
 ) {
-  stop("usage: npm run -s mutate -- <src-file> <old> <new> <test-file>");
+  stop(
+    "usage: npm run -s mutate -- <src-file> <old> <new> <test-file> [<test name>]",
+  );
 }
 
 const original = readFileSync(file, "utf8");
@@ -62,6 +65,7 @@ try {
       testFile,
       "--reporter=json",
       `--outputFile=${outputFile}`,
+      ...(testName === undefined ? [] : ["-t", testName]),
     ],
     { stdio: "ignore" },
   );

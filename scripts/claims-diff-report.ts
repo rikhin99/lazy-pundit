@@ -70,6 +70,21 @@ export const CUE_PAIRS = [
  */
 export const CUE_PAIRS_MISREAD: string[] = [];
 
+/**
+ * Punctuation at a claim's edge, tagged and untagged, inside a tag's brackets
+ * and after them, so a change to where a span ends shows up: in #130 a
+ * tagged claim's trim diffed nothing, as no sentence put a comma inside the
+ * brackets. True for Baron Von Trade, section 5, as `CUE_PAIRS` are.
+ */
+export const SPAN_EDGES = [
+  "They scored [110.08,]{ev=w8.points} and still lost.",
+  "They scored [110.08]{ev=w8.points}, and still lost.",
+  "They scored 110.08, and still lost.",
+  "Lost by 19.95; that stings.",
+  "Lost by [19.95!]{ev=w8.margin} Ouch.",
+  "Sitting at 891.03 points for: not bad.",
+];
+
 const SECTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, null];
 
 /**
@@ -83,6 +98,7 @@ export function corpus(): Case[] {
     ...TAGGED_PLAIN,
     ...CLAIM_HEAVY,
     ...CUE_PAIRS,
+    ...SPAN_EDGES,
   ];
   return [
     ...TRUE_UNTAGGED.map(([team, text]) => ({ team, text })),

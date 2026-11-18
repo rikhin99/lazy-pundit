@@ -31,21 +31,38 @@ export function verdict(report: Report): { lines: string[]; code: number } {
       code: 3,
     };
   }
-  const results = report.testResults.flatMap((r) => r.assertionResults);
+  // A test a name filter skipped didn't run, so it isn't counted.
+  const results = report.testResults
+    .flatMap((r) => r.assertionResults)
+    .filter((a) => a.status === "passed" || a.status === "failed");
+  if (results.length === 0) {
+    return {
+      lines: ["not tested: no test ran; check the test name"],
+      code: 3,
+    };
+  }
   const failed = results.filter((a) => a.status === "failed");
   if (failed.length === 0) {
     return { lines: [`survived: all ${results.length} passed`], code: 1 };
   }
   // The first line of each failure, so a red from the mutation itself (a
-  // ReferenceError, say) reads apart from a red on the behaviour.
+  // ReferenceError, say) reads apart from a red on the behaviour. Past
+  // RED_SHOWN, the rest are a count.
+  const rest = failed.length - RED_SHOWN;
   return {
     lines: [
       `red: ${failed.length} of ${results.length} failed`,
-      ...failed.flatMap((a) => [
-        `  × ${a.fullName}`,
-        `    ${(a.failureMessages?.[0] ?? "").split("\n")[0]}`,
-      ]),
+      ...failed
+        .slice(0, RED_SHOWN)
+        .flatMap((a) => [
+          `  × ${a.fullName}`,
+          `    ${(a.failureMessages?.[0] ?? "").split("\n")[0]}`,
+        ]),
+      ...(rest > 0 ? [`  and ${rest} more red`] : []),
     ],
     code: 0,
   };
 }
+
+/** How many red tests a verdict names before counting the rest. */
+const RED_SHOWN = 5;
