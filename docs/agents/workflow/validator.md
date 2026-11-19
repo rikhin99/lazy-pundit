@@ -13,3 +13,15 @@ A claim phrase that reads data `blurb()` doesn't pass (house rules) runs `PLAIN_
 A rule that widens which team or stat a claim reads adds to `TRUE_UNTAGGED` a sentence matching the new trigger where the old reading is still right. In #128 a bare "and" after "them" began reading the team that lost, and "leaving them 4-4 and sit first" turned wrong; only the spec review's probes found it.
 
 A change that fixes a reading `CUE_PAIRS_MISREAD` in `scripts/claims-diff-report.ts` lists turns `test/claims-diff-report.test.ts` red: take the sentence off that list.
+
+## A new claim status
+
+A new `ClaimStatus` reaches places its type checks only in part. The labels in `src/problems-list.ts` are a `Record`, so the typecheck asks for its label, and `FAILING` in `test/llm-draft.test.ts` asks for a sentence the gate fails on. The rest needs a decision each:
+
+- `isHard` in `src/validator.ts`: hard or soft.
+- `BLURB_PROBLEM_KINDS` in `src/check.ts`: a blurb problem, or not.
+- `withGateFailures` in `src/check.ts` pairs a problem with its gate claim by text, so the problem's text is the claim's `text`, unchanged.
+- `complaints()` in `src/prompt.ts` quotes the claim's `text` to the LLM, so the text is one it can find in its draft.
+- Where its check goes in `judgeClaim`: a status about a tag's form goes after the section check and the unknown-ID check, so it doesn't hide them.
+
+In #134, `empty-tag` first gave its problem the tag as written while its claim kept "", and the gate stopped marking it; checked first in `judgeClaim`, it turned an empty lore tag into a problem and hid an unknown ID. The spec review of the fix found both.

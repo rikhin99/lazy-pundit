@@ -2,6 +2,7 @@ import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
+  type ClaimStatus,
   draft,
   draftData,
   type LlmRequest,
@@ -276,6 +277,36 @@ describe("the LLM gate", () => {
         gate: true,
       }),
     ]);
+  });
+
+  /**
+   * A Hustle sentence the gate fails for each claim status: a new status
+   * fails the typecheck until it has one. Stale needs an earlier snapshot,
+   * which a first draft's gate never compares against.
+   */
+  const FAILING: Record<Exclude<ClaimStatus, "verified" | "stale">, string> = {
+    wrong: "Scored [999]{ev=pf}.",
+    "unknown-id": "[As foretold]{ev=w8.nope}.",
+    "empty-tag": "Sitting at [ , ]{ev=record}.",
+    loose: "They have 816.2 on the year.",
+    unchecked: "Seven wins, one loss.",
+  };
+
+  test("a section that never passes has each claim status it fails on flagged as a gate failure", async () => {
+    const blurb = Object.values(FAILING).join(" ");
+    const { dir, deps } = await withLlm(
+      await withHustle(blurb),
+      `## {team=${HUSTLE}}\n${blurb}`,
+      `## {team=${HUSTLE}}\n${blurb}`,
+    );
+
+    const result = await draft(dir, deps);
+
+    const hustle = result.problems.filter((p) => p.team === HUSTLE);
+    expect(new Set(hustle.map((p) => p.kind))).toEqual(
+      new Set(Object.keys(FAILING)),
+    );
+    expect(hustle.filter((p) => !p.gate)).toEqual([]);
   });
 
   test("an empty tag that never passes is flagged as a gate failure, and the retry quotes the tag", async () => {
