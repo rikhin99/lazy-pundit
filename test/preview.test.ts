@@ -17,8 +17,11 @@ import {
   onStandings,
   patchingTransport,
   published,
+  RELAXED_ROAST,
   rankingsDir,
+  writeFamilyLeague,
   writeLeagueFile,
+  writePersona,
 } from "./support/workspace.ts";
 
 /** A port nothing on 127.0.0.1 holds right now. */
@@ -260,6 +263,21 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
 
 const REMINDER =
   "League: correction timing: Scored. Corrections may land through Thursday";
+
+test("a relaxed persona's draft shows the relaxed-persona item after the correction-timing item", async () => {
+  const { dir, deps } = await fearTheTurtle(10);
+  await writePersona(dir, RELAXED_ROAST);
+  await writeFamilyLeague(dir, "on");
+  await draft(dir, deps);
+
+  const html = await served(dir, deps);
+
+  expect(shown(panel(html))).toContain("Problems: 0 hard, 2 soft");
+  expect(items(html).map(shown)).toEqual([
+    `· ${REMINDER}`,
+    "· League: relaxed persona: the family league is on, but this draft's persona relaxes it (swearing on, teasing roast); publishing with it asks you to confirm the first time and whenever the persona changes",
+  ]);
+});
 
 test("the page leads with the problems list, then the share tabs on Plain text", async () => {
   const { preview } = await previewing();

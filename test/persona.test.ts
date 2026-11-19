@@ -1,11 +1,14 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { isBlurbProblem } from "../src/check.ts";
 import {
   check,
   draft,
   draftData,
   PRESETS,
+  problemLine,
+  problemsHeading,
   publish,
   validate,
 } from "../src/index.ts";
@@ -15,8 +18,11 @@ import {
   atWeek,
   committed,
   fearTheTurtle,
+  RELAXED_ROAST,
   rankingsDir,
   withoutReminder,
+  writeFamilyLeague,
+  writePersona,
 } from "./support/workspace.ts";
 
 const KEY = "sk-ant-api03-test-key";
@@ -48,11 +54,6 @@ async function withPersona(persona: string | null, ...replies: string[]) {
   ws.deps.env.anthropicApiKey = KEY;
   if (persona !== null) await writePersona(ws.dir, persona);
   return { ...ws, llm };
-}
-
-async function writePersona(dir: string, text: string): Promise<void> {
-  await mkdir(join(dir, "pundits", "rikhin"), { recursive: true });
-  await writeFile(join(dir, "pundits", "rikhin", "persona.md"), text);
 }
 
 /** The Persona part of a prompt. */
@@ -148,18 +149,7 @@ describe("persona.md", () => {
   });
 });
 
-/** Turns the 2025 season's family league on or off in its `league.md`. */
-async function writeFamilyLeague(dir: string, setting: "on" | "off") {
-  await mkdir(join(dir, "seasons", "2025"), { recursive: true });
-  await writeFile(
-    join(dir, "seasons", "2025", "league.md"),
-    `---\nleague: 1\nseason: 2025\nfamily-league: ${setting}\n---\n`,
-  );
-}
-
 const ROAST = "---\nformat: 1\npreset: roast\n---\n";
-const RELAXED_ROAST =
-  "---\nformat: 1\npreset: roast\nfamily-league: relaxed\n---\n";
 
 describe("a family league", () => {
   test("lowers a Roast persona to no swearing and light teasing, with a warning", async () => {
@@ -224,6 +214,89 @@ describe("a family league", () => {
     expect(await readFile(result.path, "utf8")).toContain(
       "  family_league_relaxed: true\n",
     );
+  });
+});
+
+/** The relaxed-persona item for a recorded Roast persona, as `check` prints it. */
+const RELAXED_ITEM =
+  "· League: relaxed persona: the family league is on, but this draft's persona relaxes it (swearing on, teasing roast); publishing with it asks you to confirm the first time and whenever the persona changes";
+
+const TIMING_ITEM =
+  "· League: correction timing: Scored. Corrections may land through Thursday";
+
+describe("the relaxed-persona item", () => {
+  test("a relaxed persona's draft lists it after the correction-timing item, as a league item", async () => {
+    const { dir, deps } = await withPersona(RELAXED_ROAST);
+    await writeFamilyLeague(dir, "on");
+    await draft(dir, deps);
+
+    const { problems } = await check(dir);
+
+    expect([problemsHeading(problems), ...problems.map(problemLine)]).toEqual([
+      "Problems: 0 hard, 2 soft",
+      TIMING_ITEM,
+      RELAXED_ITEM,
+    ]);
+    expect(problems.filter(isBlurbProblem)).toEqual([]);
+  });
+
+  test("it's listed ahead of an item with a line", async () => {
+    const { dir, deps } = await withPersona(RELAXED_ROAST);
+    await writeFamilyLeague(dir, "on");
+    const { path } = await draft(dir, deps);
+    const text = await readFile(path, "utf8");
+    await writeFile(
+      path,
+      text.replace("What a week.", "What a week, 999 points."),
+    );
+
+    const { problems } = await check(dir);
+
+    expect(problems.map((p) => p.kind)).toEqual([
+      "correction-timing",
+      "relaxed-persona",
+      "unchecked",
+    ]);
+  });
+
+  test("publish lists it, and it's listed again after a confirmed publish", async () => {
+    const { dir, deps } = await withPersona(
+      RELAXED_ROAST,
+      await week8Reply(),
+      await week9Reply(),
+    );
+    await writeFamilyLeague(dir, "on");
+    await draft(dir, deps);
+
+    const published = await publish(dir, deps, relaxedConfirm(true));
+    expect(published.published).toBe(true);
+    expect(published.problems.map(problemLine)).toContain(RELAXED_ITEM);
+
+    const week9 = atWeek(deps, 9);
+    await draft(dir, week9);
+    expect((await check(dir)).problems.map(problemLine)).toContain(
+      RELAXED_ITEM,
+    );
+  });
+
+  test("an unrelaxed Roast persona, lowered by the family league, has none", async () => {
+    const { dir, deps } = await withPersona(ROAST);
+    await writeFamilyLeague(dir, "on");
+    await draft(dir, deps);
+
+    const { problems } = await check(dir);
+
+    expect(problems.map(problemLine)).toEqual([TIMING_ITEM]);
+  });
+
+  test("a relaxed persona with the family league off has none", async () => {
+    const { dir, deps } = await withPersona(RELAXED_ROAST);
+    await writeFamilyLeague(dir, "off");
+    await draft(dir, deps);
+
+    const { problems } = await check(dir);
+
+    expect(problems.map(problemLine)).toEqual([TIMING_ITEM]);
   });
 });
 

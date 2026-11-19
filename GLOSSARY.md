@@ -471,6 +471,9 @@ A soft league item when a snapshot the check compares with is gone, damaged or n
 **Correction-timing reminder**:
 A soft league item on a draft of a scored week, since nothing signals when stat corrections stop: "Scored. Corrections may land through Thursday" on Sleeper.
 
+**Relaxed-persona item**:
+A soft league item on every check of a draft whose recorded persona relaxes the family league, naming the recorded swearing and teasing: "relaxed persona". It reads the persona the draft was written in, not today's `persona.md`, and is listed whether or not a publish has confirmed that persona. It isn't a blurb problem.
+
 **Provisional claim**:
 A claim in a draft made with `--include-in-progress` that cites the in-progress week's stats and agrees with them. It is a soft problem, since the week can still change before it's scored. One that disagrees is wrong as usual.
 

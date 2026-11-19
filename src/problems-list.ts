@@ -18,6 +18,7 @@ const KINDS: Record<Problem["kind"], string> = {
   "correction-timing": "correction timing",
   "cant-compare": "can't compare",
   "correction-missing": "correction not in the draft",
+  "relaxed-persona": "relaxed persona",
 };
 
 /**

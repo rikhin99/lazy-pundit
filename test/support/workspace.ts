@@ -118,6 +118,28 @@ ${body}`,
   );
 }
 
+/** Turns the 2025 season's family league on or off in its `league.md`. */
+export async function writeFamilyLeague(
+  dir: string,
+  setting: "on" | "off",
+): Promise<void> {
+  await mkdir(join(dir, "seasons", "2025"), { recursive: true });
+  await writeFile(
+    join(dir, "seasons", "2025", "league.md"),
+    `---\nleague: 1\nseason: 2025\nfamily-league: ${setting}\n---\n`,
+  );
+}
+
+/** Writes the Fear The Turtle pundit's `persona.md`. */
+export async function writePersona(dir: string, text: string): Promise<void> {
+  await mkdir(join(dir, "pundits", "rikhin"), { recursive: true });
+  await writeFile(join(dir, "pundits", "rikhin", "persona.md"), text);
+}
+
+/** A Roast `persona.md` that relaxes the family league. */
+export const RELAXED_ROAST =
+  "---\nformat: 1\npreset: roast\nfamily-league: relaxed\n---\n";
+
 /**
  * A weekly high-score house rule paying `outcome`, as one `house-rules:` item
  * with `extra` lines (each indented four spaces) added to it.

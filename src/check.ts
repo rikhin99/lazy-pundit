@@ -24,6 +24,7 @@ import {
   orderEvidence,
 } from "./movement.ts";
 import { normalizeSnapshot } from "./normalize.ts";
+import type { PersonaRecord } from "./persona.ts";
 import { isSmallSample } from "./power-score.ts";
 import {
   checkOrder,
@@ -88,7 +89,9 @@ export interface Problem {
    * `correction-timing`: the correction-timing reminder, a league item.
    * `cant-compare`: the can't-compare item, a league item.
    * `correction-missing`: a drastic correction the draft cites nowhere, a
-   * league item naming the intro line to add.
+   * league item naming the intro line to add. `relaxed-persona`: the
+   * relaxed-persona item, a league item on a draft whose recorded persona
+   * relaxes the family league.
    */
   kind:
     | Exclude<ClaimStatus, "verified">
@@ -101,7 +104,8 @@ export interface Problem {
     | "provisional"
     | "correction-timing"
     | "cant-compare"
-    | "correction-missing";
+    | "correction-missing"
+    | "relaxed-persona";
   /** Why, in words the pundit reads. */
   reason: string;
   /** For a stale claim: what changed since it held. */
@@ -246,6 +250,7 @@ export async function checkDraft(
     ...movedTeams(ranking, order, startingOrder, teamNames(league)),
     ...(isSmallSample(week) ? [smallSampleFlag(week)] : []),
     ...(week > 0 ? [correctionTiming(league)] : []),
+    ...relaxedPersona(ranking.meta.persona),
     ...(found.cantCompare
       ? [leagueItem("cant-compare", found.cantCompare)]
       : []),
@@ -528,6 +533,21 @@ function correctionTiming(league: League): Problem {
     "correction-timing",
     `Scored. Corrections may land through ${CORRECTIONS_THROUGH[league.platform]}`,
   );
+}
+
+/**
+ * The relaxed-persona item, on every check of a draft whose recorded persona
+ * relaxes the family league; none otherwise. It reads the persona the draft
+ * was written in, not today's persona.md.
+ */
+function relaxedPersona(persona: PersonaRecord): Problem[] {
+  if (!persona.family_league_relaxed) return [];
+  return [
+    leagueItem(
+      "relaxed-persona",
+      `the family league is on, but this draft's persona relaxes it (swearing ${persona.swearing}, teasing ${persona.teasing}); publishing with it asks you to confirm the first time and whenever the persona changes`,
+    ),
+  ];
 }
 
 /** The problems list's order: hard first, then by line, with league items ahead of any line. */
