@@ -512,6 +512,15 @@ test("draft points to the Stats table on the line after Drafted week", async () 
   );
 });
 
+/** The table's last lines: a blank line, the stats key, and the final newline. */
+const KEY_TAIL = [
+  "",
+  "All-play: your record if you'd played every team every week, not just your opponent. It shows how good your scores are, without the luck of who you drew.",
+  "Form: your average points over your last three weeks played.",
+  "Luck: your wins minus the wins your all-play record would expect. Above 0, you've won more than your scores earned.",
+  "",
+];
+
 test("table prints the Stats table with no fetch, plain when it isn't a terminal", async () => {
   const { dir, deps } = await fearTheTurtle(8);
   await draft(dir, deps);
@@ -531,6 +540,9 @@ test("table prints the Stats table with no fetch, plain when it isn't a terminal
       /^ # {2}Start {2}Team +Record {2}Rank {5}PPG {2}All-play {4}Form {3}Luck {2}Streak$/,
     ),
   ]);
+  const lines = stdout.split("\n");
+  expect(lines.slice(-5)).toEqual(KEY_TAIL);
+  expect(lines[lines.length - 6]).toMatch(/^12 /);
 });
 
 test("table --sort orders the rows, and an unknown column fails on one line", async () => {
@@ -538,12 +550,15 @@ test("table --sort orders the rows, and an unknown column fails on one line", as
   await draft(dir, deps);
 
   const sorted = await cli(dir, ["table", "--sort", "rank"]);
+  const byLuck = await cli(dir, ["table", "--sort", "luck"]);
   const nope = await cli(dir, ["table", "--sort", "nope"]);
 
   expect(sorted.code).toBe(0);
   expect(sorted.stdout).toBe(
     renderStatsTable(await statsTable(dir, { sort: "rank" }), { bold: false }),
   );
+  expect(byLuck.code).toBe(0);
+  expect(byLuck.stdout.split("\n").slice(-5)).toEqual(KEY_TAIL);
   expect(nope.code).toBe(1);
   expect(nope.stdout).toBe("");
   expect(nope.stderr).toBe(

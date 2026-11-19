@@ -225,6 +225,16 @@ export const STAT_COLUMNS: Column[] = [
   { heading: "Streak", cell: (r) => r.streak ?? MISSING },
 ];
 
+/**
+ * The stats key: a line each saying what all-play, form and luck mean, under
+ * the terminal's table and on the Check tab.
+ */
+export const STATS_KEY = [
+  "All-play: your record if you'd played every team every week, not just your opponent. It shows how good your scores are, without the luck of who you drew.",
+  "Form: your average points over your last three weeks played.",
+  "Luck: your wins minus the wins your all-play record would expect. Above 0, you've won more than your scores earned.",
+] as const;
+
 /** Each column of the terminal's table. */
 const COLUMNS: Column[] = [
   { heading: "#", cell: (r) => String(r.place), right: true },
@@ -239,7 +249,8 @@ const GAP = "  ";
 /**
  * The Stats table as terminal text: the header naming the week, the data's
  * last week and the method, a blank line, the column headings and a line per
- * row. With a `width`, a long team name is cut with "…" so each row fits.
+ * row, then a blank line and the stats key. With a `width`, a long team name
+ * is cut with "…" so each row fits; the key is printed whole.
  */
 export function renderStatsTable(
   table: StatsTable,
@@ -273,7 +284,7 @@ export function renderStatsTable(
       .trimEnd(),
   );
   const title = look.bold ? `\x1b[1m${header}\x1b[22m` : header;
-  return `${[title, "", ...lines].join("\n")}\n`;
+  return `${[title, "", ...lines, "", ...STATS_KEY].join("\n")}\n`;
 }
 
 /** `text` cut to `width` with "…" at the end, if it's longer. */

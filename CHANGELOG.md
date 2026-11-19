@@ -10,6 +10,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 - The preview page's Check tab, the editing view: the week intro and each blurb as the league reads them, each claim with a problem underlined where it sits (solid red for a hard problem, dashed for a soft or provisional one); each team's place beside its starting place, with its movement mark; and a stats panel per team with the Stats table's stats plus points for and injuries ("none" when nobody is hurt). The power-score method is named once at the top, with no power-score numbers. A team's or the intro's item in the problems list now opens the Check tab at it.
 - `lazy-pundit --version` (or `-V`) prints the installed release's version, and `doctor`'s first line names it ("lazy-pundit 0.1.2"), so a bug report can say which release it's from.
 - In a family league, a draft written with a persona that relaxes it (`family-league: relaxed` in `persona.md`) now carries a soft "relaxed persona" item in the problems list, naming the draft's swearing and teasing, so `check`, the preview page and `publish` all show it on every check, not only `draft`'s warning and `publish`'s first confirm.
+- `lazy-pundit table` ends with a key saying what All-play, Form and Luck mean, one line each, so a screenshot of the table explains itself; the preview page's Check tab shows the same three lines under the power-score method.
 
 ### Changed
 

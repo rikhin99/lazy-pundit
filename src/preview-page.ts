@@ -7,6 +7,7 @@ import { problemLine, problemsHeading } from "./problems-list.ts";
 import {
   decimal,
   STAT_COLUMNS,
+  STATS_KEY,
   type StatsTableRow,
   statsTableFrom,
 } from "./stats-table.ts";
@@ -119,6 +120,7 @@ function checkTab(checked: CheckedDraft): string {
     );
   const head = [
     `<p class="method">Power-score method: ${esc(table.method)}</p>`,
+    ...STATS_KEY.map((line) => `<p class="key">${esc(line)}</p>`),
   ];
   const since = movementSince(week, baseline);
   if (since) head.push(`<p class="since">${esc(since)}</p>`);

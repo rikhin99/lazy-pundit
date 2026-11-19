@@ -517,6 +517,9 @@ _Avoid_: Draft page, live view
 **Stats table**:
 The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against.
 
+**Stats key**:
+One line each saying what all-play, form and luck mean, in words a leaguemate reading a screenshot can follow. It prints under the Stats table's rows and on the Check tab after the power-score method; the column names stay as they are.
+
 **Published ranking**:
 What the league sees, and anything copied, pasted or screenshotted from it. It is fixed at publish time. It carries no tool-internal flags or scores unless the pundit puts them there. It comes as plain text for pasting and as publish styles for screenshots, all rendered from the same frozen copy.
 _Avoid_: Post

@@ -703,6 +703,22 @@ describe("the Check tab", () => {
     }
   });
 
+  test("the stats key follows the method, before the week intro", async () => {
+    const { preview } = await previewing();
+
+    const words = shown(tab(await page(preview.url), "check"));
+
+    const key = [
+      "Power-score method: ramped blend",
+      "All-play: your record if you'd played every team every week, not just your opponent. It shows how good your scores are, without the luck of who you drew.",
+      "Form: your average points over your last three weeks played.",
+      "Luck: your wins minus the wins your all-play record would expect. Above 0, you've won more than your scores earned.",
+      "Week intro",
+    ].map((line) => words.indexOf(line));
+    expect(key).not.toContain(-1);
+    expect(key).toEqual([...key].sort((a, b) => a - b));
+  });
+
   test("an injury without a body part shows its status alone, and a team with nobody hurt reads none", async () => {
     const { dir, deps } = await fearTheTurtle(10);
     const patched = patchingTransport(deps.transport, {

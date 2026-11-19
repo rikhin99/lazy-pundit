@@ -347,7 +347,7 @@ const TABLE: StatsTable = {
 };
 
 describe("the Stats table as terminal text", () => {
-  test("is the header, the column headings, then a line per row", () => {
+  test("is the header, the column headings, a line per row, then the stats key", () => {
     expect(renderStatsTable(TABLE, { bold: false })).toBe(
       [
         "Week 10 draft · data through week 10 · method: ramped blend",
@@ -357,18 +357,26 @@ describe("the Stats table as terminal text", () => {
         "2      1  The Extremely Long Team Name Of Bye Bye Bea  7-3     2nd   125.40  79-31     133.20  -0.05  L1",
         "3      3  Hail Mary Hustle                             —       —          —  —              —      —  —",
         "",
+        "All-play: your record if you'd played every team every week, not just your opponent. It shows how good your scores are, without the luck of who you drew.",
+        "Form: your average points over your last three weeks played.",
+        "Luck: your wins minus the wins your all-play record would expect. Above 0, you've won more than your scores earned.",
+        "",
       ].join("\n"),
     );
   });
 
-  test("cuts a long team name with … so each row fits the width", () => {
+  test("cuts a long team name with … so each row fits the width, and prints the stats key whole", () => {
     const lines = renderStatsTable(TABLE, { bold: false, width: 80 }).split(
       "\n",
     );
 
-    for (const line of lines.slice(2)) {
+    for (const line of lines.slice(2, 6)) {
       expect(line.length).toBeLessThanOrEqual(80);
     }
+    expect(lines.slice(6)).toEqual(
+      renderStatsTable(TABLE, { bold: false }).split("\n").slice(6),
+    );
+    expect(lines[7]).toMatch(/^All-play: .* who you drew\.$/);
     expect(lines[3]).toBe(
       "1      2  Bench Mob        9-1     1st   123.99  80-30     128.00   1.36  W9",
     );
