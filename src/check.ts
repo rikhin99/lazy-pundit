@@ -75,7 +75,10 @@ export interface Problem {
   section: string;
   /** The file line the words are on, or null for a league item, which has none. */
   line: number | null;
-  /** The words at fault, as the league would read them. Empty for a league item. */
+  /**
+   * The words at fault, as the league would read them. Empty for a league
+   * item; an empty tag's is the tag as written.
+   */
   text: string;
   /**
    * `moved`: a moved team, away from its starting place. `small-sample`: the
@@ -449,7 +452,10 @@ function reviewProse(input: {
         }
         continue;
       }
-      claimAt(c, isHard(c.status) ? "hard" : "soft");
+      // An empty tag has no words to underline.
+      if (c.status !== "empty-tag") {
+        claimAt(c, isHard(c.status) ? "hard" : "soft");
+      }
       problems.push({
         ...at,
         severity: isHard(c.status) ? "hard" : "soft",
@@ -555,6 +561,7 @@ const BLURB_PROBLEM_KINDS = new Set<Problem["kind"]>([
   "wrong",
   "stale",
   "unknown-id",
+  "empty-tag",
   "loose",
   "unchecked",
   "provisional",

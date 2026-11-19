@@ -65,11 +65,12 @@ export type ClaimStatus =
   | "wrong"
   | "stale"
   | "unknown-id"
+  | "empty-tag"
   | "loose"
   | "unchecked";
 
 export interface CheckedClaim {
-  /** The claim's words, without any tag. */
+  /** The claim's words, without any tag; an empty tag's is the tag as written. */
   text: string;
   /** Where the claim sits in the input text, tag included when it has one. */
   start: number;

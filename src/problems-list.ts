@@ -5,6 +5,7 @@ const KINDS: Record<Problem["kind"], string> = {
   wrong: "wrong",
   stale: "stale",
   "unknown-id": "unknown ID",
+  "empty-tag": "empty tag",
   loose: "loose",
   unchecked: "unchecked",
   swear: "word list",

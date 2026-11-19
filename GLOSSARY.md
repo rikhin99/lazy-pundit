@@ -447,6 +447,9 @@ An untagged claim whose words match a stat, but not clearly enough to say which 
 **Unchecked claim**:
 A claim with no evidence to check it against, such as a tier claim in a ranking with no groups.
 
+**Empty tag**:
+A tag citing evidence with no words between its brackets, only spaces or punctuation, such as `[ , ]{ev=w10.margin}`. It's a hard problem, listed with the tag as written and not underlined, since there's no claim to check. A lore, stakes or log tag with no words is still checked only for whether its section exists.
+
 ## Problems
 
 **Problems list**:

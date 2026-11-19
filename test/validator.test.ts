@@ -1234,6 +1234,7 @@ describe("playoff words", () => {
     ["[mathematically out]{ev=playoffs}", "eliminated", "verified"],
     ["[playoff lock]{ev=playoffs}", "clinched", "unchecked"],
     ["[in the hunt]{ev=playoffs}", "clinched", "unchecked"],
+    ["[ , ]{ev=playoffs}", "clinched", "empty-tag"],
   ])("%s against %s is %s", (text, value, status) => {
     const r = validate(blurb(3, text, settled(value)));
     expect(r.claims.map((c) => c.status)).toEqual([status]);
@@ -1350,6 +1351,29 @@ describe("lore, stakes and log citations are checked only for existence", () => 
   test("a missing section is an unknown ID", () => {
     expect(only(3, "[as foretold]{lore=manager:nobody}", sections)).toEqual([
       ["as foretold", "unknown-id", "lore=manager:nobody"],
+    ]);
+  });
+
+  test("an empty lore tag is still checked only for existence", () => {
+    expect(
+      only(3, "[ ]{lore=manager:bo} [ ]{lore=manager:nobody}", sections),
+    ).toEqual([
+      ["", "verified", "lore=manager:bo"],
+      ["", "unknown-id", "lore=manager:nobody"],
+    ]);
+  });
+});
+
+describe("an empty tag", () => {
+  test("citing an ID not in the evidence pack is an unknown ID", () => {
+    expect(only(3, "[ , ]{ev=w8.nope}")).toEqual([
+      ["", "unknown-id", "w8.nope"],
+    ]);
+  });
+
+  test("citing evidence that resolves is an empty tag, its text the tag as written", () => {
+    expect(only(3, "Won by [ , ]{ev=w8.margin}.")).toEqual([
+      ["[ , ]{ev=w8.margin}", "empty-tag", "w8.margin"],
     ]);
   });
 });

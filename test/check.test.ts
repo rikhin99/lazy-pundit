@@ -3,11 +3,12 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "vitest";
-import { checkDraft } from "../src/check.ts";
+import { checkDraft, isBlurbProblem } from "../src/check.ts";
 import {
   check,
   draft,
   type Problem,
+  problemLine,
   publish,
   readManifest,
   refresh,
@@ -173,6 +174,29 @@ describe("check", () => {
         { team: "sleeper:3", start, end, severity: "hard" },
       ]);
     });
+
+    test.each(["   ", " , "])(
+      "a tag with only %j inside is an empty tag, quoted as written and not underlined",
+      async (inner) => {
+        const { hard, claims } = await benchMobMargin(inner);
+
+        expect(hard).toEqual([
+          expect.objectContaining({
+            section: "Bench Mob",
+            kind: "empty-tag",
+            text: `[${inner}]{ev=w10.margin}`,
+            reason:
+              "the tag has no words to check: put the claim between its brackets, or delete the tag",
+            id: "w10.margin",
+          }),
+        ]);
+        expect(hard.every(isBlurbProblem)).toBe(true);
+        expect(problemLine(hard[0] as Problem)).toBe(
+          `✗ line 28 Bench Mob: "[${inner}]{ev=w10.margin}" empty tag: the tag has no words to check: put the claim between its brackets, or delete the tag`,
+        );
+        expect(claims).toEqual([]);
+      },
+    );
 
     test("[ 23.9, ] is still verified", async () => {
       const { hard, claims } = await benchMobMargin(" 23.9, ");

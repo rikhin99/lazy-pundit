@@ -278,6 +278,28 @@ describe("the LLM gate", () => {
     ]);
   });
 
+  test("an empty tag that never passes is flagged as a gate failure, and the retry quotes the tag", async () => {
+    const { dir, deps, llm } = await withLlm(
+      await withHustle("Rock bottom at [ , ]{ev=record}."),
+      `## {team=${HUSTLE}}\nStill rock bottom at [ , ]{ev=record}.`,
+      `## {team=${HUSTLE}}\nYes, rock bottom at [ , ]{ev=record}.`,
+    );
+
+    const result = await draft(dir, deps);
+
+    expect(llm.requests).toHaveLength(3);
+    expect(toRewrite(llm.requests[1])).toContain('"[ , ]{ev=record}"');
+    expect(withoutReminder(result.problems)).toEqual([
+      expect.objectContaining({
+        team: HUSTLE,
+        severity: "hard",
+        kind: "empty-tag",
+        text: "[ , ]{ev=record}",
+        gate: true,
+      }),
+    ]);
+  });
+
   test("a word-list hit with swearing off fails the gate and is flagged in the best attempt", async () => {
     const { dir, deps, llm } = await withLlm(
       (await week8Reply()).replace("What a week.", "What a damn week."),

@@ -103,6 +103,15 @@ function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
         hits: [],
       };
     }
+    // An empty tag still cites its evidence, so an unknown ID is said first.
+    if (claim.text === "") {
+      return {
+        status: "empty-tag",
+        reason:
+          "the tag has no words to check: put the claim between its brackets, or delete the tag",
+        hits: [],
+      };
+    }
     const other = wrongPlayer(ctx, r, claim.text);
     if (other) return { status: "wrong", reason: other, hits: [] };
     return agrees(ctx, r, claim.text)
@@ -202,7 +211,10 @@ export function validate(input: ValidatorInput): ValidationResult {
       }
     }
     const out: CheckedClaim = {
-      text: claim.text,
+      text:
+        verdict.status === "empty-tag" && claim.tag
+          ? input.text.slice(claim.tag.start, claim.tag.end)
+          : claim.text,
       ...(claim.tag
         ? { start: claim.tag.start, end: claim.tag.end }
         : written(claim.start, claim.end)),
@@ -255,7 +267,12 @@ export function validate(input: ValidatorInput): ValidationResult {
 
 /** Hard problems block nothing on their own, but publish asks before going ahead. */
 export function isHard(status: ClaimStatus): boolean {
-  return status === "wrong" || status === "stale" || status === "unknown-id";
+  return (
+    status === "wrong" ||
+    status === "stale" ||
+    status === "unknown-id" ||
+    status === "empty-tag"
+  );
 }
 
 /**
