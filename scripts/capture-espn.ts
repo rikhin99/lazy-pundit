@@ -77,15 +77,17 @@ function rawFileOf(req: Pick<TransportRequest, "url" | "params">) {
   const name = period === undefined ? views : `${views}@${period}`;
   const raw = RAW_FILES.get(views);
   if (!raw || Boolean(raw.weekly) !== (period !== undefined)) return { name };
-  const file = raw.weekly
-    ? `${raw.file}/week-${(period ?? "").padStart(2, "0")}.json`
-    : raw.file;
-  return { name, file, list: raw.list };
+  if (!raw.weekly) return { name, file: raw.file, list: raw.list };
+  const file = `${raw.file}/week-${(period ?? "").padStart(2, "0")}.json`;
+  return { name, file, list: raw.list, week: Number(period) };
 }
 
 /** Runs `inner`, keeping each answered payload under its raw file. */
 function recording(inner: Transport) {
-  const files = new Map<string, { body: Uint8Array; list: PayloadList }>();
+  const files = new Map<
+    string,
+    { body: Uint8Array; list: PayloadList; week: number | undefined }
+  >();
   const unmapped: string[] = [];
   const transport: Transport = {
     async request(req) {
@@ -93,7 +95,8 @@ function recording(inner: Transport) {
       if (!raw.file) unmapped.push(raw.name);
       const res = await inner.request(req);
       if (raw.file && res.status >= 200 && res.status < 300) {
-        files.set(raw.file, { body: res.body, list: raw.list });
+        const { list, week } = raw;
+        files.set(raw.file, { body: res.body, list, week });
       }
       return res;
     },
@@ -184,20 +187,28 @@ export async function captureEspn(opts: {
 
   const files = [...recorder.files].sort(([a], [b]) => (a < b ? -1 : 1));
   const width = Math.max(...files.map(([file]) => file.length)) + 2;
-  for (const [file, { body, list }] of files) {
+  for (const [file, { body, list, week }] of files) {
     const path = join(rawDir, file);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, body);
-    log(`${file.padEnd(width)}${countOf(body, list)} ${LIST_ENTRIES[list]}`);
+    const count = countOf(body, list, week);
+    log(`${file.padEnd(width)}${count} ${LIST_ENTRIES[list]}`);
   }
   log(`Wrote ${files.length} files.`);
 }
 
-/** How many entries a payload's list holds. */
-function countOf(body: Uint8Array, list: PayloadList): number {
+/**
+ * How many entries a payload's list holds. A weekly file's schedule counts
+ * only its own week's matchups, those whose matchup period is the file's
+ * scoring period, as the fetcher reads them: ESPN sends a week's box scores
+ * with the whole season's schedule.
+ */
+function countOf(body: Uint8Array, list: PayloadList, week?: number): number {
   try {
-    const entries = JSON.parse(new TextDecoder().decode(body))?.[list];
-    return Array.isArray(entries) ? entries.length : 0;
+    const entries: unknown = JSON.parse(new TextDecoder().decode(body))?.[list];
+    if (!Array.isArray(entries)) return 0;
+    if (list !== "schedule" || week === undefined) return entries.length;
+    return entries.filter((m) => m?.matchupPeriodId === week).length;
   } catch {
     return 0;
   }

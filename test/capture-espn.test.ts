@@ -170,6 +170,35 @@ test("the output is a count per file, with no league ID, name or cookie", async 
   for (const name of names) expect(output).not.toContain(name);
 });
 
+test("a week's box scores count that week's matchups, not the whole schedule ESPN sends with them", async () => {
+  const { deps } = await replay();
+  const base = espnLeagueUrl("2025", HOT_TAKERY_ID);
+  const boxScoresUrl = espnViewUrl(base, ESPN_VIEWS.boxscores);
+  const params = { scoringPeriodId: "7" };
+  const payload = async (url: string, p?: Record<string, string>) =>
+    JSON.parse(
+      new TextDecoder().decode(
+        (await deps.transport.request({ url, ...(p ? { params: p } : {}) }))
+          .body,
+      ),
+    ) as Json;
+  const week7 = await payload(boxScoresUrl, params);
+  const { schedule } = await payload(espnViewUrl(base, ESPN_VIEWS.schedule));
+  week7.schedule = [
+    ...(week7.schedule as Json[]),
+    ...(schedule as Json[]).filter((m) => m.matchupPeriodId !== 7),
+  ];
+  const body = new TextEncoder().encode(JSON.stringify(week7));
+
+  const { lines, error } = await capture(
+    failingOn(deps, boxScoresUrl, { params, answer: { status: 200, body } }),
+  );
+
+  expect(error).toBeUndefined();
+  expect(lines).toContain("boxscores/week-07.json     6 matchups");
+  expect(lines).toContain("schedule.json              96 matchups");
+});
+
 test("a credentials file others can read gets its warning once", async () => {
   const { deps } = await replay({ privateTo: COOKIE, stored: COOKIE });
   const path = join(deps.configDir, "credentials.yaml");
