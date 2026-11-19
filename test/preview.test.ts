@@ -19,7 +19,6 @@ import {
   published,
   RELAXED_ROAST,
   rankingsDir,
-  writeFamilyLeague,
   writeLeagueFile,
   writePersona,
 } from "./support/workspace.ts";
@@ -267,7 +266,7 @@ const REMINDER =
 test("a relaxed persona's draft shows the relaxed-persona item after the correction-timing item", async () => {
   const { dir, deps } = await fearTheTurtle(10);
   await writePersona(dir, RELAXED_ROAST);
-  await writeFamilyLeague(dir, "on");
+  await writeLeagueFile(dir, "family-league: on\n");
   await draft(dir, deps);
 
   const html = await served(dir, deps);

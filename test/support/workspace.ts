@@ -98,6 +98,7 @@ export async function writeSettings(dir: string, lines: string) {
 /**
  * Writes the 2025 season's `league.md` with `fields` of front matter (stakes,
  * house rules, rivalry weeks), each line ending in a newline, and `body` below.
+ * The family league is off unless `fields` sets `family-league:`.
  */
 export async function writeLeagueFile(
   dir: string,
@@ -106,27 +107,15 @@ export async function writeLeagueFile(
 ): Promise<void> {
   const season = join(dir, "seasons", "2025");
   await mkdir(season, { recursive: true });
+  const family = /^family-league:/m.test(fields) ? "" : "family-league: off\n";
   await writeFile(
     join(season, "league.md"),
     `---
 league: 1
 season: "2025"
-family-league: off
-${fields}---
+${family}${fields}---
 
 ${body}`,
-  );
-}
-
-/** Turns the 2025 season's family league on or off in its `league.md`. */
-export async function writeFamilyLeague(
-  dir: string,
-  setting: "on" | "off",
-): Promise<void> {
-  await mkdir(join(dir, "seasons", "2025"), { recursive: true });
-  await writeFile(
-    join(dir, "seasons", "2025", "league.md"),
-    `---\nleague: 1\nseason: 2025\nfamily-league: ${setting}\n---\n`,
   );
 }
 

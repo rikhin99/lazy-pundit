@@ -21,7 +21,7 @@ import {
   RELAXED_ROAST,
   rankingsDir,
   withoutReminder,
-  writeFamilyLeague,
+  writeLeagueFile,
   writePersona,
 } from "./support/workspace.ts";
 
@@ -154,7 +154,7 @@ const ROAST = "---\nformat: 1\npreset: roast\n---\n";
 describe("a family league", () => {
   test("lowers a Roast persona to no swearing and light teasing, with a warning", async () => {
     const { dir, deps, llm } = await withPersona(ROAST);
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
 
     const result = await draft(dir, deps);
 
@@ -174,7 +174,7 @@ describe("a family league", () => {
     const { dir, deps, llm } = await withPersona(
       "---\nformat: 1\npreset: family\nteasing: none\n---\n",
     );
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
 
     const result = await draft(dir, deps);
 
@@ -186,7 +186,7 @@ describe("a family league", () => {
 
   test("off leaves Roast as it is", async () => {
     const { dir, deps, llm } = await withPersona(RELAXED_ROAST);
-    await writeFamilyLeague(dir, "off");
+    await writeLeagueFile(dir, "family-league: off\n");
 
     const result = await draft(dir, deps);
 
@@ -201,7 +201,7 @@ describe("a family league", () => {
 
   test("a relaxed persona keeps its controls, warns on every load and is recorded", async () => {
     const { dir, deps, llm } = await withPersona(RELAXED_ROAST);
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
 
     const result = await draft(dir, deps);
 
@@ -227,7 +227,7 @@ const TIMING_ITEM =
 describe("the relaxed-persona item", () => {
   test("a relaxed persona's draft lists it after the correction-timing item, as a league item", async () => {
     const { dir, deps } = await withPersona(RELAXED_ROAST);
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
     await draft(dir, deps);
 
     const { problems } = await check(dir);
@@ -242,7 +242,7 @@ describe("the relaxed-persona item", () => {
 
   test("it's listed ahead of an item with a line", async () => {
     const { dir, deps } = await withPersona(RELAXED_ROAST);
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
     const { path } = await draft(dir, deps);
     const text = await readFile(path, "utf8");
     await writeFile(
@@ -265,7 +265,7 @@ describe("the relaxed-persona item", () => {
       await week8Reply(),
       await week9Reply(),
     );
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
     await draft(dir, deps);
 
     const published = await publish(dir, deps, relaxedConfirm(true));
@@ -281,7 +281,7 @@ describe("the relaxed-persona item", () => {
 
   test("an unrelaxed Roast persona, lowered by the family league, has none", async () => {
     const { dir, deps } = await withPersona(ROAST);
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
     await draft(dir, deps);
 
     const { problems } = await check(dir);
@@ -291,7 +291,7 @@ describe("the relaxed-persona item", () => {
 
   test("a relaxed persona with the family league off has none", async () => {
     const { dir, deps } = await withPersona(RELAXED_ROAST);
-    await writeFamilyLeague(dir, "off");
+    await writeLeagueFile(dir, "family-league: off\n");
     await draft(dir, deps);
 
     const { problems } = await check(dir);
@@ -360,7 +360,7 @@ describe("publishing with a relaxed family-league persona", () => {
       await week8Reply(),
       await week9Reply(),
     );
-    await writeFamilyLeague(ws.dir, "on");
+    await writeLeagueFile(ws.dir, "family-league: on\n");
     await draft(ws.dir, ws.deps);
     return ws;
   }
@@ -461,7 +461,7 @@ describe("publishing with a relaxed family-league persona", () => {
 
   test("a persona that isn't relaxed is never asked about", async () => {
     const { dir, deps } = await withPersona(ROAST);
-    await writeFamilyLeague(dir, "on");
+    await writeLeagueFile(dir, "family-league: on\n");
     await draft(dir, deps);
     const no = relaxedConfirm(false);
 
