@@ -113,6 +113,15 @@ function judgeClaim(ctx: Ctx, claim: Claim, section: TeamId | null): Verdict {
   return judge(ctx, u.team, claim.text, u.shape);
 }
 
+/**
+ * Where a claim's words sit in `text`, a tag's inner text or a claim shape:
+ * spaces at either end and trailing punctuation read as the sentence's.
+ */
+function claimWords(text: string): { lead: number; text: string } {
+  const lead = text.length - text.trimStart().length;
+  return { lead, text: text.slice(lead).replace(/[\s,;:.!?]+$/, "") };
+}
+
 export function validate(input: ValidatorInput): ValidationResult {
   const ctxFor = (
     evidence: EvidencePack,
@@ -131,22 +140,20 @@ export function validate(input: ValidatorInput): ValidationResult {
     end: (toInput[end - 1] as number) + 1,
   });
 
-  /** A claim's words: trailing punctuation reads as the sentence's, not the claim's. */
-  const words = (text: string) => text.replace(/[,;:.!?]+$/, "");
   const found: Claim[] = [];
   for (const tag of tags) {
-    const text = words(tag.inner);
+    const { lead, text } = claimWords(tag.inner);
     found.push({
       text,
-      start: tag.plainStart,
-      end: tag.plainStart + text.length,
+      start: tag.plainStart + lead,
+      end: tag.plainStart + lead + text.length,
       tag,
     });
   }
   for (const { s, start } of units(plain)) {
     for (const f of extract(ctx, s)) {
-      const text = words(s.slice(f.start, f.end));
-      const a = start + f.start;
+      const { lead, text } = claimWords(s.slice(f.start, f.end));
+      const a = start + f.start + lead;
       const b = a + text.length;
       if (tags.some((t) => a < t.plainEnd && t.plainStart < b)) continue;
       found.push({
@@ -220,13 +227,9 @@ export function validate(input: ValidatorInput): ValidationResult {
       for (const h of hits) {
         const from = claim.start + (h.part?.start ?? 0);
         const to = h.part ? claim.start + h.part.end : claim.end;
-        const words = plain.slice(from, to);
+        const { lead, text } = claimWords(plain.slice(from, to));
         autoTags.push({
-          ...written(
-            from + (words.length - words.trimStart().length),
-            // Trailing punctuation reads as the sentence's, not the claim's.
-            to - (/[\s,;:.!?]*$/.exec(words)?.[0].length ?? 0),
-          ),
+          ...written(from + lead, from + lead + text.length),
           id: idFor(ctx, h),
         });
       }

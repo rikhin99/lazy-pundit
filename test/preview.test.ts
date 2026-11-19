@@ -545,6 +545,17 @@ describe("the Check tab", () => {
     expect(comma.underlines).toEqual([
       { text: "50", style: "hard", start: 53 },
     ]);
+
+    // Nor are spaces just inside the tag's brackets.
+    await writeFile(
+      draftPath,
+      text.replace("by [23.9]{ev=w10.margin}", "by [ 50, ]{ev=w10.margin}"),
+    );
+    const spaced = checkBlock(await page(preview.url), "Bench Mob");
+    expect(spaced.blurb).toContain("by  50,  · Clinched");
+    expect(spaced.underlines).toEqual([
+      { text: "50", style: "hard", start: 54 },
+    ]);
   });
 
   test("untagged claims are underlined hard and soft, never over the comma after them", async () => {

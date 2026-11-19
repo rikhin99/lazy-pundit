@@ -24,6 +24,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 - In a league with no house rule for it, `check` no longer marks a count like "2 high scores" or "3 low scores" wrong against the week's points or the season's high or low. It can't tell which stat such a count means, so it leaves it unchecked or loose.
 - The Tabloid and Broadcast style pages leave a team's untouched stat line out of its row's quote, as they do for the week intro: when a blurb is the stat line plus a sentence of the pundit's own, the row now quotes that sentence. Before, the quote could be the stat line run on into the pundit's sentence. Punctuation added to end a stat line (".", "!", "?!", "..."), there or in the intro, no longer makes it count as edited; other edits to a stat line still count as the pundit's prose.
 - `check` quotes a claim without the punctuation after it: "won by 50, and more" is listed as `"50"`, not `"50,"`, and so is a tagged `[50,]{ev=w8.margin}`. A comma inside a number ("1,240") stays.
+- A tag's claim leaves out spaces just inside its brackets: `[ 50, ]{ev=w8.margin}` is listed as `"50"`, and the Check tab underlines only the "50". Spaces between the words stay ("won 9 straight").
 
 ## 0.1.1
 

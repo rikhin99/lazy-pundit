@@ -1410,6 +1410,14 @@ describe("auto-tag", () => {
     );
   });
 
+  test("a spaced score's halves are tagged without the spaces around its dash", () => {
+    const text = "Kim Possible Kicks won 101.56 - 95.38.";
+    const r = validate(blurb(7, text));
+    expect(applyAutoTags(text, r.autoTags)).toBe(
+      "Kim Possible Kicks won [101.56]{ev=w8.points} - [95.38]{ev=w8.opp_points}.",
+    );
+  });
+
   test("an auto-tag leaves punctuation after the claim outside the tag", () => {
     const text = "Gus Bus won by 55, and nobody saw it coming.";
     const r = validate(blurb(1, text));

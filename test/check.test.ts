@@ -3,6 +3,7 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "vitest";
+import { checkDraft } from "../src/check.ts";
 import {
   check,
   draft,
@@ -131,6 +132,54 @@ describe("check", () => {
         reason: "w10.margin is 23.9",
       }),
     ]);
+  });
+
+  describe("a tag's words drop spaces at either end", () => {
+    /** Drafts week 10 with Bench Mob's margin tag's inner text as `inner`. */
+    async function benchMobMargin(inner: string) {
+      const { dir, deps } = await fearTheTurtle(10);
+      const { path } = await draft(dir, deps);
+      const text = await readFile(path, "utf8");
+      const edited = text.replace(
+        "by [23.9]{ev=w10.margin}",
+        `by [${inner}]{ev=w10.margin}`,
+      );
+      expect(edited).not.toBe(text);
+      await writeFile(path, edited);
+      const checked = await checkDraft(dir, { autoTag: false });
+      const benchMob = (c: { team: string | null }) => c.team === "sleeper:3";
+      return {
+        hard: checked.problems.filter((p) => p.severity === "hard"),
+        claims: checked.problemClaims.filter(benchMob),
+      };
+    }
+
+    test.each([
+      ["[ 50]", " 50", 54, 56],
+      ["[50 ]", "50 ", 53, 55],
+      ["[ 50, ]", " 50, ", 54, 56],
+    ])("%s reads as the claim 50", async (_, inner, start, end) => {
+      const { hard, claims } = await benchMobMargin(inner);
+
+      expect(hard).toEqual([
+        expect.objectContaining({
+          section: "Bench Mob",
+          kind: "wrong",
+          text: "50",
+          reason: "w10.margin is 23.9",
+        }),
+      ]);
+      expect(claims).toEqual([
+        { team: "sleeper:3", start, end, severity: "hard" },
+      ]);
+    });
+
+    test("[ 23.9, ] is still verified", async () => {
+      const { hard, claims } = await benchMobMargin(" 23.9, ");
+
+      expect(hard).toEqual([]);
+      expect(claims).toEqual([]);
+    });
   });
 
   test("a clear untagged claim is auto-tagged in the file, words unchanged", async () => {
