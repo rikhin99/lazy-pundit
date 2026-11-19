@@ -17,8 +17,11 @@ import type { EvidencePack, EvidenceValue } from "./validator/types.ts";
 /** A matchup decided by less than this many points is a close matchup. */
 const CLOSE_MATCHUP = 5;
 
-/** How many of a team's most recent played weeks its form averages. */
-const FORM_WEEKS = 3;
+/**
+ * How many of a team's most recent played weeks its form averages. The stats
+ * key's Form line names it in words.
+ */
+export const FORM_WEEKS = 3;
 
 /** One week a team played: its side, its opponent's, and its lineup's best. */
 interface Played {

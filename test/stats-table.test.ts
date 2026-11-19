@@ -2,6 +2,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { describe, expect, test } from "vitest";
 import { checkDraft } from "../src/check.ts";
+import { FORM_WEEKS } from "../src/evidence-pack.ts";
 import {
   check,
   draft,
@@ -15,6 +16,7 @@ import {
   statsTableLook,
 } from "../src/index.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
+import { STATS_KEY } from "../src/stats-table.ts";
 import {
   FEAR_THE_TURTLE_ID,
   fearTheTurtle,
@@ -383,6 +385,12 @@ describe("the Stats table as terminal text", () => {
     expect(lines[4]).toBe(
       "2      1  The Extremely …  7-3     2nd   125.40  79-31     133.20  -0.05  L1",
     );
+  });
+
+  test("the stats key's Form line names the weeks form averages", () => {
+    const words = ["zero", "one", "two", "three", "four", "five", "six"];
+
+    expect(STATS_KEY[1]).toContain(`your last ${words[FORM_WEEKS]} weeks`);
   });
 
   test("bolds the header alone", () => {

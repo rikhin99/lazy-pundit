@@ -42,7 +42,8 @@
     "trace": "node scripts/trace-context.ts",
     "release": "node scripts/release.ts",
     "install:smoke": "bash scripts/install-smoke.sh",
-    "claims:diff": "node scripts/claims-diff.ts"
+    "claims:diff": "node scripts/claims-diff.ts",
+    "tty": "python3 -I scripts/tty-run.py"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
