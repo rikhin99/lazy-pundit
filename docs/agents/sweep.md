@@ -21,6 +21,6 @@ Step 3 of `ticket-workflow.md` hands this to one subagent after the commit, with
 > - Keep the "from reading the code" mark on any claim you repeat, and add it to your own findings that you didn't run.
 > - Write a choice the build leaves open (which fixture, which ticket owns a step) as its options, and list it in your report as a question for the maintainer.
 > - Use `GLOSSARY.md` terms, and avoid its _Avoid_ terms.
-> - Write each new section or comment with the Write tool to a file in the scratchpad folder, and write only the new text. Pass a comment with `--body-file`. Append a section with `{ gh issue view <t> --json body --jq .body; echo; cat <file>; } | gh issue edit <t> --body-file -`. To correct a section, save the body to a scratch file, change it with Edit, then pass it with `--body-file`. No heredocs.
+> - Write each new section or comment with the Write tool to a file in the scratchpad folder, and write only the new text. Pass a comment with `--body-file`. Append a section with `{ gh issue view <t> --json body --jq .body; echo; cat <file>; } | gh issue edit <t> --body-file -`. To correct a section, save the body to a scratch file, change it with Edit, then pass it with `--body-file`. To correct a comment you posted, change its file with Edit and pass it with `gh issue comment <n> --edit-last --body-file <file>`. No heredocs.
 >
 > Report each ticket you changed and what you changed, then list the other open tickets by number as unaffected. Then list each thing #<n> asked for that <sha> leaves undone and no open ticket owns.

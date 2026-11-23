@@ -20,6 +20,8 @@ A `ready-for-human` brief for a run against a live league points to `docs/agents
 
 Run each command an acceptance criterion names at HEAD before writing the criterion, and write what it does now. A guessed cause stays out of the desired behaviour until it's confirmed. In #75, "every other scenario still exits 0" was false for the four Ctrl-C scenarios, which exit 1 by design, and the offline key check it asked for already happened at HEAD.
 
+A bug brief's red-first test runs on a fixture that has the bug's shape: check the payload at HEAD with `npm run fixture:show`. A scrubbed fixture is often tidier than the live answer, and then the brief names the patch that restores the shape. In #116, Hot Takery's box scores held only their own week, where ESPN sends the whole schedule, so a literal on the replay was green at HEAD and the red came from `failingOn` with an `answer`.
+
 A brief that words a message: list the states that reach its throw and check its fix holds in each, as CODING_STANDARDS.md's boundary-error rule asks. In #91, the fixed indent hint for front matter that isn't valid YAML also printed for a value with a colon or an unclosed bracket, where it's wrong, and the standards review caught it only after the build.
 
 A message that tells the pundit what to run or edit, a note as much as an error: run each instruction as written at HEAD, from the pundit's home folder, and where it removes an entry, with that entry the last one. In #97, the brief's note said `lazy-pundit setup <step>`, which works only inside the workspace, and "delete its line under `workspaces:`", which with one league left a bare `workspaces:` that every command refused; the hand check and the spec review each found one.
