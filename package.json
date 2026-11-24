@@ -35,6 +35,7 @@
     "drive:wizard": "expect scripts/drive-wizard.exp",
     "drive:wizard:all": "bash scripts/drive-wizard-all.sh",
     "drive:wizard:plain": "bash scripts/drive-wizard-plain.sh",
+    "drive:table": "bash scripts/drive-table.sh",
     "outline": "node scripts/outline.ts",
     "mutate": "node scripts/mutate.ts",
     "replace": "node scripts/replace.ts",

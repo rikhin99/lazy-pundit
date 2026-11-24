@@ -229,6 +229,7 @@ export {
   statsTableFrom,
   statsTableLook,
 } from "./stats-table.ts";
+export { type StatsViewTerminal, statsView } from "./stats-view.ts";
 export { deleteTranscripts } from "./transcripts.ts";
 export {
   httpTransport,

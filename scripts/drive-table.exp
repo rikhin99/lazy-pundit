@@ -1,0 +1,204 @@
+#!/usr/bin/expect -f
+# Drives `lazy-pundit table` through a real terminal of 100 columns and 30
+# rows, from a fixture workspace drafted at week 10. Run it with
+# `npm run -s drive:table -- <scenario>` (scripts/drive-table.sh makes the
+# workspace), or every scenario with `npm run -s drive:table -- all`.
+#
+#   keys         the full-screen view in the file's order, then → through every
+#                sort column and back, each screen's rows checked against the
+#                static table piped with that --sort; ↓ moves the highlight,
+#                ← steps back, q restores the screen and exits 0
+#   escape       Esc quits, exit 0
+#   ctrl-c       Ctrl-C restores the screen and exits 1, as a cancelled setup does
+#   resize       the terminal narrowed to 60 columns redraws to that width
+#   sort         --sort ppg in a terminal prints the static table, no screen opened
+#   no-draft     the draft deleted: its one-line refusal, no screen opened, exit 1
+#   missing-team a team's section deleted: its refusal, no screen opened, exit 1
+#
+# It prints `PASS <scenario>` and exits 0, or names what it missed and exits
+# 7 (a wrong screen or code), 8 (the program ended early) or 9 (it hung).
+
+set timeout 20
+set scenario [lindex $argv 0]
+set repo [lindex $argv 1]
+set draft $env(DRAFT)
+set cli [list node $repo/src/cli.ts table]
+set OPEN "\x1b\[?1049h"
+set CLOSE "\x1b\[?1049l"
+log_user 0
+
+proc fail {code what} {
+  global scenario
+  puts "FAIL $scenario: $what"
+  catch { exec kill -9 [exp_pid] }
+  exit $code
+}
+
+# Waits for the next whole screen, the footer its last line, and gives its
+# text with the escape codes taken out, a list of lines.
+proc screen {} {
+  expect {
+    -re {(.*)q quit} { set raw "$expect_out(1,string)q quit" }
+    timeout { fail 9 "no screen drawn" }
+    eof { fail 8 "ended before a screen was drawn" }
+  }
+  # The last draw in what arrived, from its cursor-home.
+  set at [string last "\x1b\[H" $raw]
+  if {$at >= 0} { set raw [string range $raw $at end] }
+  regsub -all {\x1b\[[0-9;?]*[A-Za-z]} $raw "" text
+  return [split [string map {"\r" ""} $text] "\n"]
+}
+
+# The rows of the static table, piped, for `sort` (none: the file's order).
+proc static_rows {sort} {
+  global repo
+  set args [list node $repo/src/cli.ts table]
+  if {$sort ne ""} { lappend args --sort $sort }
+  set lines [split [exec {*}$args] "\n"]
+  set rows {}
+  foreach line [lrange $lines 3 end] {
+    if {$line eq ""} break
+    lappend rows $line
+  }
+  return $rows
+}
+
+# Each row of a screen, without the two characters of its highlight mark or
+# the spaces that carry the highlight's reverse video to the screen's edge.
+proc screen_rows {lines} {
+  set rows {}
+  foreach line [lrange $lines 3 end] {
+    if {$line eq ""} break
+    lappend rows [string trimright [string range $line 2 end]]
+  }
+  return $rows
+}
+
+proc highlighted {lines} {
+  set i 0
+  foreach line [lrange $lines 3 end] {
+    if {[string match "▶ *" $line]} { return $i }
+    incr i
+  }
+  return -1
+}
+
+# Waits for the program to end, and checks it put the screen back and its code.
+proc finish {want} {
+  global CLOSE
+  expect {
+    -ex $CLOSE {}
+    timeout { fail 9 "the screen wasn't restored" }
+    eof { fail 7 "ended without restoring the screen" }
+  }
+  expect {
+    eof {}
+    timeout { fail 9 "hung after restoring the screen" }
+  }
+  lassign [wait] pid spawnid oserror code
+  if {$code != $want} { fail 7 "exit $code, not $want" }
+}
+
+proc open_view {} {
+  # Global, so the other procs' expect and send reach it, not this proc alone.
+  global cli OPEN spawn_id spawn_out
+  spawn sh -c "stty rows 30 cols 100; exec [join $cli]"
+  expect {
+    -ex $OPEN {}
+    timeout { fail 9 "no alternate screen" }
+    eof { fail 8 "ended without opening the screen" }
+  }
+}
+
+# Runs `table` with `args`, and checks it printed what's wanted and opened no screen.
+proc no_screen {want_code want_text args} {
+  global cli OPEN spawn_id
+  spawn sh -c "stty rows 30 cols 100; exec [join $cli] $args"
+  expect {
+    eof {}
+    timeout { fail 9 "hung" }
+  }
+  set out $expect_out(buffer)
+  lassign [wait] pid spawnid oserror code
+  if {[string first $OPEN $out] >= 0} { fail 7 "opened the alternate screen" }
+  if {[string first $want_text $out] < 0} { fail 7 "no \"$want_text\" in: $out" }
+  if {$code != $want_code} { fail 7 "exit $code, not $want_code" }
+}
+
+set RIGHT "\033\[C"
+set LEFT "\033\[D"
+set DOWN "\033\[B"
+set SORTS {"" start record rank ppg all-play form luck ""}
+set NAMES {"" Start Record Rank PPG All-play Form Luck ""}
+
+switch -- $scenario {
+  keys {
+    open_view
+    set first 1
+    foreach sort $SORTS name $NAMES {
+      if {!$first} { send $RIGHT }
+      set first 0
+      set lines [screen]
+      set label [expr {$name eq "" ? "sort: draft order" : "sort: $name ▾"}]
+      if {![string match "Week 10 draft · data through week 10 · *$label" [lindex $lines 0]]} {
+        fail 7 "header: [lindex $lines 0]"
+      }
+      if {[screen_rows $lines] ne [static_rows $sort]} {
+        fail 7 "rows for \"$sort\" aren't --sort's:\n[join [screen_rows $lines] \n]"
+      }
+      if {![string match "←/→ sort  ↑/↓ move  q quit" [lindex $lines end]]} {
+        fail 7 "footer: [lindex $lines end]"
+      }
+    }
+    if {[highlighted $lines] != 0} { fail 7 "the first row isn't highlighted" }
+    send $DOWN
+    if {[highlighted [screen]] != 1} { fail 7 "↓ didn't move the highlight" }
+    send $LEFT
+    set lines [screen]
+    if {![string match "*sort: Luck ▾" [lindex $lines 0]]} { fail 7 "← didn't step back to Luck" }
+    send q
+    finish 0
+  }
+  escape {
+    open_view
+    screen
+    send "\033"
+    finish 0
+  }
+  ctrl-c {
+    open_view
+    screen
+    send "\x03"
+    finish 1
+  }
+  resize {
+    open_view
+    screen
+    exec stty cols 60 < $spawn_out(slave,name)
+    set lines [screen]
+    if {![string match "*…  sort: draft order" [lindex $lines 0]]} {
+      fail 7 "not redrawn at 60 columns: [lindex $lines 0]"
+    }
+    foreach line $lines {
+      if {[string length $line] > 60} { fail 7 "wider than 60: $line" }
+    }
+    send q
+    finish 0
+  }
+  sort {
+    no_screen 0 "Week 10 draft · data through week 10" --sort ppg
+  }
+  no-draft {
+    file delete $draft
+    no_screen 1 "No draft in "
+  }
+  missing-team {
+    exec sed -i.bak {/^## Hail Mary Hustle/,+2d} $draft
+    no_screen 1 "Hail Mary Hustle"
+  }
+  default {
+    puts stderr "unknown scenario \"$scenario\""
+    exit 2
+  }
+}
+puts "PASS $scenario"

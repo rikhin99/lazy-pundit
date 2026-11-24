@@ -521,7 +521,7 @@ The local page beside the draft that shows the published ranking as it would go 
 _Avoid_: Draft page, live view
 
 **Stats table**:
-The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against.
+The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against. In a terminal it opens full screen, where ←/→ sorts it best first by a column and ↑/↓ moves a highlight over the rows; piped, or with `--sort`, it's printed.
 
 **Stats key**:
 One line each saying what all-play, form and luck mean, in words a leaguemate reading a screenshot can follow. It prints under the Stats table's rows and on the Check tab after the power-score method; the column names stay as they are.

@@ -12,6 +12,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 - `lazy-pundit --version` (or `-V`) prints the installed release's version, and `doctor`'s first line names it ("lazy-pundit 0.1.2"), so a bug report can say which release it's from.
 - In a family league, a draft written with a persona that relaxes it (`family-league: relaxed` in `persona.md`) now carries a soft "relaxed persona" item in the problems list, naming the draft's swearing and teasing, so `check`, the preview page and `publish` all show it on every check, not only `draft`'s warning and `publish`'s first confirm.
 - `lazy-pundit table` ends with a key saying what All-play, Form and Luck mean, one line each, so a screenshot of the table explains itself; the preview page's Check tab shows the same three lines under the power-score method.
+- `lazy-pundit table` in a terminal opens the Stats table full screen: ←/→ sorts it best first by a column, ↑/↓ moves a highlight over the rows, and `q` or Esc puts your terminal back as it was. Piped, or with `--sort`, it prints the table as before, so you can still paste it.
 
 ### Changed
 
@@ -84,7 +85,6 @@ The first release, for Sleeper leagues.
 
 - ESPN leagues (and Yahoo).
 - `revise`, the LLM revision of one blurb or the intro.
-- An interactive Stats table.
 - `season add` and `handles`, for carrying a workspace into a new season.
 - Week-0 (preseason) drafts.
 - Playoff status for leagues with median scoring or divisions.

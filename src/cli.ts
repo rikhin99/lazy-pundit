@@ -109,6 +109,7 @@ import {
   stats,
   statsTable,
   statsTableLook,
+  statsView,
   systemDeps,
   type TeamNicknames,
   WINNER_TAKES_ALL,
@@ -214,7 +215,7 @@ program
 program
   .command("table")
   .description(
-    "Print the Stats table: the latest draft's teams in its order, each with its starting place and stats.",
+    "Show the Stats table: the latest draft's teams in its order, each with its starting place and stats. In a terminal it opens full screen (←/→ sort, ↑/↓ move, q quit); piped, or with --sort, it's printed.",
   )
   .option(
     "--sort <column>",
@@ -227,6 +228,20 @@ program
     if (problem) {
       console.error(problem);
       process.exitCode = 1;
+      return;
+    }
+    // In a terminal without --sort, the full-screen view; piped, or sorted
+    // by --sort, the static table, so it can be pasted.
+    if (
+      opts.sort === undefined &&
+      process.stdout.isTTY &&
+      process.stdin.isTTY
+    ) {
+      process.exitCode = await statsView(await workspace(deps), {
+        input: process.stdin,
+        output: process.stdout,
+        env: deps.env,
+      });
       return;
     }
     const table = await statsTable(await workspace(deps), {

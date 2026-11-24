@@ -256,7 +256,35 @@ export function renderStatsTable(
   table: StatsTable,
   look: StatsTableLook,
 ): string {
-  const header = `Week ${table.week} draft · data through week ${table.dataWeek} · method: ${table.method}`;
+  const header = statsTableHeader(table);
+  const lines = statsTableLines(table, look.width);
+  const title = bold(header, look.bold);
+  return `${[title, "", ...lines, "", ...STATS_KEY].join("\n")}\n`;
+}
+
+/** `text` in bold, when the look allows it. */
+export function bold(text: string, on: boolean): string {
+  return on ? `\x1b[1m${text}\x1b[22m` : text;
+}
+
+/** The heading of the column `sort` sorts by, as the table shows it ("PPG" for `ppg`). */
+export function sortHeading(sort: StatsTableSort): string {
+  return (
+    STAT_COLUMNS.find((c) => c.heading.toLowerCase() === sort)?.heading ?? sort
+  );
+}
+
+/** The Stats table's header: the week, the data's last week and the method. */
+export function statsTableHeader(table: StatsTable): string {
+  return `Week ${table.week} draft · data through week ${table.dataWeek} · method: ${table.method}`;
+}
+
+/**
+ * The Stats table's column headings and a line per row, each cell padded to
+ * its column. With a `width`, a long team name is cut with "…" so each line
+ * fits, though never below the "Team" heading's length.
+ */
+export function statsTableLines(table: StatsTable, width?: number): string[] {
   const cells = [
     COLUMNS.map((c) => c.heading),
     ...table.rows.map((r) => COLUMNS.map((c) => c.cell(r))),
@@ -264,31 +292,29 @@ export function renderStatsTable(
   const widths = COLUMNS.map((_, i) =>
     Math.max(...cells.map((line) => (line[i] as string).length)),
   );
-  if (look.width !== undefined) {
+  if (width !== undefined) {
     const total =
       widths.reduce((a, b) => a + b, 0) + GAP.length * (widths.length - 1);
-    const over = total - look.width;
+    const over = total - width;
     if (over > 0) {
       const team = widths[TEAM] as number;
       widths[TEAM] = Math.max("Team".length, team - over);
     }
   }
-  const lines = cells.map((line) =>
+  return cells.map((line) =>
     line
       .map((cell, i) => {
-        const width = widths[i] as number;
-        const text = cut(cell, width);
-        return COLUMNS[i]?.right ? text.padStart(width) : text.padEnd(width);
+        const w = widths[i] as number;
+        const text = cut(cell, w);
+        return COLUMNS[i]?.right ? text.padStart(w) : text.padEnd(w);
       })
       .join(GAP)
       .trimEnd(),
   );
-  const title = look.bold ? `\x1b[1m${header}\x1b[22m` : header;
-  return `${[title, "", ...lines, "", ...STATS_KEY].join("\n")}\n`;
 }
 
 /** `text` cut to `width` with "…" at the end, if it's longer. */
-function cut(text: string, width: number): string {
+export function cut(text: string, width: number): string {
   return text.length > width ? `${text.slice(0, width - 1)}…` : text;
 }
 
