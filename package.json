@@ -1,6 +1,6 @@
 {
   "name": "lazy-pundit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local, CLI-first power rankings with checked stats for fantasy football leagues.",
   "license": "MIT",
   "type": "module",
