@@ -24,11 +24,13 @@ import {
   personaStatus,
   personaText,
   proposedHandles,
+  proposedNicknames,
   RERUN_STEPS,
   SetupRefusal,
   type StakesAnswers,
   settingsText,
   spendCapProblem,
+  type TeamNicknames,
 } from "./init.ts";
 import { familyLeague, leagueFilePath, readLeagueFile } from "./league-file.ts";
 import {
@@ -38,6 +40,7 @@ import {
   loadLore,
   loreLines,
   parseLore,
+  sectionName,
 } from "./lore.ts";
 import { type PresetName, personaPath } from "./persona.ts";
 import { PLATFORM_NAMES } from "./plain-text.ts";
@@ -209,6 +212,26 @@ export async function rerunPreselections(
   );
   const family = await familyLeague(ws).catch(() => false);
   return { ...(type ? { type } : {}), familyLeague: family };
+}
+
+/**
+ * The lore step's nicknames on a re-run: each team's are those `lore.md` gives
+ * the section the step writes it under, as written, so accepting them changes
+ * nothing. A team with no such section, or a `lore.md` missing or not loading,
+ * gets `proposedNicknames`' names.
+ */
+export async function rerunNicknames(
+  dir: string,
+  league: LeagueCheck,
+  handles: ManagerHandle[],
+): Promise<TeamNicknames[]> {
+  const proposed = proposedNicknames(league, handles);
+  const lore = await loadLore(await readWorkspace(dir)).catch(() => undefined);
+  return proposed.map((t) => {
+    const name = sectionName(t.section);
+    const section = lore?.sections.find((s) => s.name === name);
+    return section ? { ...t, nicknames: section.nicknames } : t;
+  });
 }
 
 /**
@@ -526,10 +549,21 @@ function withEntriesOf(current: string, fresh: string): MergedLine[] {
         if (STEP_COMMENT.test(under[0]?.text ?? "")) under.shift();
         return fromFile(under.filter((line) => !isStepLine(name, line.read)));
       });
+  // A team section that says no nicknames in both, however the file says it
+  // (an empty `nicknames:` line, none at all), stays as the file wrote it.
+  // A file that loads names each section once.
+  const freshNone = withoutNicknames(fresh);
+  const currentNone = withoutNicknames(current);
+  const asWritten = (name: string) =>
+    freshNone.has(name) && currentNone.has(name)
+      ? currentLines.sections.find((s) => s.name === name)
+      : undefined;
   const sections = [
-    ...freshLines.sections.map((s) =>
-      trimmed([...trimmed(fromStep(s.lines)), ...keptUnder(s.name)]),
-    ),
+    ...freshLines.sections.map((s) => {
+      const kept = asWritten(s.name);
+      if (kept) return trimmed(fromFile(kept.lines));
+      return trimmed([...trimmed(fromStep(s.lines)), ...keptUnder(s.name)]);
+    }),
     ...currentLines.sections
       .filter((s) => !written.has(s.name))
       .map((s) => trimmed(fromFile(s.lines))),
@@ -539,6 +573,16 @@ function withEntriesOf(current: string, fresh: string): MergedLine[] {
     ...sections.flatMap((s, i) => (i === 0 ? s : [{ text: "" }, ...s])),
     { text: "" },
   ];
+}
+
+/** The names of the team sections a `lore.md` that loads gives no nicknames. */
+function withoutNicknames(text: string): Set<string> {
+  return new Set(
+    parseLore(text)
+      .sections.filter((s) => /^(manager|team):/.test(s.name))
+      .filter((s) => s.nicknames.length === 0)
+      .map((s) => s.name),
+  );
 }
 
 /** Lines without the blank ones at their end. */

@@ -7,6 +7,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 ### Fixed
 
 - The full-screen Stats table puts your terminal back however it ends: closing the terminal's tab or a `kill` (SIGHUP or SIGTERM) now restores the screen, the cursor and typing, as `q`, Esc and Ctrl-C do (#140).
+- `setup lore` starts from what `lore.md` already says: each team's nicknames as you last wrote them, and the league type, so a re-run that accepts every answer changes nothing (#143).
 
 ## 0.1.2
 
@@ -38,7 +39,6 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 ### Not in it yet
 
 - `setup` doesn't yet say what lore is for or what to write in it, so a workspace set up by `init` has nicknames and nothing else in `lore.md` until you add entries by hand (#138).
-- `setup lore`'s nickname prefill offers the platform's names, not nicknames you've since changed by hand in `lore.md`; edit its answers, or `lore.md` after it (#143).
 - A test of the preview page's reload sometimes fails when the tests run in parallel; the preview page itself is unaffected (#142).
 - Yahoo leagues.
 - `revise`, the LLM revision of one blurb or the intro.

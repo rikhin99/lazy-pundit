@@ -192,6 +192,7 @@ export {
   type RerunStep,
   refuseUneditableWorkspace,
   rerunLeague,
+  rerunNicknames,
   rerunPreselections,
   rerunStep,
   rerunStop,

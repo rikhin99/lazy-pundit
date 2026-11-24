@@ -18,6 +18,7 @@ import {
   readConfig,
   refuseUneditableWorkspace,
   rerunLeague,
+  rerunNicknames,
   rerunPreselections,
   rerunStep,
   rerunStop,
@@ -26,6 +27,7 @@ import {
   setUpWorkspace,
   setupChecklist,
   spendCapNote,
+  type TeamNicknames,
   WorkspaceFileError,
 } from "../src/index.ts";
 import { leagueFilePath, loadLeagueFile } from "../src/league-file.ts";
@@ -810,6 +812,116 @@ describe("a workspace.md whose front matter setup can't edit", () => {
     // As the CLI calls it, before reading the workspace for the questions.
     await expect(refuseUneditableWorkspace(dir, "method")).rejects.toThrow(
       /isn't valid YAML; check each key's indent/,
+    );
+  });
+});
+
+describe("setup lore's nicknames start from lore.md", () => {
+  // The first three teams as the step shows them, from `fixture:show -- 8 --model`.
+  const firstThree = (all: TeamNicknames[]) =>
+    all.slice(0, 3).map((t) => `${t.team} ${t.section}: ${t.nicknames}`);
+
+  test("a team's are its section's, as written and in order, and a team with no section gets the league's", async () => {
+    const { dir, league, ws, writeBody } = await twoTeamLore();
+    await writeBody(`## League
+type: friends
+
+## {manager=waiver-wendy}
+nicknames: waiver_wendy, Wendy's Wire
+
+## {manager=gridiron-gus}
+nicknames: Big Bus, gridiron_gus
+- Won it all in 2021.
+`);
+    const handles = linkedHandles(ws, league);
+
+    const defaults = await rerunNicknames(dir, league, handles);
+
+    expect(firstThree(defaults)).toEqual([
+      "sleeper:1 {manager=gridiron-gus}: Big Bus,gridiron_gus",
+      "sleeper:2 {manager=waiver-wendy}: waiver_wendy,Wendy's Wire",
+      "sleeper:3 {manager=benchwarmer-bo}: Bench Mob,benchwarmer_bo",
+    ]);
+    expect(defaults).toHaveLength(12);
+  });
+
+  test("a section with no nicknames, or an empty nicknames line, has none", async () => {
+    const { dir, league, ws, writeBody } = await twoTeamLore();
+    await writeBody(`## League
+type: friends
+
+## {manager=gridiron-gus}
+<!-- Gus Bus, gridiron_gus -->
+- Won it all in 2021.
+
+## {manager=waiver-wendy}
+nicknames:
+`);
+    const handles = linkedHandles(ws, league);
+
+    const defaults = await rerunNicknames(dir, league, handles);
+
+    expect(defaults.slice(0, 2).map((t) => t.nicknames)).toEqual([[], []]);
+  });
+
+  test("accepted over sections that say none, an empty nicknames line or none at all, they write nothing", async () => {
+    const { deps, dir, league, ws, lorePath, writeBody } = await twoTeamLore();
+    await writeBody(`## League
+type: friends
+
+## {manager=gridiron-gus}
+nicknames:
+- Won it all in 2021.
+
+## {manager=waiver-wendy}
+- Always on the wire.
+`);
+    const before = await readFile(lorePath, "utf8");
+    const handles = linkedHandles(ws, league);
+    const nicknames = (await rerunNicknames(dir, league, handles)).slice(0, 2);
+
+    const { shown, written } = await rerun(deps, dir, {
+      step: "lore",
+      league,
+      lore: { type: "friends", nicknames },
+    });
+
+    expect(shown).toEqual([]);
+    expect(written).toBe(false);
+    expect(await readFile(lorePath, "utf8")).toBe(before);
+  });
+
+  test("a team with no linked manager reads its {team=<id>} section", async () => {
+    const { dir, league, writeBody } = await twoTeamLore();
+    await writeBody(`## League
+type: friends
+
+## {team=sleeper:3}
+nicknames: The Mob
+`);
+
+    const defaults = await rerunNicknames(dir, league, []);
+
+    expect(firstThree(defaults)[2]).toBe("sleeper:3 {team=sleeper:3}: The Mob");
+  });
+
+  test("with no lore.md, or one that doesn't load, they're the league's", async () => {
+    const { dir, league, ws, lorePath, writeBody } = await twoTeamLore();
+    const handles = linkedHandles(ws, league);
+    const leagues = [
+      "sleeper:1 {manager=gridiron-gus}: Gus Bus,gridiron_gus",
+      "sleeper:2 {manager=waiver-wendy}: Wendy's Wire,waiver_wendy",
+      "sleeper:3 {manager=benchwarmer-bo}: Bench Mob,benchwarmer_bo",
+    ];
+    await writeBody(
+      "## League\ntype: friends {bogus}\n\n## {manager=gridiron-gus}\nnicknames: Big Bus\n",
+    );
+    expect(firstThree(await rerunNicknames(dir, league, handles))).toEqual(
+      leagues,
+    );
+    await rm(lorePath);
+    expect(firstThree(await rerunNicknames(dir, league, handles))).toEqual(
+      leagues,
     );
   });
 });

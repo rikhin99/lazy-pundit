@@ -89,6 +89,7 @@ import {
   refuseUneditableWorkspace,
   renderStatsTable,
   rerunLeague,
+  rerunNicknames,
   rerunPreselections,
   rerunStep,
   rerunStop,
@@ -727,17 +728,22 @@ async function askCap(deps: Deps, initial: number): Promise<number> {
   return spendCap;
 }
 
-/** Step 4: the league type, then each team's nicknames, accepted as a list or changed a team at a time. */
+/**
+ * Step 4: the league type, then each team's nicknames, accepted as a list or
+ * changed a team at a time. A re-run starts from `lore.md`'s type and nicknames.
+ */
 async function askLore(
   league: LeagueCheck,
   handles: ManagerHandle[],
   skips = SKIPS,
+  rerun: { type?: LeagueType; nicknames?: TeamNicknames[] } = {},
 ): Promise<{ lore?: LoreAnswers; skipRest: boolean }> {
   log.info(LORE_NOTICE);
   const type = answered(
     await select<string>({
       message: "What kind of league is this?",
       options: [...LEAGUE_TYPE_CHOICES, ...skips],
+      ...(rerun.type ? { initialValue: rerun.type } : {}),
     }),
   );
   if (type === SKIP || type === SKIP_REST) {
@@ -745,7 +751,7 @@ async function askLore(
   }
   const withNicknames = (all: TeamNicknames[], i: number, typed: string) =>
     all.map((t, j) => (j === i ? { ...t, nicknames: nicknamesOf(typed) } : t));
-  let nicknames = proposedNicknames(league, handles);
+  let nicknames = rerun.nicknames ?? proposedNicknames(league, handles);
   for (;;) {
     const picked = answered(
       await select({
@@ -1079,7 +1085,11 @@ async function askRerun(
     }
     case "lore": {
       const { league, linked } = await rerunLeague(deps, dir);
-      const { lore } = await askLore(league, linked, RERUN_SKIPS);
+      const nicknames = await rerunNicknames(dir, league, linked);
+      const { lore } = await askLore(league, linked, RERUN_SKIPS, {
+        ...(type ? { type } : {}),
+        nicknames,
+      });
       return { step, league, ...(lore ? { lore } : {}) };
     }
     case "stakes": {

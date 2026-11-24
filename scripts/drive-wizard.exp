@@ -42,7 +42,9 @@
 #   family          a family league type, so the family league and Family persona are preselected
 #   setup-lore      every default into <home>/ws, an entry added to lore.md, then setup lore
 #                   with the same answers (nothing to confirm), then a renamed nickname
-#                   declined at the diff and run again confirmed
+#                   declined at the diff and run again confirmed; then every default
+#                   again, which keeps the renamed nickname, and lore.md's type edited
+#                   to family by hand, which every default keeps too (nothing to confirm)
 #   setup-stakes    the stakes scenario into <home>/ws, week 8 drafted and published,
 #                   then setup stakes paying $20, whose changed-outcome warning
 #                   shows before the confirm
@@ -463,5 +465,33 @@ foreach answer {n y} {
   } else {
     need "lore set"
   }
+}
+expect eof
+wait
+# Every default is what lore.md says: the renamed nickname, then a type edited
+# by hand, each kept with nothing to confirm.
+foreach edit {none type} {
+  if {$edit eq "type"} {
+    # The last one: the top comment's example has a `type: friends` too.
+    set f [open "$home/ws/lore.md"]; set text [read $f]; close $f
+    set at [string last "type: friends" $text]
+    set f [open "$home/ws/lore.md" w]
+    puts -nonewline $f [string replace $text $at [expr {$at + 12}] "type: family"]
+    close $f
+  }
+  spawn node "$repo/src/cli.ts" setup lore
+  need "What kind of league"
+  send "\r"
+  need "nicknames each team"
+  send "\r"
+  need_without "lore left as it was" "differs"
+  # The last run is `finish`'s to wait for.
+  if {$edit eq "none"} { expect eof; wait }
+}
+if {[string first "nicknames: The Bus, gridiron_gus" [exec cat "$home/ws/lore.md"]] < 0} {
+  puts "\nlore.md lost the renamed nickname"; exit 7
+}
+if {[string first "type: family" [exec cat "$home/ws/lore.md"]] < 0} {
+  puts "\nlore.md lost the family type"; exit 7
 }
 finish
