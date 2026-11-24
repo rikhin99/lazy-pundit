@@ -9,6 +9,7 @@ import {
   highScore,
   linkHandles,
   noClipboard,
+  preseason,
   published,
   rankingsDir,
   writeLeagueFile,
@@ -757,6 +758,40 @@ ${highScore()}rivalry-weeks:
     const marks = result.text.match(/\((▲\d+|▼\d+|—|new)\)/g) ?? [];
     expect(marks.length).toBeGreaterThan(0);
     for (const mark of marks) expect(text).toContain(mark);
+  });
+});
+
+describe("a week-0 ranking's style pages", () => {
+  test("say Preseason, show 0-0 records and no movement, and quote only the blurbs written", async () => {
+    const ws = await fearTheTurtle(1);
+    ws.deps = preseason(ws.deps);
+    const { path } = await draft(ws.dir, ws.deps);
+    // A blurb for Wendy's Wire alone.
+    await writeFile(
+      path,
+      (await readFile(path, "utf8")).replace(
+        "## Wendy's Wire {team=sleeper:2}\n",
+        "## Wendy's Wire {team=sleeper:2}\nReady to roll. Again.\n",
+      ),
+    );
+    await published(ws.dir, ws.deps);
+
+    for (const html of [await tabloid(ws.dir, 0), await broadcast(ws.dir, 0)]) {
+      const text = textOf(html);
+      expect(text).toContain("Preseason");
+      expect(text).not.toContain("after Week");
+      expect(text).not.toMatch(/[▲▼]|\(new\)|\(—\)|Movement since/);
+      expect(text.match(/0-0/g)).toHaveLength(12);
+      // One quote, the blurb's first sentence; no empty one for the rest.
+      expect(html.match(/class="quote"/g)).toHaveLength(1);
+      expect(text).not.toContain("Again.");
+    }
+    expect(textOf(await tabloid(ws.dir, 0))).toContain(
+      "1 Gus Bus 0-0 2 Wendy's Wire 0-0 “Ready to roll.” 3 Bench Mob 0-0",
+    );
+    expect(textOf(await broadcast(ws.dir, 0))).toContain(
+      "1 Gus Bus 0-0 2 Wendy's Wire 0-0 Ready to roll. 3 Bench Mob 0-0",
+    );
   });
 });
 

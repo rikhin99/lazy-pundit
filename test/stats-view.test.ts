@@ -92,6 +92,26 @@ describe("the full-screen Stats table", () => {
     ]);
   });
 
+  test("at week 0 draws — in Start for every team, and the stats key under the rows", () => {
+    const rows = ROWS.map(({ start: _, ...row }) => row);
+    const screen = renderStatsView(
+      { week: 0, dataWeek: 0, method: "ramped blend", rows },
+      { team: "sleeper:3" },
+      { width: 120, height: 12, bold: false },
+    );
+
+    expect(screen.slice(2, 10)).toEqual([
+      "  #  Start  Team                                         Record  Rank     PPG  All-play    Form   Luck  Streak",
+      "▶ 1      —  Bench Mob                                    9-1     1st   123.99  80-30     128.00   1.36  W9",
+      "  2      —  The Extremely Long Team Name Of Bye Bye Bea  7-3     2nd   125.40  79-31     133.20  -0.05  L1",
+      "  3      —  Hail Mary Hustle                             —       —          —  —              —      —  —",
+      "",
+      "All-play: your record if you'd played every team every week, not just your opponent. It shows how good your scores are,",
+      "without the luck of who you drew.",
+      "Form: your average points over your last three weeks played.",
+    ]);
+  });
+
   test("names the sort column best first, from the column's heading", () => {
     const [header] = renderStatsView(
       tableFor("all-play"),
@@ -186,6 +206,34 @@ describe("a key in the full-screen Stats table", () => {
     expect(statsViewStep({ team: "sleeper:9" }, "down", tableFor).team).toBe(
       "sleeper:9",
     );
+  });
+
+  test("at week 0, → and ← skip Start, which a preseason draft hasn't got", () => {
+    const preseason = (sort?: StatsTableSort): StatsTable => ({
+      ...tableFor(sort),
+      week: 0,
+      dataWeek: 0,
+    });
+    let state: StatsViewState = { team: "sleeper:3" };
+    const sorts: (StatsTableSort | undefined)[] = [];
+    for (let i = 0; i < 7; i++) {
+      state = statsViewStep(state, "right", preseason);
+      sorts.push(state.sort);
+    }
+
+    expect(sorts).toEqual([
+      "record",
+      "rank",
+      "ppg",
+      "all-play",
+      "form",
+      "luck",
+      undefined,
+    ]);
+    expect(
+      statsViewStep({ sort: "record", team: "sleeper:3" }, "left", preseason)
+        .sort,
+    ).toBeUndefined();
   });
 
   test("a re-sort keeps the highlight on the same team", () => {

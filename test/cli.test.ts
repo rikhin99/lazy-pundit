@@ -253,6 +253,23 @@ test("refresh of a week-0 draft after a method change says the platform's order 
   );
 });
 
+test("publish of a week-0 draft prints the preseason note first, asks nothing, and lists the flag", async () => {
+  const { dir } = await fearTheTurtle(1);
+  const replay = { LAZY_PUNDIT_REPLAY: await preseasonReplay() };
+  expect((await cli(dir, ["draft"], "", undefined, replay)).code).toBe(0);
+
+  const { code, stdout } = await cli(dir, ["publish"], "", undefined, replay);
+
+  expect(code).toBe(0);
+  expect(stdout.split("\n").slice(0, 5)).toEqual([
+    "Note: week 0 has no starting order, and 12 teams have no blurb: Gus Bus, Wendy's Wire, Bench Mob, Frank's FAAB Fund, Baron Von Trade, Pylon Patrol, Kim Possible Kicks, Red Zone Rascals, Hail Mary Hustle, Tank Brigade, Bye Bye Bea and Snap Judgement.",
+    "Problems: 0 hard, 1 soft",
+    "  · League: preseason: week 0 has no starting order: the teams are in the platform's order, so order them by gut",
+    "Published week 0:",
+    `  ${join("pundits", "rikhin", "2025", "week-00.published.md")}`,
+  ]);
+});
+
 test("--league finds the workspace config.yaml lists, from any folder", async () => {
   const { dir, deps } = await fearTheTurtle(8);
   await draft(dir, deps);
@@ -607,6 +624,40 @@ test("table --sort orders the rows, and an unknown column fails on one line", as
   expect(nope.stdout).toBe("");
   expect(nope.stderr).toBe(
     'There\'s no "nope" column to sort by; use start, record, rank, ppg, all-play, form or luck.\n',
+  );
+});
+
+test("table on a week-0 draft shows no Start, and --sort start refuses on one line", async () => {
+  const { dir } = await fearTheTurtle(1);
+  const replay = { LAZY_PUNDIT_REPLAY: await preseasonReplay() };
+  expect((await cli(dir, ["draft"], "", undefined, replay)).code).toBe(0);
+
+  const piped = await cli(dir, ["table"], "", undefined, replay);
+  const byStart = await cli(
+    dir,
+    ["table", "--sort", "start"],
+    "",
+    undefined,
+    replay,
+  );
+
+  expect(piped.code).toBe(0);
+  expect(piped.stdout.split("\n").slice(0, 5)).toEqual([
+    "Week 0 draft · data through week 0 · method: ramped blend",
+    "",
+    " #  Start  Team                Record  Rank  PPG  All-play  Form  Luck  Streak",
+    " 1      —  Gus Bus             —       —       —  —            —     —  —",
+    " 2      —  Wendy's Wire        —       —       —  —            —     —  —",
+  ]);
+  expect(piped.stdout.split("\n").slice(3, 15)).toHaveLength(12);
+  for (const row of piped.stdout.split("\n").slice(3, 15)) {
+    expect(row.slice(2, 9)).toBe("      —");
+  }
+  expect(piped.stdout.split("\n").slice(-5)).toEqual(KEY_TAIL);
+  expect(byStart.code).toBe(1);
+  expect(byStart.stdout).toBe("");
+  expect(byStart.stderr).toBe(
+    "A preseason draft has no starting order, so there's no Start to sort by; use record, rank, ppg, all-play, form or luck.\n",
   );
 });
 

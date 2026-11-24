@@ -166,21 +166,21 @@ describe("the Stats table", () => {
 
     expect(week).toBe(0);
     // Before any scored week the standings are empty too, so no team has a
-    // single stat; injuries are always listed, if only as none.
+    // single stat, and a preseason draft has no starting place; injuries are
+    // always listed, if only as none.
     expect(rows).toHaveLength(12);
     for (const row of rows) {
       expect(Object.keys(row).sort()).toEqual([
         "injuries",
         "name",
         "place",
-        "start",
         "team",
       ]);
     }
   });
 
   test.each([
-    ["start", (r: StatsTableRow) => -r.start],
+    ["start", (r: StatsTableRow) => -(r.start as number)],
     ["record", (r: StatsTableRow) => winShare(r.record)],
     ["rank", (r: StatsTableRow) => -(r.rank as number)],
     ["ppg", (r: StatsTableRow) => r.ppg as number],

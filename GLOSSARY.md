@@ -500,6 +500,9 @@ _Avoid_: Warning (for a soft problem alone)
 The one question publishing asks when the draft has hard problems: Publish anyway or Back to editing, with Back to editing the answer whenever nobody says otherwise. A draft with no hard problems publishes without it. It never rejects a ranking outright.
 _Avoid_: Override, force publish
 
+**Preseason note**:
+What publishing a week-0 draft prints before anything is asked or written: the no-starting-order flag, and the teams with no blurb. It's a note, never a question, so a preseason ranking asks nothing a later week wouldn't.
+
 **Moved team**:
 A team the pundit has placed somewhere other than its starting place. It's listed as a soft problem with both places, so the pundit sees their edits at a glance.
 
@@ -511,7 +514,7 @@ _Avoid_: Test suite, usage stats
 The builder's Stage 1 trial with real pundits ranking their own leagues, to learn whether the tool earns a place in their week. It gathers no telemetry: what the builder learns, each pundit chooses to paste.
 
 **Demand-test summary**:
-What `stats` prints, read from the pundit's frozen copies and LLM prose files alone, for the pundit to paste to the builder during the demand test. For each published ranking week, it shows the minutes from the draft's start to its first publish, how many teams were moved and by how many places in all (measured against the starting order at publish), the LLM text kept, whether the LLM was used and the blurb problems at publish. Then it gives the medians. Nothing is sent anywhere: the pundit chooses what to paste.
+What `stats` prints, read from the pundit's frozen copies and LLM prose files alone, for the pundit to paste to the builder during the demand test. For each published ranking week, it shows the minutes from the draft's start to its first publish, how many teams were moved and by how many places in all (measured against the starting order at publish; "no starting order" for week 0, which is left out of that median), the LLM text kept, whether the LLM was used and the blurb problems at publish. Then it gives the medians. Nothing is sent anywhere: the pundit chooses what to paste.
 _Avoid_: Usage stats, usage summary
 
 **LLM text kept**:
@@ -527,7 +530,7 @@ The local page beside the draft that shows the published ranking as it would go 
 _Avoid_: Draft page, live view
 
 **Stats table**:
-The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against. In a terminal it opens full screen, where ←/→ sorts it best first by a column and ↑/↓ moves a highlight over the rows; piped, or with `--sort`, it's printed.
+The editing view's stats behind the starting order, printed in the terminal: one row per team in the draft's current order, with its starting place beside its stats. A week-0 draft has no starting place, so its Start reads "—" and it can't be sorted by Start. It reads the data the draft was built from, through the ranking week, so it matches what the draft's claims are checked against. In a terminal it opens full screen, where ←/→ sorts it best first by a column and ↑/↓ moves a highlight over the rows; piped, or with `--sort`, it's printed.
 
 **Stats key**:
 One line each saying what all-play, form and luck mean, in words a leaguemate reading a screenshot can follow. It prints under the Stats table's rows and on the Check tab after the power-score method; the column names stay as they are.

@@ -6,10 +6,10 @@ import {
   bold,
   cut,
   STATS_KEY,
-  STATS_TABLE_SORTS,
   type StatsTable,
   type StatsTableSort,
   sortHeading,
+  sortsFor,
   statsTableFrom,
   statsTableHeader,
   statsTableLines,
@@ -26,11 +26,9 @@ const MOVES = ["left", "right", "up", "down"] as const;
 
 export type StatsViewMove = (typeof MOVES)[number];
 
-/** The sorts ←/→ step through: the draft's order, then each sort column. */
-const SORTS: (StatsTableSort | undefined)[] = [undefined, ...STATS_TABLE_SORTS];
-
 /**
- * The state after `move`: ←/→ step to the previous or next sort, wrapping
+ * The state after `move`: ←/→ step to the previous or next sort, from the
+ * draft's order through each sort column its week offers (`sortsFor`), wrapping
  * round, with the highlight kept on its team; ↑/↓ move the highlight a row in
  * the order `tableFor` gives for the shown sort, stopping at the first and last.
  */
@@ -40,9 +38,10 @@ export function statsViewStep(
   tableFor: (sort?: StatsTableSort) => StatsTable,
 ): StatsViewState {
   if (move === "left" || move === "right") {
-    const at = SORTS.indexOf(state.sort);
+    const sorts = [undefined, ...sortsFor(tableFor(state.sort).week)];
+    const at = sorts.indexOf(state.sort);
     const next =
-      SORTS[(at + (move === "right" ? 1 : -1) + SORTS.length) % SORTS.length];
+      sorts[(at + (move === "right" ? 1 : -1) + sorts.length) % sorts.length];
     return { ...(next ? { sort: next } : {}), team: state.team };
   }
   const rows = tableFor(state.sort).rows;

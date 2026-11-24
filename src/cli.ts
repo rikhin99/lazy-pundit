@@ -97,6 +97,7 @@ import {
   STATS_TABLE_SORTS,
   type StakesAnswers,
   type StakesFields,
+  StatsTableRefusal,
   type StatsTableSort,
   type StepRerun,
   setUpWorkspace,
@@ -220,7 +221,7 @@ program
 program
   .command("table")
   .description(
-    "Show the Stats table: the latest draft's teams in its order, each with its starting place and stats. In a terminal it opens full screen (←/→ sort, ↑/↓ move, q quit); piped, or with --sort, it's printed.",
+    "Show the Stats table: the latest draft's teams in its order, each with its starting place (none at week 0) and stats. In a terminal it opens full screen (←/→ sort, ↑/↓ move, q quit); piped, or with --sort, it's printed.",
   )
   .option(
     "--sort <column>",
@@ -360,6 +361,7 @@ program
       },
       confirmRelaxed,
       onWarnings: printWarnings,
+      onPreseasonNote: (note) => console.log(note),
       showPath: shown,
     });
     if (!result.published) {
@@ -1178,6 +1180,7 @@ try {
     err instanceof FetchError ||
     err instanceof PublishWriteError ||
     err instanceof SetupRefusal ||
+    err instanceof StatsTableRefusal ||
     err instanceof SetupCancelled
   ) {
     // A cancel keeps its look: the cancelled prompt already ended the frame.

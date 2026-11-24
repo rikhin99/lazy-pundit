@@ -6,6 +6,7 @@ import { movementSince, plainTextBlocks } from "./plain-text.ts";
 import { problemLine, problemsHeading } from "./problems-list.ts";
 import {
   decimal,
+  MISSING,
   STAT_COLUMNS,
   STATS_KEY,
   type StatsTableRow,
@@ -145,7 +146,7 @@ function checkTab(checked: CheckedDraft): string {
     const blurb = entry.blurb
       ? `\n<p class="blurb">${marked(team, entry.blurb)}</p>`
       : "";
-    blocks.push(`<article class="entry" id="${checkId(team)}"><div class="places"><span class="place" title="Place">${row.place}</span><span class="start" title="Starting place">start ${row.start}</span></div>
+    blocks.push(`<article class="entry" id="${checkId(team)}"><div class="places"><span class="place" title="Place">${row.place}</span><span class="start" title="Starting place">start ${row.start ?? MISSING}</span></div>
 <div class="body"><h2>${esc(row.name)}${mark}</h2>${blurb}</div>
 ${statsPanel(row)}</article>`);
   }

@@ -73,6 +73,8 @@ Then paste into your league chat. If there's no clipboard, `publish` says so: op
 
 With an Anthropic key, `draft` has the LLM write the intro and blurbs, and writes each call's prompt and reply to `transcripts/<season>/` in the workspace. With no key, past the spend cap, or on any error from Anthropic, it writes stat lines instead (or the LLM's prose so far, if it stopped partway) and says why. `draft` drafts the last scored week. Run while a week's matchups are still being played, it says a week is in progress and drafts the week before; `draft --include-in-progress` adds the in-progress week's stats as evidence, so claims about it are listed as provisional until the week is scored.
 
+Before any week is scored, `draft` makes week 0, the preseason ranking: the teams in the platform's own order (Sleeper's roster IDs, ESPN's team IDs), each section just the team's heading, and no LLM call, so you order them by gut and write any blurbs yourself. A team with no manager yet keeps the platform's name, such as "Team 3". `publish` titles it "Preseason", with no movement marks, and first prints a note that there's no starting order and which teams have no blurb; it asks nothing it wouldn't ask at a later week. Week 1's movement is then measured from your preseason places.
+
 ### Editing a draft
 
 Open `week-NN.md` in any text editor. Leave the front matter (the lines between the two `---`) as it is. Below it is the intro, then a `## <team>` section for each team:
@@ -85,6 +87,7 @@ Open `week-NN.md` in any text editor. Leave the front matter (the lines between 
 - **To reorder**, move whole sections, heading and blurb together. The order of the sections is your ranking. Keep each heading line as it is: `{team=…}` says which team it is.
 - **To rewrite a blurb**, replace the text under the heading. A tag such as `[55]{ev=w8.margin}` marks a claim and names the stat it's checked against. Publishing strips the tags, so the league sees only `55`. You don't need to write tags: `check` adds them to the claims it can match to one stat, and leaves the words as they are.
 - **`lazy-pundit table`** shows the stats behind the starting order (record, standings rank, points per game, all-play record, form, luck and streak), with each team's place now (#) against its starting place (Start). In a terminal it opens full screen: ←/→ sorts it best first by a column (PPG, Luck and the rest), ↑/↓ moves a highlight over the rows, and `q` (or Esc) puts your terminal back as it was. Below about 69 columns the full screen cuts each line at the window's edge, so widen the window to see every column. Piped (`lazy-pundit table | pbcopy`), or with `--sort ppg` (or `start`, `record`, `rank`, `all-play`, `form`, `luck`), it prints the table instead, best first with `--sort`; run it again after moving sections, and below about 69 columns a printed row wraps.
+- **In a week-0 draft** there's no starting order: the sections start in the platform's order, moving one never lists it as a moved team, and Start reads "—" in `table` and on the preview's Check tab, so `--sort start` refuses and the full screen's ←/→ skip it.
 
 Say you move Gus Bus to the top and write "Gus Bus beat Pylon Patrol by 55 and are 6-2." `check` tags the claims and finds one wrong:
 

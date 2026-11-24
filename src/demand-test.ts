@@ -10,10 +10,13 @@ export interface DemandTestWeek {
   week: number;
   /** From the draft's start to its first publish; unknown for a frozen copy that predates the record. */
   minutesToPublish?: number;
-  /** Teams placed away from their starting place, against the starting order at publish. */
-  movedTeams: number;
-  /** The places those teams were moved, in all. */
-  placesMoved: number;
+  /**
+   * Teams placed away from their starting place, against the starting order at
+   * publish. Absent at week 0, which has no starting order.
+   */
+  movedTeams?: number;
+  /** The places those teams were moved, in all; absent at week 0. */
+  placesMoved?: number;
   /** Whether the LLM wrote any section of the week's draft. */
   llmUsed: boolean;
   /** The LLM text kept, from 0 to 1, when the LLM was used. */
@@ -80,8 +83,8 @@ function summaryText(
   const median = [
     timing(medianOf(known(weeks.map((w) => w.minutesToPublish)))),
     moved(
-      medianOf(weeks.map((w) => w.movedTeams)) ?? 0,
-      medianOf(weeks.map((w) => w.placesMoved)) ?? 0,
+      medianOf(known(weeks.map((w) => w.movedTeams))),
+      medianOf(known(weeks.map((w) => w.placesMoved))),
     ),
     `LLM used in ${used.length} of ${plural(weeks.length, "week")}${keptText(medianOf(known(used.map((w) => w.llmTextKept))))}`,
     blurbProblemsText(
@@ -114,7 +117,9 @@ function timing(minutes: number | undefined): string {
     : `${Math.round(minutes)} min to publish`;
 }
 
-function moved(teams: number, places: number): string {
+/** The teams moved and places in all, or "no starting order" for none to count: week 0's alone. */
+function moved(teams: number | undefined, places: number | undefined): string {
+  if (teams === undefined || places === undefined) return "no starting order";
   if (teams === 0) return "no teams moved";
   return `${plural(teams, "team")} moved, ${plural(places, "place")} in all`;
 }
@@ -216,6 +221,8 @@ function minutesBetween(from: string, to: string): number {
 function moves(
   ranking: RankingFile,
 ): Pick<DemandTestWeek, "movedTeams" | "placesMoved"> {
+  // A week-0 draft records the platform order, which is no starting order.
+  if (ranking.meta.week === 0) return {};
   const start = ranking.meta.starting_order;
   let movedTeams = 0;
   let placesMoved = 0;

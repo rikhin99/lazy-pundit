@@ -742,7 +742,7 @@ describe("the Check tab", () => {
     expect(checkBlock(html, "Bye Bye Bea").stats.Injuries).toEqual(["none"]);
   });
 
-  test("at week 0 each stat shows the missing mark", async () => {
+  test("at week 0 each stat and both Starts show the missing mark, with the stats key after the method", async () => {
     const ws = await fearTheTurtle(1);
     ws.deps.transport = patchingTransport(ws.deps.transport, {
       [`${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`]: (league: Json) => {
@@ -751,19 +751,23 @@ describe("the Check tab", () => {
     });
     await draft(ws.dir, ws.deps);
 
-    const teams = checkBlocks(await served(ws.dir, ws.deps)).filter(
-      (b) => b.place,
-    );
+    const html = await served(ws.dir, ws.deps);
+    const teams = checkBlocks(html).filter((b) => b.place);
 
     expect(teams).toHaveLength(12);
-    for (const { stats, mark } of teams) {
-      // Nothing to move from before the season, as the plain text shows it.
+    for (const { stats, mark, start } of teams) {
+      // Nothing to move from before the season, as the plain text shows it,
+      // and no starting place beside the place or in the panel.
       expect(mark).toBeUndefined();
-      const { Start, Injuries, ...rest } = stats;
-      expect(Start).toEqual([expect.stringMatching(/^\d+$/)]);
-      expect(Object.keys(rest)).toHaveLength(8);
+      expect(start).toBe("—");
+      const { Injuries, ...rest } = stats;
+      expect(Object.keys(rest)).toHaveLength(9);
       for (const values of Object.values(rest)) expect(values).toEqual(["—"]);
       expect(Injuries?.length).toBeGreaterThan(0);
     }
+    const words = shown(tab(html, "check"));
+    expect(words).toContain(
+      "Power-score method: ramped blendAll-play: your record if you'd played every team every week",
+    );
   });
 });

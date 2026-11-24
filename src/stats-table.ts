@@ -16,8 +16,8 @@ import type { EvidenceValue, OrderEvidence } from "./validator/types.ts";
 export interface StatsTableRow {
   /** The team's place in the draft as the file stands. */
   place: number;
-  /** Its starting place. */
-  start: number;
+  /** Its starting place; none in a week-0 draft, which has no starting order. */
+  start?: number;
   team: TeamId;
   name: string;
   record?: string;
@@ -62,8 +62,24 @@ export type StatsTableSort = (typeof STATS_TABLE_SORTS)[number];
 /** Why `value` can't be a sort column, or nothing when it can. */
 export function sortProblem(value: string): string | undefined {
   if ((STATS_TABLE_SORTS as readonly string[]).includes(value)) return;
-  const valid = `${STATS_TABLE_SORTS.slice(0, -1).join(", ")} or ${STATS_TABLE_SORTS.at(-1)}`;
-  return `There's no "${value}" column to sort by; use ${valid}.`;
+  return `There's no "${value}" column to sort by; use ${sortList(STATS_TABLE_SORTS)}.`;
+}
+
+/** The sorts a week's Stats table offers: every one but `start` at week 0, which has no starting order. */
+export function sortsFor(week: number): readonly StatsTableSort[] {
+  return week === 0
+    ? STATS_TABLE_SORTS.filter((s) => s !== "start")
+    : STATS_TABLE_SORTS;
+}
+
+/** `sorts` as a refusal lists them: "record, rank … or luck". */
+function sortList(sorts: readonly string[]): string {
+  return `${sorts.slice(0, -1).join(", ")} or ${sorts.at(-1)}`;
+}
+
+/** A Stats table the draft can't give: a sort by Start at week 0. Refused before anything is shown. */
+export class StatsTableRefusal extends Error {
+  override name = "StatsTableRefusal";
 }
 
 /**
@@ -75,7 +91,7 @@ const GOODNESS: Record<
   StatsTableSort,
   (r: StatsTableRow) => number | undefined
 > = {
-  start: (r) => -r.start,
+  start: (r) => (r.start === undefined ? undefined : -r.start),
   record: (r) => winShare(r.record),
   rank: (r) => (r.rank === undefined ? undefined : -r.rank),
   ppg: (r) => r.ppg,
@@ -117,19 +133,25 @@ export function statsTableFrom(
   opts: { sort?: StatsTableSort } = {},
 ): StatsTable {
   const week = ranking.meta.week;
+  if (opts.sort && !sortsFor(week).includes(opts.sort)) {
+    throw new StatsTableRefusal(
+      `A preseason draft has no starting order, so there's no Start to sort by; use ${sortList(sortsFor(week))}.`,
+    );
+  }
   // Through the ranking week alone, so an in-progress week a draft let in
   // adds nothing.
   const pack = buildEvidencePack(league, week);
   const names = new Map<string, string>(
     league.teams.map((t) => [t.id, t.name]),
   );
-  const starts = ranking.meta.starting_order;
+  // A week-0 draft records the platform order, which is no starting order.
+  const starts = week === 0 ? [] : ranking.meta.starting_order;
   const rows = (Object.entries(order) as [TeamId, OrderEvidence][])
     .map(([team, { place }]): StatsTableRow => {
       const ev = pack.teams[team] ?? {};
       return {
         place,
-        start: starts.indexOf(team) + 1,
+        ...(starts.includes(team) && { start: starts.indexOf(team) + 1 }),
         team,
         name: names.get(team) ?? team,
         ...text("record", ev.record),
@@ -212,7 +234,11 @@ interface Column {
  * the terminal prints them and the Check tab's stats panel shows them.
  */
 export const STAT_COLUMNS: Column[] = [
-  { heading: "Start", cell: (r) => String(r.start), right: true },
+  {
+    heading: "Start",
+    cell: (r) => (r.start === undefined ? MISSING : String(r.start)),
+    right: true,
+  },
   { heading: "Record", cell: (r) => r.record ?? MISSING },
   {
     heading: "Rank",

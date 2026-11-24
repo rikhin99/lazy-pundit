@@ -8,6 +8,7 @@ import {
   type Problem,
 } from "./check.ts";
 import type { Deps } from "./deps.ts";
+import { list } from "./evidence-pack.ts";
 import { rawFrontMatterValue, WorkspaceFileError } from "./front-matter.ts";
 import type { PersonaRecord } from "./persona.ts";
 import { renderPlainText } from "./plain-text.ts";
@@ -47,6 +48,11 @@ export interface PublishOptions {
    */
   onWarnings?: (warnings: string[]) => void;
   /**
+   * Told the preseason note, on a week-0 draft, after the warnings and before
+   * anything is asked or written. The result carries it too.
+   */
+  onPreseasonNote?: (note: string) => void;
+  /**
    * How a `PublishWriteError` shows a file's path: the CLI's own way, so the
    * message matches the paths it lists. Relative to the league workspace when
    * not given.
@@ -72,6 +78,8 @@ export type PublishResult =
       problems: Problem[];
       /** The data-changed warning, or a note that the fetch failed. */
       warnings: string[];
+      /** The preseason note, on a week-0 draft. */
+      preseasonNote?: string;
     }
   | {
       /** Nothing was written. */
@@ -106,6 +114,8 @@ export async function publish(
     ...(ownCopy?.warnings ?? []),
   ];
   opts.onWarnings?.(warnings);
+  const preseasonNote = preseasonNoteOf(checked);
+  if (preseasonNote) opts.onPreseasonNote?.(preseasonNote);
 
   const hard = problems.filter((p) => p.severity === "hard");
   if (hard.length > 0 && !opts.yes && !(await opts.confirm?.(hard))) {
@@ -217,7 +227,23 @@ export async function publish(
     copied,
     problems,
     warnings,
+    ...(preseasonNote && { preseasonNote }),
   };
+}
+
+/**
+ * The preseason note a week-0 draft is published with: it has no starting
+ * order, and which teams have no blurb, by their headings. None at a later week.
+ */
+function preseasonNoteOf({ ranking }: CheckedDraft): string | undefined {
+  if (ranking.meta.week !== 0) return undefined;
+  const noBlurb = ranking.entries.flatMap((e) =>
+    e.kind === "team" && e.blurb.trim() === "" ? [e.label] : [],
+  );
+  if (noBlurb.length === 0) return "Note: week 0 has no starting order.";
+  const teams =
+    noBlurb.length === 1 ? "1 team has" : `${noBlurb.length} teams have`;
+  return `Note: week 0 has no starting order, and ${teams} no blurb: ${list(noBlurb)}.`;
 }
 
 /**

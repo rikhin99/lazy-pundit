@@ -223,6 +223,7 @@ export {
   STATS_TABLE_SORTS,
   type StatsTable,
   type StatsTableLook,
+  StatsTableRefusal,
   type StatsTableRow,
   type StatsTableSort,
   sortProblem,
