@@ -90,7 +90,9 @@ export function firstDraftPrompt(ctx: DraftContext): string {
 
   const teams = ctx.teams.map((t) => {
     const by =
-      t.managers.length > 0 ? `, managed by ${t.managers.join(" and ")}` : "";
+      t.managers.length > 0
+        ? `, managed by ${t.managers.join(" and ")}`
+        : ", with no manager";
     const last = ctx.lastBlurbs?.blurbs[t.id];
     return [
       `### ${t.name} (team id ${t.id})${by}`,

@@ -13,6 +13,7 @@ const KINDS: Record<Problem["kind"], string> = {
   "unreadable-tag": "unreadable tag",
   moved: "you moved this team",
   "small-sample": "small sample",
+  "no-starting-order": "preseason",
   "failed-fetch": "fetch failed",
   provisional: "provisional",
   "correction-timing": "correction timing",

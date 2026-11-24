@@ -40,6 +40,7 @@ export {
 export {
   DraftExistsError,
   type DraftOptions,
+  DraftRefusal,
   type DraftResult,
   draft,
 } from "./draft.ts";

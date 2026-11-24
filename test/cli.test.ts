@@ -20,6 +20,7 @@ import {
   fearTheTurtle,
   frontMatter,
   patchingTransport,
+  preseasonReplay,
   rankingsDir,
   statCorrection,
   WEEKS,
@@ -206,6 +207,49 @@ test("stats prints the demand-test summary to paste, with no replay to fetch fro
       "Median: 0 min to publish · no teams moved · LLM used in 0 of 1 week · 0 hard and 0 soft blurb problems",
       "",
     ].join("\n"),
+  );
+});
+
+test("draft --include-in-progress before any week is scored exits 1 with the refusal and writes no draft", async () => {
+  const { dir } = await fearTheTurtle(1);
+
+  const { code, stdout, stderr } = await cli(
+    dir,
+    ["draft", "--include-in-progress"],
+    "",
+    undefined,
+    { LAZY_PUNDIT_REPLAY: await preseasonReplay() },
+  );
+
+  expect({ code, stdout }).toEqual({ code: 1, stdout: "" });
+  expect(stderr).toBe(
+    "A preseason draft takes no in-progress week, so --include-in-progress can't be used until week 1 is scored.\n",
+  );
+  expect(existsSync(rankingsDir(dir))).toBe(false);
+});
+
+test("draft before any week is scored points to the teams' stats, not a starting order", async () => {
+  const { dir } = await fearTheTurtle(1);
+
+  const { code, stdout } = await cli(dir, ["draft"], "", undefined, {
+    LAZY_PUNDIT_REPLAY: await preseasonReplay(),
+  });
+
+  expect(code).toBe(0);
+  expect(stdout.split("\n")[1]).toBe("See the teams' stats: lazy-pundit table");
+});
+
+test("refresh of a week-0 draft after a method change says the platform's order stays", async () => {
+  const { dir } = await fearTheTurtle(1);
+  const replay = { LAZY_PUNDIT_REPLAY: await preseasonReplay() };
+  expect((await cli(dir, ["draft"], "", undefined, replay)).code).toBe(0);
+  await writeSettings(dir, "method: form");
+
+  const { code, stdout } = await cli(dir, ["refresh"], "", undefined, replay);
+
+  expect(code).toBe(0);
+  expect(stdout.split("\n")[0]).toBe(
+    "The draft now records your settings' power-score method; a week-0 draft keeps the platform's order.",
   );
 });
 

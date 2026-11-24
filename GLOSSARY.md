@@ -106,6 +106,12 @@ One year of a league, named by the platform's season year. Stakes, teams, rankin
 A manager's entry in one season, named by its platform and the platform's team ID for that season. A team's identity isn't assumed to survive into the next season; anything that spans seasons follows the manager instead.
 _Avoid_: Roster, franchise
 
+**Platform order**:
+The order the platform lists a league's teams in: Sleeper's by roster ID, ESPN's by team ID. A week-0 draft records it in place of a starting order, though it isn't one.
+
+**Unmanaged team**:
+A team the platform has no manager for yet, as before a league fills. It keeps the platform's name for it, such as "Team 3", and nothing is made up for it: no manager, nickname or stat.
+
 **Matchup**:
 One head-to-head game in one week. It is a regular-season, winners-bracket, consolation or losers-bracket game, and it ends in a win, loss or tie. A win decided by a tiebreak is still a win, marked as decided that way.
 _Avoid_: Game (for the fantasy contest)
@@ -287,7 +293,7 @@ A change the platform makes to a week's scores after it has been scored.
 A stat correction that flips a matchup result or changes a trigger winner. It is found by comparing fresh data with the snapshot behind the latest published ranking, so it only covers weeks that a published ranking has already shown. It becomes evidence for the next draft, whichever week that is, one item per corrected week, and opens that draft's week intro as "Correction from week 7: …", even when the persona turns the intro off. One found later, by `refresh`, is a soft league item naming that line for the pundit to add. It lasts until a ranking that includes it is published. Smaller corrections are only noted for the pundit.
 
 **Draft**:
-The pundit's working copy of a week's ranking. It can be edited freely, before and after publishing, and the league never sees it.
+The pundit's working copy of a week's ranking. It can be edited freely, before and after publishing, and the league never sees it. Not the platform's player draft, which is "the platform draft".
 
 **Blurb**:
 The short prose about one team that goes with its place in the ranking. The LLM drafts it and the pundit can rewrite it.
@@ -347,7 +353,7 @@ The default power-score method: a weighted mix of a team's league percentiles of
 One pundit's choices for one league that aren't part of the persona: the power-score method and its weights. A pundit can change them at any time. A draft copies what it used, so changing them later never rewrites the past, and an existing draft picks up the change only when the pundit refreshes.
 
 **Starting order**:
-The order the tool proposes from the power score. The pundit edits it into the ranking. It is fixed when a draft begins and changes only when the pundit refreshes.
+The order the tool proposes from the power score. The pundit edits it into the ranking. It is fixed when a draft begins and changes only when the pundit refreshes. A week-0 draft has none: it records the platform order in its place, and refreshing keeps it.
 _Avoid_: Suggested ranking, default ranking, recommendation, starting-order snapshot
 
 **Starting place**:
@@ -384,7 +390,7 @@ _Avoid_: Previous ranking, last week's ranking
 A warning that the season is too young for the power score to mean much. It appears only in the editing view.
 
 **No-starting-order flag**:
-A warning on a week-0 ranking's draft: the teams are in the platform's own order, not a starting order, and the pundit orders them by gut. It appears only in the editing view and lasts for that draft's life.
+A warning on a week-0 ranking's draft: the teams are in the platform order, not a starting order, and the pundit orders them by gut. It's a soft league item, so it shows wherever the problems list does, and lasts for that draft's life. With no starting order, no team is a moved team.
 
 ## Stats
 

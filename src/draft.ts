@@ -104,6 +104,11 @@ export interface DraftOptions {
   includeInProgress?: boolean;
 }
 
+/** A draft the options given can't make, refused before anything is written. */
+export class DraftRefusal extends Error {
+  override name = "DraftRefusal";
+}
+
 export class DraftExistsError extends Error {
   override name = "DraftExistsError";
 }
@@ -137,6 +142,13 @@ export async function draft(
   const fetched = await fetchOrContinue(ws, deps, { credentials });
   const names = validatorNames(lore, fetched.league, ws.handles, stakes);
   const week = fetched.league.lastScoredWeek;
+  const preseason = week === 0;
+  // Before anything is written: a preseason draft has no week to include.
+  if (preseason && opts.includeInProgress) {
+    throw new DraftRefusal(
+      "A preseason draft takes no in-progress week, so --include-in-progress can't be used until week 1 is scored.",
+    );
+  }
   const dir = rankingsDir(ws);
   const path = join(dir, `${weekStem(week)}.md`);
   // Before the snapshot, the LLM call and a draft in the way, which would
@@ -157,7 +169,11 @@ export async function draft(
   const league = normalizeSnapshot(snapshot);
   const method = methodForWeek(settings, league, week);
   const order = startingOrder(league, week, method);
-  const inProgress = league.weeks.find((w) => !w.scored && w.week > week)?.week;
+  // A preseason draft is made before the season, so week 1 being under way
+  // isn't worth a word.
+  const inProgress = preseason
+    ? undefined
+    : league.weeks.find((w) => !w.scored && w.week > week)?.week;
   const included = opts.includeInProgress ? inProgress : undefined;
   if (inProgress !== undefined) {
     warn([
@@ -183,7 +199,10 @@ export async function draft(
   warn(personaWarnings);
   const began = deps.clock.now();
   let outcome: ProseOutcome;
-  if (anthropicApiKey) {
+  if (preseason) {
+    // A preseason ranking is the pundit's gut: no LLM, so no fallback either.
+    outcome = { prose: statLines(data, persona), failed: [] };
+  } else if (anthropicApiKey) {
     const sent = sentLore(lore, league, ws.handles);
     const stakesSent = sentStakes(stakes, league, week);
     const ctx = draftContext(

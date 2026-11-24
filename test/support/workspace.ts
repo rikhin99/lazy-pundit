@@ -368,6 +368,61 @@ export function patchingTransport(
   };
 }
 
+/** Changes to a preseason replay, made after `preseason`'s own. */
+export interface Preseason {
+  /** Patches to the league payload, after its scored week is set to 0. */
+  league?: (league: Json) => void;
+  /** Patches to each roster, after its record and points are zeroed. */
+  roster?: (roster: Json) => void;
+}
+
+/**
+ * Fear The Turtle's week-1 replay made a preseason: no week scored, and every
+ * roster's record and points zeroed, as a real league reads before week 1.
+ */
+export function preseason(deps: Deps, patch: Preseason = {}): Deps {
+  const league = `${SLEEPER_API}/league/${FEAR_THE_TURTLE_ID}`;
+  return {
+    ...deps,
+    transport: patchingTransport(deps.transport, {
+      [league]: (payload: Json) => {
+        payload.settings.last_scored_leg = 0;
+        patch.league?.(payload);
+      },
+      [`${league}/rosters`]: (rosters: Json[]) => {
+        for (const r of rosters) {
+          for (const key of [
+            "wins",
+            "losses",
+            "ties",
+            "fpts",
+            "fpts_decimal",
+            "fpts_against",
+            "fpts_against_decimal",
+          ]) {
+            r.settings[key] = 0;
+          }
+          patch.roster?.(r);
+        }
+      },
+    }),
+  };
+}
+
+/** `preseason`'s replay written as a snapshot, for the CLI's `LAZY_PUNDIT_REPLAY`: its folder. */
+export async function preseasonReplay(patch?: Preseason): Promise<string> {
+  const deps = preseason(atWeek(await operator(), 1), patch);
+  const snapshots = await mkdtemp(join(tmpdir(), "lazy-pundit-replay-"));
+  const { id } = await fetchSleeperSnapshot({
+    transport: deps.transport,
+    clock: deps.clock,
+    snapshotsDir: snapshots,
+    cacheDir: deps.cacheDir,
+    leagueId: FEAR_THE_TURTLE_ID,
+  });
+  return join(snapshots, id);
+}
+
 /** A committed week's snapshot, normalized. */
 export async function committed(week: number): Promise<League> {
   return normalizeSleeper(

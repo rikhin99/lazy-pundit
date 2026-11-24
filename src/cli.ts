@@ -33,6 +33,7 @@ import {
   type Deps,
   type DoctorCheck,
   DraftExistsError,
+  DraftRefusal,
   defaultPunditName,
   defaultWorkspaceFolder,
   deleteTranscripts,
@@ -208,7 +209,11 @@ program
     console.log(
       `Drafted week ${result.week}: ${shown(result.path)} (snapshot ${result.snapshot})`,
     );
-    console.log("See the stats behind the starting order: lazy-pundit table");
+    console.log(
+      result.week === 0
+        ? "See the teams' stats: lazy-pundit table"
+        : "See the stats behind the starting order: lazy-pundit table",
+    );
     report(result.problems);
   });
 
@@ -309,7 +314,9 @@ program
     printWarnings(result.warnings);
     if (result.methodChanged) {
       console.log(
-        "The draft recorded another power-score method or weights: its starting order now follows your settings.",
+        result.week === 0
+          ? "The draft now records your settings' power-score method; a week-0 draft keeps the platform's order."
+          : "The draft recorded another power-score method or weights: its starting order now follows your settings.",
       );
     }
     if (result.changes.length === 0) {
@@ -1167,6 +1174,7 @@ try {
     err instanceof WorkspaceFileError ||
     err instanceof ConfigFileError ||
     err instanceof DraftExistsError ||
+    err instanceof DraftRefusal ||
     err instanceof FetchError ||
     err instanceof PublishWriteError ||
     err instanceof SetupRefusal ||

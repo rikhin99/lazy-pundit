@@ -88,7 +88,8 @@ export function buildEvidencePack(
     weekStats(league, g, teams[g.side.team] as Record<string, EvidenceValue>);
   }
   activity(league, week, played, teams);
-  for (const [team, status] of playoffStatuses(league, week)) {
+  // A preseason says nothing of the playoffs, even where every team makes them.
+  for (const [team, status] of week > 0 ? playoffStatuses(league, week) : []) {
     (teams[team] as Record<string, EvidenceValue>).playoffs = status;
   }
   const knockedOutBy = knockedOut(league, week);

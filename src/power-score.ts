@@ -130,12 +130,15 @@ export function powerScores(
 /**
  * The order `used` proposes through `week`: by power score, then points for,
  * then the standings' own order, so every tie is broken the same way each run.
+ * Week 0 has no starting order: it gives the platform order, which a week-0
+ * draft records in its place.
  */
 export function startingOrder(
   league: League,
   week: number,
   used: PowerScoreRecord,
 ): TeamId[] {
+  if (week === 0) return league.teams.map((t) => t.id);
   const scores = powerScores(league, week, used);
   const score = (team: TeamId) => scores.get(team) as number;
   return standingsThrough(league, week)

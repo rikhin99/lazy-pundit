@@ -83,7 +83,8 @@ export interface Problem {
   text: string;
   /**
    * `moved`: a moved team, away from its starting place. `small-sample`: the
-   * small-sample flag, a league item. `no-stakes`: the no-stakes flag.
+   * small-sample flag, a league item. `no-starting-order`: the
+   * no-starting-order flag, a league item. `no-stakes`: the no-stakes flag.
    * `failed-fetch`: the failed-fetch item, a league item only the command
    * that fetched lists. `provisional`: a provisional claim.
    * `correction-timing`: the correction-timing reminder, a league item.
@@ -100,6 +101,7 @@ export interface Problem {
     | "unreadable-tag"
     | "moved"
     | "small-sample"
+    | "no-starting-order"
     | "failed-fetch"
     | "provisional"
     | "correction-timing"
@@ -237,6 +239,7 @@ export async function checkDraft(
       `${clashText(c)} in ${name}'s snapshot, so this check counts it for ${c.team} only. Remove it from ${c.section} to clear this; \`draft\`, and \`refresh\` onto changed data, stop on it while the platform has that name`,
   );
   const earlier = await earlierEvidence(ws, ranking, stakes);
+  const preseason = week === 0;
   const { problems, autoTags, problemClaims } = reviewProse({
     text: written,
     ranking,
@@ -244,10 +247,16 @@ export async function checkDraft(
     evidence,
     order,
     validatorNames: names,
-    before: { order: startingOrder, evidence: earlier.packs },
+    // Week 0's platform order isn't a starting order, so nothing is
+    // measured against it: no stale-on-reorder and no moved teams.
+    before: preseason
+      ? { evidence: earlier.packs }
+      : { order: startingOrder, evidence: earlier.packs },
   });
   problems.push(
-    ...movedTeams(ranking, order, startingOrder, teamNames(league)),
+    ...(preseason
+      ? [noStartingOrderFlag()]
+      : movedTeams(ranking, order, startingOrder, teamNames(league))),
     ...(isSmallSample(week) ? [smallSampleFlag(week)] : []),
     ...(week > 0 ? [correctionTiming(league)] : []),
     ...relaxedPersona(ranking.meta.persona),
@@ -506,6 +515,14 @@ export const SWEAR_REASON = "on the word list, and swearing is off";
 /** Why a mention of money, a prize or a punishment is a problem under `stakes: none`. */
 export const NO_STAKES_REASON =
   "mentions money, a prize or a punishment, and league.md says stakes: none (bragging rights only)";
+
+/** The no-starting-order flag, on a week-0 draft for its whole life. Never written to the file, as the small-sample flag isn't. */
+function noStartingOrderFlag(): Problem {
+  return leagueItem(
+    "no-starting-order",
+    "week 0 has no starting order: the teams are in the platform's order, so order them by gut",
+  );
+}
 
 /** The small-sample flag. Worked out here, never written to the file, so nothing published can carry it. */
 function smallSampleFlag(week: number): Problem {
