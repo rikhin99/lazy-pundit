@@ -19,6 +19,7 @@ Step 3 of `ticket-workflow.md` hands this to one subagent after the commit, with
 > Rules:
 > - Every identifier you cite (function, file, field, command) must exist in <sha>; check it with `git grep`. Describe anything not built yet in words ("a function that adds to the month's spend"), never as a made-up name.
 > - Keep the "from reading the code" mark on any claim you repeat, and add it to your own findings that you didn't run.
+> - For one part of a split ticket, run each item the next part owes at <sha> (a `test/scratch-*.test.ts` file, deleted after), and mark it "already at <sha>: needs tests only" or "owed", or "from reading the code" if you didn't run it.
 > - Write a choice the build leaves open (which fixture, which ticket owns a step) as its options, and list it in your report as a question for the maintainer.
 > - Use `GLOSSARY.md` terms, and avoid its _Avoid_ terms.
 > - Write each new section or comment with the Write tool to a file in the scratchpad folder, and write only the new text. Pass a comment with `--body-file`. Append a section with `{ gh issue view <t> --json body --jq .body; echo; cat <file>; } | gh issue edit <t> --body-file -`. To correct a section, save the body to a scratch file, change it with Edit, then pass it with `--body-file`. To correct a comment you posted, change its file with Edit and pass it with `gh issue comment <n> --edit-last --body-file <file>`. No heredocs.
