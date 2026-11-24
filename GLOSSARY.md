@@ -192,7 +192,7 @@ The file a skipped setup step still writes: comments saying how to fill it in, a
 _Avoid_: Template
 
 **Hand edit**:
-A change the pundit made by hand to a file a setup step wrote. Re-running the step shows the diff against it and overwrites only on confirm.
+A change the pundit made by hand to a file a setup step wrote. Re-running the step shows the diff against it and overwrites only on confirm. The lore and stakes steps keep what the pundit wrote below their own lines (lore's entries and added sections, the stakes file's body), so an added entry is no hand edit.
 
 **Wizard**:
 `init`'s prompts: they ask for each setup step's answers in order and hand them to the library. Only the CLI has one.

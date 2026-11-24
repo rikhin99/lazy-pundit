@@ -17,6 +17,7 @@ import {
   type LoreAnswers,
   leagueText,
   loreFileText,
+  loreNamesProblem,
   type ManagerHandle,
   methodStatus,
   nicknamesProblem,
@@ -30,7 +31,14 @@ import {
   spendCapProblem,
 } from "./init.ts";
 import { familyLeague, leagueFilePath, readLeagueFile } from "./league-file.ts";
-import { type LeagueType, loadLore } from "./lore.ts";
+import {
+  isStepLine,
+  type LeagueType,
+  type LoreLine,
+  loadLore,
+  loreLines,
+  parseLore,
+} from "./lore.ts";
 import { type PresetName, personaPath } from "./persona.ts";
 import { PLATFORM_NAMES } from "./plain-text.ts";
 import type { PowerScoreMethod } from "./power-score.ts";
@@ -264,6 +272,8 @@ async function stepFile(
 ): Promise<StepFile> {
   switch (rerun.step) {
     case "lore": {
+      const path = join(ws.dir, "lore.md");
+      let text = loreFileText(rerun.lore, rerun.league);
       if (rerun.lore) {
         const handles = linkedHandles(ws, rerun.league);
         const problem = nicknamesProblem(
@@ -272,10 +282,25 @@ async function stepFile(
           rerun.lore.nicknames,
         );
         if (problem !== undefined) throw new SetupRefusal(problem);
+        const current = await readIfAny(path);
+        if (current !== undefined && loreLoadProblem(current) === undefined) {
+          // Merged with LF lines, and written back with the file's own.
+          const eol = current.includes("\r\n") ? "\r\n" : "\n";
+          const merged = withEntriesOf(current.replaceAll("\r\n", "\n"), text);
+          text = merged.map((line) => line.text).join(eol);
+          const problem =
+            loreLoadProblem(text) ??
+            loreNamesProblem(rerun.league, handles, parseLore(text));
+          if (problem !== undefined) {
+            throw new SetupRefusal(
+              `These nicknames can't be written over lore.md's entries: ${inCurrentFile(problem, merged)}`,
+            );
+          }
+        }
       }
       return {
-        path: join(ws.dir, "lore.md"),
-        text: loreFileText(rerun.lore, rerun.league),
+        path,
+        text,
         placeholder: loreFileText(undefined, rerun.league),
         versionKey: "lore",
         status: rerun.lore ? "done" : "skipped",
@@ -455,6 +480,80 @@ function withBodyOf(current: string | undefined, fresh: string): string {
   const freshBody = readFrontMatter("league.md", fresh, "league").body;
   const kept = readFrontMatter("league.md", current, "league").body;
   return fresh.slice(0, fresh.length - freshBody.length) + kept;
+}
+
+/** Why `lore.md`'s text wouldn't load, or undefined when it loads. */
+function loreLoadProblem(lore: string): string | undefined {
+  try {
+    parseLore(lore);
+    return undefined;
+  } catch (err) {
+    if (!(err instanceof WorkspaceFileError)) throw err;
+    return err.message;
+  }
+}
+
+/** A line of a merged `lore.md`, with its line in the current file when it came from there. */
+interface MergedLine {
+  text: string;
+  fileLine?: number;
+}
+
+/** The comment the lore step writes under a team with no nicknames, on the heading's next line. */
+const STEP_COMMENT = /^\s*<!--.*-->\s*$/;
+
+/**
+ * The step's `lore.md` with the current file's lore kept: each section the
+ * step writes, then every other line the current file has under it, then
+ * every section the step doesn't write, in the file's order. Kept lines stay
+ * as written, blank lines and comments too; the step's own lines (a
+ * `nicknames:` or `type:` line, its comment for a team with no nicknames)
+ * aren't kept. With each line, where it came from in the current file.
+ */
+function withEntriesOf(current: string, fresh: string): MergedLine[] {
+  const currentLines = loreLines(current);
+  const freshLines = loreLines(fresh);
+  const written = new Set(freshLines.sections.map((s) => s.name));
+  const fromFile = (lines: LoreLine[]): MergedLine[] =>
+    lines.map((line) => ({ text: line.text, fileLine: line.at }));
+  const fromStep = (lines: LoreLine[]): MergedLine[] =>
+    lines.map((line) => ({ text: line.text }));
+  const keptUnder = (name: string) =>
+    currentLines.sections
+      .filter((s) => s.name === name)
+      .flatMap((s) => {
+        const under = s.lines.slice(1);
+        if (STEP_COMMENT.test(under[0]?.text ?? "")) under.shift();
+        return fromFile(under.filter((line) => !isStepLine(name, line.read)));
+      });
+  const sections = [
+    ...freshLines.sections.map((s) =>
+      trimmed([...trimmed(fromStep(s.lines)), ...keptUnder(s.name)]),
+    ),
+    ...currentLines.sections
+      .filter((s) => !written.has(s.name))
+      .map((s) => trimmed(fromFile(s.lines))),
+  ];
+  return [
+    ...fromStep(freshLines.top),
+    ...sections.flatMap((s, i) => (i === 0 ? s : [{ text: "" }, ...s])),
+    { text: "" },
+  ];
+}
+
+/** Lines without the blank ones at their end. */
+function trimmed(lines: MergedLine[]): MergedLine[] {
+  const end = lines.findLastIndex((line) => line.text.trim() !== "");
+  return lines.slice(0, end + 1);
+}
+
+/** A message about a merged `lore.md` with each line number moved to the current file's, where the line came from there. */
+function inCurrentFile(message: string, merged: MergedLine[]): string {
+  return message.replace(
+    /\b(lines? |and )(\d+)/g,
+    (_, word: string, n: string) =>
+      `${word}${merged[Number(n) - 1]?.fileLine ?? n}`,
+  );
 }
 
 /** Lines kept around each change in a diff. */

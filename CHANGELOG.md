@@ -18,6 +18,7 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 ### Changed
 
 - `init`'s folder question offers a folder by where you run it: next to the workspace you're in, `~/lazy-pundit/<league>` from your home folder or above it, and otherwise a new folder in the one you're in, and it says which. Before, it offered a folder next to the last workspace you set up, wherever you ran it.
+- `setup lore` keeps what you wrote in `lore.md`: it rewrites the league type and each team's nicknames, keeps your entries under their sections, and keeps every section it doesn't write (relationships, running jokes, a manager who has left) after its own. Re-running it with the same answers asks nothing, and a changed nickname shows as the only change in the diff. Before, it offered to overwrite every entry. A re-run whose result wouldn't load, such as a nickname that clashes with one in a kept section, is refused and writes nothing.
 
 ### Fixed
 

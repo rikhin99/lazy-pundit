@@ -66,6 +66,11 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     return { sections: [], localLines: [], warnings: [] };
   }
+  return parseLore(text);
+}
+
+/** `lore.md`'s text read as `loadLore` reads the file, refusing as it does. */
+export function parseLore(text: string): Lore {
   const { data, body, bodyLine } = readFrontMatter("lore.md", text, "lore");
   const parsed = loreSchema.safeParse(data);
   if (!parsed.success) {
@@ -94,11 +99,11 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
       continue;
     }
     if (/^(?:[-*_]{3,}|#\s.*)$/.test(line)) continue; // A rule or a title.
-    const item = line.replace(/^[-*]\s+/, "");
-    const nicknames = /^nicknames:(.*)$/i.exec(item)?.[1];
+    const item = itemOf(line);
+    const nicknames = NICKNAMES_LINE.exec(item)?.[1];
     if (nicknames !== undefined) {
       addNicknames(section, nicknames, at);
-    } else if (section?.name === "league" && /^type:/i.test(item)) {
+    } else if (section?.name === "league" && TYPE_LINE.test(item)) {
       lore.type = leagueType(item.slice("type:".length).trim(), lore, at);
     } else if (section && item) {
       section.entries.push(item);
@@ -199,6 +204,55 @@ function refuseUnknownTags(lines: { text: string; at: number }[]): void {
 
 /** A `## ` heading line, capturing its text; a `###` is no heading. */
 export const HEADING = /^##(?!#)\s*(.*)$/;
+/** A manager or team's `nicknames:` line, capturing the names. */
+const NICKNAMES_LINE = /^nicknames:(.*)$/i;
+/** The league section's `type:` line. */
+const TYPE_LINE = /^type:/i;
+
+/** A line of lore without its bullet. */
+function itemOf(line: string): string {
+  return line.replace(/^[-*]\s+/, "");
+}
+
+/** A line of `lore.md` as written, its line number, and as `loadLore` reads it: no comments, trimmed. */
+export interface LoreLine {
+  text: string;
+  at: number;
+  read: string;
+}
+
+/** A `lore.md` as its lines: those above the first section, then each section's, heading first. */
+export interface LoreLines {
+  top: LoreLine[];
+  sections: { name: string; lines: LoreLine[] }[];
+}
+
+/** Splits `lore.md`'s text at its `## ` headings, as `loadLore` finds them outside comments. */
+export function loreLines(text: string): LoreLines {
+  const read = withoutComments(text).split("\n");
+  const out: LoreLines = { top: [], sections: [] };
+  for (const [i, written] of text.split("\n").entries()) {
+    const line = { text: written, at: i + 1, read: read[i]?.trim() ?? "" };
+    const heading = HEADING.exec(line.read)?.[1];
+    const last = out.sections.at(-1);
+    if (heading !== undefined) {
+      out.sections.push({ name: sectionName(heading), lines: [line] });
+    } else if (last) last.lines.push(line);
+    else out.top.push(line);
+  }
+  return out;
+}
+
+/**
+ * Whether a line, as `loadLore` reads it, is one the lore step writes in this
+ * section: a `nicknames:` line, or the league's `type:` line.
+ */
+export function isStepLine(section: string, read: string): boolean {
+  const item = itemOf(read);
+  return (
+    NICKNAMES_LINE.test(item) || (section === "league" && TYPE_LINE.test(item))
+  );
+}
 const SECTION_TAG = /^\{(?:manager=([^{}\s=]+)|team=([a-z]+:[^{}\s:=]+))\}$/;
 
 /** A comment's text removed, its line breaks kept so line numbers hold. */
@@ -211,12 +265,7 @@ function newSection(
   line: number,
   sections: LoreSection[],
 ): LoreSection {
-  const tag = SECTION_TAG.exec(heading);
-  const name = tag
-    ? tag[1]
-      ? `manager:${tag[1]}`
-      : `team:${tag[2]}`
-    : headingName(heading);
+  const name = sectionName(heading);
   if (!name) {
     throw new WorkspaceFileError(
       `lore.md line ${line}: this heading has no words a {lore=…} tag could cite`,
@@ -229,6 +278,16 @@ function newSection(
     );
   }
   return { name, line, nicknames: [], entries: [] };
+}
+
+/**
+ * The name a heading gives its section: `manager:bo` or `team:sleeper:3` for a
+ * section's tag, else `headingName`'s. Empty when no tag could cite it.
+ */
+export function sectionName(heading: string): string {
+  const tag = SECTION_TAG.exec(heading);
+  if (!tag) return headingName(heading);
+  return tag[1] ? `manager:${tag[1]}` : `team:${tag[2]}`;
 }
 
 /** A heading as a tag can cite it, since a tag holds no spaces. */

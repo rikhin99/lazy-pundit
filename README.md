@@ -112,7 +112,7 @@ A hard problem (✗) would put something false in front of the league: fix it, a
 
 - `lazy-pundit refresh` refetches the league after stat corrections or late scoring and moves the draft onto the new data, leaving your order and words. `--full` refetches every week.
 - `lazy-pundit stats` prints a summary of your published weeks (time to publish, teams moved, how much LLM text you kept) to paste to the builder. Nothing is sent anywhere.
-- `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `espn` (a fresh cookie, for an ESPN league), `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`.
+- `lazy-pundit setup` shows the setup checklist. `lazy-pundit setup <step>` re-runs one step: `espn` (a fresh cookie, for an ESPN league), `handles`, `lore`, `stakes`, `method`, `key`, `cap` or `persona`. `setup lore` rewrites only the league type and the nicknames, and keeps lore's entries and the sections you added.
 - `lazy-pundit doctor` checks Node, your config and credentials, and each workspace.
 - `lazy-pundit transcripts delete` removes the workspace's LLM transcripts.
 

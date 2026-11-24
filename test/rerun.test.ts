@@ -82,7 +82,7 @@ function statusOf(items: { step: string; status: string }[], step: string) {
   return items.find((i) => i.step === step)?.status;
 }
 
-test("setup lore after a hand edit shows the diff and only overwrites on confirm", async () => {
+test("setup lore over added entries asks nothing, and a change shows only its own lines and overwrites on confirm", async () => {
   const { deps, dir, league, ws } = await setUp();
   const lorePath = join(dir, "lore.md");
   const first = {
@@ -92,8 +92,11 @@ test("setup lore after a hand edit shows the diff and only overwrites on confirm
   await rerun(deps, dir, { step: "lore", league, lore: first });
   const edited = `${await readFile(lorePath, "utf8")}\n## Running jokes\n\n- The trade that never was.\n`;
   await writeFile(lorePath, edited);
-  const again = { type: "family" as const, nicknames: first.nicknames };
 
+  const same = await rerun(deps, dir, { step: "lore", league, lore: first });
+
+  expect(same).toMatchObject({ shown: [], written: false });
+  const again = { type: "family" as const, nicknames: first.nicknames };
   const declined = await rerun(
     deps,
     dir,
@@ -102,11 +105,10 @@ test("setup lore after a hand edit shows the diff and only overwrites on confirm
   );
 
   expect(declined.written).toBe(false);
-  expect(declined.shown).toHaveLength(1);
   expect(declined.shown[0]?.file).toBe(lorePath);
-  expect(declined.shown[0]?.diff).toMatch(/^-## Running jokes$/m);
-  expect(declined.shown[0]?.diff).toMatch(/^-type: friends$/m);
-  expect(declined.shown[0]?.diff).toMatch(/^\+type: family$/m);
+  expect(
+    declined.shown[0]?.diff.split("\n").filter((l) => /^[-+]/.test(l)),
+  ).toEqual(["+type: family", "-type: friends"]);
   expect(await readFile(lorePath, "utf8")).toBe(edited);
 
   const confirmed = await rerun(deps, dir, {
@@ -116,7 +118,273 @@ test("setup lore after a hand edit shows the diff and only overwrites on confirm
   });
 
   expect(confirmed.written).toBe(true);
-  expect((await loadLore(ws)).type).toBe("family");
+  const lore = await loadLore(ws);
+  expect(lore.type).toBe("family");
+  expect(lore.sections.at(-1)).toMatchObject({
+    name: "running-jokes",
+    entries: ["The trade that never was."],
+  });
+});
+
+test("setup lore over a lore.md that doesn't load offers the step's own text", async () => {
+  const { deps, dir, league } = await setUp();
+  const lorePath = join(dir, "lore.md");
+  const lore = {
+    type: "friends" as const,
+    nicknames: proposedNicknames(league, []),
+  };
+  await writeFile(lorePath, "---\nlore: 1\n---\n\n## Jokes\n\n## Jokes\n");
+
+  const { shown, written } = await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore,
+  });
+
+  expect(shown[0]?.diff).toMatch(/^-## Jokes$/m);
+  expect(written).toBe(true);
+  expect(await readFile(lorePath, "utf8")).not.toMatch(/Jokes/);
+});
+
+/** Two teams' lore, with their managers linked as handles. */
+async function withTwoTeamsLore() {
+  const set = await setUp();
+  const { deps, dir, league } = set;
+  const handles = proposedHandles(league);
+  await rerun(deps, dir, { step: "handles", league, handles });
+  const nicknames = proposedNicknames(league, handles).slice(0, 2);
+  await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames },
+  });
+  const lorePath = join(dir, "lore.md");
+  const written = await readFile(lorePath, "utf8");
+  // The top comment shows a `## League` too, so the section is the last one.
+  const top = written.slice(0, written.lastIndexOf("## League"));
+  /** Writes `lore.md` with the step's top and this body. */
+  const writeBody = (body: string) => writeFile(lorePath, top + body);
+  return { ...set, nicknames, lorePath, top, writeBody };
+}
+
+test("setup lore keeps each entry under its section and every other section after the step's, a stale handle's too", async () => {
+  const { deps, dir, league, nicknames, lorePath, top, writeBody } =
+    await withTwoTeamsLore();
+  await writeBody(`## League
+type: friends
+- Founded in 2015.
+
+## {manager=gone-guy}
+nicknames: Old Guy
+- Left in 2023.
+
+## {manager=gridiron-gus}
+nicknames: Gus Bus, gridiron_gus
+- Won it all in 2021.
+
+## Running jokes
+
+- The trade that never was.
+<!-- more to come -->
+
+## {manager=waiver-wendy}
+nicknames: Wendy's Wire, waiver_wendy
+`);
+  const renamed = nicknames.map((t, i) =>
+    i === 0 ? { ...t, nicknames: ["The Bus", "gridiron_gus"] } : t,
+  );
+
+  const { written } = await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames: renamed },
+  });
+
+  expect(written).toBe(true);
+  expect(await readFile(lorePath, "utf8")).toBe(`${top}## League
+type: friends
+- Founded in 2015.
+
+## {manager=gridiron-gus}
+nicknames: The Bus, gridiron_gus
+- Won it all in 2021.
+
+## {manager=waiver-wendy}
+nicknames: Wendy's Wire, waiver_wendy
+
+## {manager=gone-guy}
+nicknames: Old Guy
+- Left in 2023.
+
+## Running jokes
+
+- The trade that never was.
+<!-- more to come -->
+`);
+});
+
+test("setup lore keeps entries under a heading written another way that names the same section", async () => {
+  const { deps, dir, league, nicknames, lorePath, top, writeBody } =
+    await withTwoTeamsLore();
+  await writeBody(`## league
+type: work
+- Founded in 2015.
+`);
+
+  await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames },
+  });
+
+  expect(await readFile(lorePath, "utf8")).toBe(`${top}## League
+type: friends
+- Founded in 2015.
+
+## {manager=gridiron-gus}
+nicknames: Gus Bus, gridiron_gus
+
+## {manager=waiver-wendy}
+nicknames: Wendy's Wire, waiver_wendy
+`);
+});
+
+test("setup lore keeps a section's blank lines and comments as written, so the same answers ask nothing", async () => {
+  const { deps, dir, league, nicknames, lorePath, writeBody } =
+    await withTwoTeamsLore();
+  await writeBody(`## League
+type: friends
+- Founded in 2015. <!-- a note
+  that runs on -->
+
+- Moved online in 2020.
+
+## {manager=gridiron-gus}
+nicknames: Gus Bus, gridiron_gus
+
+## {manager=waiver-wendy}
+nicknames: Wendy's Wire, waiver_wendy
+`);
+  const before = await readFile(lorePath, "utf8");
+
+  const same = await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames },
+  });
+
+  expect(same).toMatchObject({ shown: [], written: false });
+  expect(await readFile(lorePath, "utf8")).toBe(before);
+});
+
+test("setup lore over a lore.md with CRLF line endings keeps them, so the same answers ask nothing", async () => {
+  const { deps, dir, league, nicknames, lorePath } = await withTwoTeamsLore();
+  const crlf = `${(await readFile(lorePath, "utf8")).replaceAll("\n", "\r\n")}\r\n## Running jokes\r\n- The trade that never was.\r\n`;
+  await writeFile(lorePath, crlf);
+
+  const same = await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames },
+  });
+
+  expect(same).toMatchObject({ shown: [], written: false });
+});
+
+test("setup lore swaps the step's comment for a team's new nicknames, and keeps the entries under it", async () => {
+  const { deps, dir, league, nicknames, lorePath, top } =
+    await withTwoTeamsLore();
+  const none = nicknames.map((t, i) => (i === 0 ? { ...t, nicknames: [] } : t));
+  await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames: none },
+  });
+  const written = await readFile(lorePath, "utf8");
+  await writeFile(
+    lorePath,
+    written.replace(
+      "\n\n## {manager=waiver-wendy}",
+      "\n- Won it all in 2021.\n\n## {manager=waiver-wendy}",
+    ),
+  );
+  expect(
+    await rerun(deps, dir, {
+      step: "lore",
+      league,
+      lore: { type: "friends", nicknames: none },
+    }),
+  ).toMatchObject({ shown: [], written: false });
+
+  await rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames },
+  });
+
+  expect(await readFile(lorePath, "utf8")).toBe(`${top}## League
+type: friends
+
+## {manager=gridiron-gus}
+nicknames: Gus Bus, gridiron_gus
+- Won it all in 2021.
+
+## {manager=waiver-wendy}
+nicknames: Wendy's Wire, waiver_wendy
+`);
+});
+
+test("setup lore refuses entries that wouldn't load once kept, naming the line in lore.md, and writes nothing", async () => {
+  const { deps, dir, league, nicknames, lorePath, writeBody } =
+    await withTwoTeamsLore();
+  // The comment opens on the step's nicknames line, which isn't kept, so the
+  // tag on its closing line reads as lore.
+  await writeBody(`## {manager=gridiron-gus}
+nicknames: Gus Bus, gridiron_gus <!-- a note
+{oops} -->
+
+## League
+type: friends
+`);
+  const before = await readFile(lorePath, "utf8");
+
+  const refused = rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "work", nicknames },
+  });
+
+  await expect(refused).rejects.toThrow(SetupRefusal);
+  await expect(refused).rejects.toThrow(
+    "These nicknames can't be written over lore.md's entries: lore.md has tags this version doesn't know, so remove each one (a {manager=<handle>} or {team=<platform>:<id>} is a whole heading): line 23: {oops}",
+  );
+  expect(await readFile(lorePath, "utf8")).toBe(before);
+});
+
+test("setup lore refuses a nickname that clashes with a kept section's", async () => {
+  const { deps, dir, league, nicknames, lorePath, writeBody } =
+    await withTwoTeamsLore();
+  await writeBody(`## League
+type: friends
+
+## {team=sleeper:3}
+nicknames: The Mob
+`);
+  const before = await readFile(lorePath, "utf8");
+  const clashing = nicknames.map((t, i) =>
+    i === 0 ? { ...t, nicknames: ["The Mob"] } : t,
+  );
+
+  const refused = rerun(deps, dir, {
+    step: "lore",
+    league,
+    lore: { type: "friends", nicknames: clashing },
+  });
+
+  await expect(refused).rejects.toThrow(
+    `These nicknames can't be written over lore.md's entries: the nickname "The Mob" points at both manager:gridiron-gus and team:sleeper:3; keep it on one`,
+  );
+  expect(await readFile(lorePath, "utf8")).toBe(before);
 });
 
 test("a re-run over a placeholder, a missing file or the same text asks nothing, and sets the step in workspace.md", async () => {

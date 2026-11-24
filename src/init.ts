@@ -431,6 +431,18 @@ export function nicknamesProblem(
     localLines: [],
     warnings: [],
   };
+  return loreNamesProblem(league, handles, lore);
+}
+
+/**
+ * What's wrong with lore's nicknames against the league, or undefined: one
+ * that reads as two teams' names, as a draft would refuse.
+ */
+export function loreNamesProblem(
+  league: LeagueCheck,
+  handles: ManagerHandle[],
+  lore: Lore,
+): string | undefined {
   try {
     validatorNames(lore, leagueNames(league), linksOf(handles));
   } catch (err) {

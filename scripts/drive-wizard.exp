@@ -40,7 +40,8 @@
 #                   typed, refused as already set up, re-asked, then Ctrl-C
 #   stakes          money at stake: buy-in 50, the default payouts, a $10 weekly high score
 #   family          a family league type, so the family league and Family persona are preselected
-#   setup-lore      every default into <home>/ws, a hand edit to lore.md, then setup lore
+#   setup-lore      every default into <home>/ws, an entry added to lore.md, then setup lore
+#                   with the same answers (nothing to confirm), then a renamed nickname
 #                   declined at the diff and run again confirmed
 #   setup-stakes    the stakes scenario into <home>/ws, week 8 drafted and published,
 #                   then setup stakes paying $20, whose changed-outcome warning
@@ -192,6 +193,16 @@ proc need {prompt} {
     exit 2
   }
   expect {
+    -ex $prompt { after 300 }
+    timeout { puts "\nTIMEOUT waiting for \"$prompt\""; exec kill -9 [exp_pid]; exit 9 }
+    eof { puts "\nEOF waiting for \"$prompt\""; exit 8 }
+  }
+}
+
+# As need, but fails if `bad` shows first.
+proc need_without {prompt bad} {
+  expect {
+    -ex $bad { puts "\nSAW \"$bad\" before \"$prompt\""; exit 7 }
     -ex $prompt { after 300 }
     timeout { puts "\nTIMEOUT waiting for \"$prompt\""; exec kill -9 [exp_pid]; exit 9 }
     eof { puts "\nEOF waiting for \"$prompt\""; exit 8 }
@@ -422,13 +433,28 @@ set lore [open "$home/ws/lore.md" a]
 puts $lore "\n## Running jokes\n\n- The trade that never was."
 close $lore
 cd "$home/ws"
+# The same answers keep the entry, so there's nothing to confirm.
+spawn node "$repo/src/cli.ts" setup lore
+need "What kind of league"
+send "\r"
+need "nicknames each team"
+send "\r"
+need_without "lore left as it was" "differs"
+expect eof
+wait
+# A renamed nickname is the only change the diff shows.
 foreach answer {n y} {
   spawn node "$repo/src/cli.ts" setup lore
   need "What kind of league"
   send "\r"
   need "nicknames each team"
+  send $DOWN; after 200; send "\r"
+  need "Nicknames for Gus Bus"
+  send [string repeat "\x7f" 30]; after 200; send "The Bus, gridiron_gus\r"
+  need "nicknames each team"
   send "\r"
-  need "Overwrite"
+  need "+nicknames: The Bus, gridiron_gus"
+  need_without "Overwrite" "-## Running jokes"
   send "$answer"; after 200; send "\r"
   if {$answer eq "n"} {
     need "left as it was"
