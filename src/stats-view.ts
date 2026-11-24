@@ -139,13 +139,24 @@ export interface StatsViewTerminal {
 const OPEN = "\x1b[?1049h\x1b[?25l";
 const CLOSE = "\x1b[?25h\x1b[?1049l";
 
+// The signals that end the view with the terminal put back, each with the
+// exit code a shell reports for a process they killed: 128 plus its number.
+const SIGNAL_CODES = [
+  ["SIGTERM", 143],
+  ["SIGHUP", 129],
+] as const;
+
+const ignore = () => {};
+
 /**
  * `table` in a terminal: the latest draft's Stats table full screen on the
  * alternate screen, until `q` or Esc (exit code 0) or Ctrl-C (1, as a
  * cancelled setup exits). It checks the draft first, so a refusal throws
  * before any screen opens, and checks it once: each sort is built from that
  * check. A resize redraws to the new size. Closing puts the screen back as it
- * was, leaving nothing in the scrollback.
+ * was, leaving nothing in the scrollback, and so do SIGTERM (exit code 143)
+ * and SIGHUP (129) while it's open, and an error while drawing, which the
+ * promise rejects with once the screen is back.
  */
 export async function statsView(
   workspaceDir: string,
@@ -170,15 +181,35 @@ export async function statsView(
     // Each line clears what an earlier, wider draw left after it.
     output.write(`\x1b[H${lines.map((l) => `${l}\x1b[K`).join("\n")}`);
   };
-  return new Promise((resolve) => {
-    const close = (code: number) => {
+  return new Promise((resolve, reject) => {
+    // Puts the terminal back. It first removes every listener that could
+    // call it, so it runs once however many ways the view ends.
+    const restore = () => {
       input.off("keypress", onKey);
-      output.off("resize", draw);
+      output.off("resize", redraw);
+      for (const [signal, onSignal] of signals) process.off(signal, onSignal);
       input.setRawMode(false);
       input.pause();
-      output.write(CLOSE);
+      // A terminal that's gone (its tab closed) can't be put back: the view
+      // still ends, with its code or its drawing error, not this one.
+      try {
+        output.write(CLOSE);
+      } catch {}
+    };
+    const close = (code: number) => {
+      restore();
       resolve(code);
     };
+    // An error while drawing restores the terminal before the CLI reports it.
+    const restoringOnError = (step: () => void) => {
+      try {
+        step();
+      } catch (err) {
+        restore();
+        reject(err);
+      }
+    };
+    const redraw = () => restoringOnError(draw);
     const onKey = (
       _: string | undefined,
       key?: { name?: string; ctrl?: boolean },
@@ -186,17 +217,31 @@ export async function statsView(
       if (key?.ctrl && key.name === "c") return close(1);
       if (key?.name === "q" || key?.name === "escape") return close(0);
       const move = MOVES.find((m) => m === key?.name);
-      if (move) {
-        state = statsViewStep(state, move, tableFor);
-        draw();
-      }
+      if (move)
+        restoringOnError(() => {
+          state = statsViewStep(state, move, tableFor);
+          draw();
+        });
     };
+    // After a hangup, Node reports the terminal's failed reads and writes
+    // later, as error events: ignored, since the process is ending.
+    const onSignal = (code: number) => () => {
+      input.on("error", ignore);
+      output.on("error", ignore);
+      close(code);
+    };
+    const signals = SIGNAL_CODES.map(
+      ([signal, code]) => [signal, onSignal(code)] as const,
+    );
     emitKeypressEvents(input);
     input.setRawMode(true);
     input.resume();
     input.on("keypress", onKey);
-    output.on("resize", draw);
-    output.write(`${OPEN}\x1b[2J`);
-    draw();
+    output.on("resize", redraw);
+    for (const [signal, onSignal] of signals) process.on(signal, onSignal);
+    restoringOnError(() => {
+      output.write(`${OPEN}\x1b[2J`);
+      draw();
+    });
   });
 }

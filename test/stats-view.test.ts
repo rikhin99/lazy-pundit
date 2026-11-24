@@ -1,8 +1,13 @@
-import { describe, expect, test } from "vitest";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import { beforeAll, describe, expect, test } from "vitest";
 import {
+  draft,
   STATS_TABLE_SORTS,
   type StatsTable,
   type StatsTableSort,
+  type StatsViewTerminal,
+  statsView,
 } from "../src/index.ts";
 import { STATS_KEY } from "../src/stats-table.ts";
 import {
@@ -10,6 +15,7 @@ import {
   type StatsViewState,
   statsViewStep,
 } from "../src/stats-view.ts";
+import { fearTheTurtle } from "./support/workspace.ts";
 
 const ROWS: StatsTable["rows"] = [
   {
@@ -241,5 +247,146 @@ describe("a key in the full-screen Stats table", () => {
       sort: "start",
       team: "sleeper:11",
     });
+  });
+});
+
+const RESTORE = "\x1b[?25h\x1b[?1049l";
+
+/**
+ * A terminal for `statsView`: its input takes keys by `press`, and its
+ * output keeps what's written and throws `failure` on write number `failOn`,
+ * and with `keepFailing` an EIO on every write after it, as a closed tab does.
+ */
+function fakeTerminal(failOn?: number, { keepFailing = false } = {}) {
+  const failure = new Error("drawing failed");
+  const input = Object.assign(new PassThrough(), {
+    isTTY: true,
+    rawModes: [] as boolean[],
+    setRawMode(mode: boolean) {
+      this.rawModes.push(mode);
+      return this;
+    },
+  });
+  const written: string[] = [];
+  const output = Object.assign(new EventEmitter(), {
+    columns: 100,
+    rows: 30,
+    write(text: string) {
+      written.push(text);
+      if (written.length === failOn) throw failure;
+      if (keepFailing && failOn && written.length > failOn) {
+        throw new Error("write EIO");
+      }
+      return true;
+    },
+  });
+  const terminal = {
+    input,
+    output,
+    env: { nodeVersion: "v24.1.0" },
+  } as unknown as StatsViewTerminal;
+  const press = (name: string) => input.emit("keypress", undefined, { name });
+  const restores = () => written.filter((w) => w.includes(RESTORE)).length;
+  return { terminal, input, output, written, press, restores, failure };
+}
+
+const SIGNALS = ["SIGTERM", "SIGHUP"] as const;
+const signalListeners = () => SIGNALS.map((s) => process.listenerCount(s));
+
+describe("how the full-screen Stats table ends", () => {
+  let dir: string;
+  beforeAll(async () => {
+    const ws = await fearTheTurtle(10);
+    await draft(ws.dir, ws.deps);
+    dir = ws.dir;
+  });
+
+  test("q restores the screen once and leaves no signal listener of its own on process", async () => {
+    const before = signalListeners();
+    const t = fakeTerminal();
+    const ended = statsView(dir, t.terminal);
+    await expect.poll(() => t.written.length).toBe(2);
+    t.press("q");
+    await expect(ended).resolves.toBe(0);
+    expect(t.restores()).toBe(1);
+    expect(t.input.rawModes).toEqual([true, false]);
+    expect(signalListeners()).toEqual(before);
+  });
+
+  test.each([
+    ["SIGTERM", 143],
+    ["SIGHUP", 129],
+  ] as const)(
+    "%s restores the screen once, turns raw mode off and ends with %i",
+    async (signal, code) => {
+      const before = signalListeners();
+      const t = fakeTerminal();
+      const ended = statsView(dir, t.terminal);
+      await expect.poll(() => t.written.length).toBe(2);
+      process.emit(signal);
+      process.emit(signal);
+      await expect(ended).resolves.toBe(code);
+      expect(t.restores()).toBe(1);
+      expect(t.input.rawModes).toEqual([true, false]);
+      expect(signalListeners()).toEqual(before);
+    },
+  );
+
+  test("an error drawing after a key restores the screen once, turns raw mode off and rejects with it", async () => {
+    const before = signalListeners();
+    // Writes: the screen opened, the first draw, then the redraw after ↓.
+    const t = fakeTerminal(3);
+    const ended = statsView(dir, t.terminal);
+    await expect.poll(() => t.written.length).toBe(2);
+    t.press("down");
+    await expect(ended).rejects.toBe(t.failure);
+    expect(t.restores()).toBe(1);
+    expect(t.input.rawModes).toEqual([true, false]);
+    t.press("q");
+    expect(t.restores()).toBe(1);
+    expect(signalListeners()).toEqual(before);
+  });
+
+  test("SIGHUP from a closed tab still ends with 129 when the terminal can't be written or errors after", async () => {
+    // Writes: the screen opened, the first draw; the restore then fails.
+    const t = fakeTerminal(3, { keepFailing: true });
+    const ended = statsView(dir, t.terminal);
+    await expect.poll(() => t.written.length).toBe(2);
+    process.emit("SIGHUP");
+    await expect(ended).resolves.toBe(129);
+    expect(t.input.rawModes).toEqual([true, false]);
+    // Node reports a failed write to a terminal later, as an error event.
+    expect(() => t.output.emit("error", new Error("write EIO"))).not.toThrow();
+  });
+
+  test("an error drawing that leaves every later write failing still rejects with the drawing's error", async () => {
+    const t = fakeTerminal(3, { keepFailing: true });
+    const ended = statsView(dir, t.terminal);
+    await expect.poll(() => t.written.length).toBe(2);
+    t.press("down");
+    await expect(ended).rejects.toBe(t.failure);
+    expect(t.input.rawModes).toEqual([true, false]);
+  });
+
+  test("an error in the first draw restores the screen and rejects with it", async () => {
+    const before = signalListeners();
+    const t = fakeTerminal(2);
+    await expect(statsView(dir, t.terminal)).rejects.toBe(t.failure);
+    expect(t.restores()).toBe(1);
+    expect(t.input.rawModes).toEqual([true, false]);
+    expect(signalListeners()).toEqual(before);
+  });
+
+  test("an error in a redraw on a resize restores the screen and rejects with it", async () => {
+    const t = fakeTerminal(3);
+    const ended = statsView(dir, t.terminal);
+    await expect.poll(() => t.written.length).toBe(2);
+    t.output.emit("resize");
+    await expect(ended).rejects.toBe(t.failure);
+    expect(t.restores()).toBe(1);
+    expect(t.input.rawModes).toEqual([true, false]);
+    const writes = t.written.length;
+    t.output.emit("resize");
+    expect(t.written.length).toBe(writes);
   });
 });

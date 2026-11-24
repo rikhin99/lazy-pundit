@@ -2,6 +2,12 @@
 
 Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pundit#semver:^0` (with npm 12 or later, add `--allow-git=all`). Within 0.x, a release may change the files a workspace holds; its entry says how.
 
+## 0.1.3
+
+### Fixed
+
+- The full-screen Stats table puts your terminal back however it ends: closing the terminal's tab or a `kill` (SIGHUP or SIGTERM) now restores the screen, the cursor and typing, as `q`, Esc and Ctrl-C do (#140).
+
 ## 0.1.2
 
 ### Added
@@ -33,7 +39,6 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 - `setup` doesn't yet say what lore is for or what to write in it, so a workspace set up by `init` has nicknames and nothing else in `lore.md` until you add entries by hand (#138).
 - `setup lore`'s nickname prefill offers the platform's names, not nicknames you've since changed by hand in `lore.md`; edit its answers, or `lore.md` after it (#143).
-- The full-screen Stats table can leave your terminal broken when it ends any way but `q`, Esc or Ctrl-C; type `reset` and Enter to fix it (#140).
 - A test of the preview page's reload sometimes fails when the tests run in parallel; the preview page itself is unaffected (#142).
 - Yahoo leagues.
 - `revise`, the LLM revision of one blurb or the intro.
