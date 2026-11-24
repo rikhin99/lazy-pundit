@@ -760,6 +760,32 @@ ${highScore()}rivalry-weeks:
   });
 });
 
+describe("the deadline reminder on the style pages", () => {
+  test("both pages show it just before the awards in the reminder weeks", async () => {
+    const ws = await drafted(10);
+    await published(ws.dir, ws.deps);
+    const pages = [
+      [await tabloid(ws.dir, 10), "awards"],
+      [await broadcast(ws.dir, 10), "chips"],
+    ];
+    for (const [html = "", awards] of pages) {
+      expect(partOf(html, "deadline")).toBe("Trade deadline: week 11");
+      expect(html.indexOf('class="deadline"')).toBeLessThan(
+        html.indexOf(`<ul class="${awards}">`),
+      );
+    }
+
+    const before = await drafted(8);
+    await published(before.dir, before.deps);
+    for (const html of [
+      await tabloid(before.dir, 8),
+      await broadcast(before.dir, 8),
+    ]) {
+      expect(textOf(html)).not.toContain("Trade deadline");
+    }
+  });
+});
+
 describe("the published test helper", () => {
   test("a publish held back by a hard problem names the problem", async () => {
     const ws = await drafted(10);

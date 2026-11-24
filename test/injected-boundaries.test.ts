@@ -178,7 +178,11 @@ test("only src/sleeper/ reads Sleeper's raw payload fields", async () => {
   fields.delete("league_id");
 
   const names = [...fields].join("|");
-  const read = new RegExp(`\\.(${names})\\b|\\["(${names})"\\]`, "g");
+  // A `platform.` evidence ID, such as `platform.trade_deadline`, reads no payload.
+  const read = new RegExp(
+    `(?<!\\bplatform)\\.(${names})\\b|\\["(${names})"\\]`,
+    "g",
+  );
   const offences: string[] = [];
   for (const file of await sourceFiles(SRC)) {
     if (sleeper.includes(file)) continue;

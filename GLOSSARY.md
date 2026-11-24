@@ -96,6 +96,9 @@ The fantasy service a league's season is played on, such as Sleeper, ESPN or Yah
 **Platform settings**:
 The league settings the platform owns, such as the FAAB budget, how many teams make the playoffs and the week they start. They are read fresh from the platform on every fetch and shown read-only, never copied into a file the pundit writes, so they can't drift.
 
+**Trade deadline**:
+The platform setting for when trades stop: on Sleeper the last week trades are allowed, on ESPN the moment they stop. A Sleeper league with `0` has none, as does an ESPN league that reports no date. Neither is turned into the other's terms.
+
 **Season**:
 One year of a league, named by the platform's season year. Stakes, teams, rankings and movement belong to a season. Lore and personas carry over between seasons.
 
@@ -298,6 +301,9 @@ _Avoid_: Header, summary
 
 **Award**:
 A league-wide item picked deterministically from the week's data, such as the top score, the biggest margin or an upset. Awards appear on publish styles and are never written by the LLM.
+
+**Deadline reminder**:
+The fixed line a published ranking carries while the trade deadline is coming up: "Trade deadline: week 11" on Sleeper, in the deadline's week and the two before it, and "Trade deadline: Wed Nov 26" on ESPN, the deadline's day in the machine's time zone, while it's after the snapshot's data as of and less than 21 days after it. It sits under the title in the plain text and just above the awards on the style pages. In the same weeks the evidence pack holds the deadline as `platform.trade_deadline` (the week, or on ESPN the day without its weekday, "Nov 26"), so the week intro can cite it; it's never written by the LLM.
 
 **Upset**:
 The award for the week's winner that had the worse all-play record going into the week, by the biggest gap. It goes by score, so in the losers bracket the higher score is the winner.

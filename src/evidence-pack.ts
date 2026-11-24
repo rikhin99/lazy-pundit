@@ -12,6 +12,7 @@ import {
 import { bestLineupPoints } from "./lineup.ts";
 import { playoffStatuses, settledThisWeek } from "./playoff-status.ts";
 import { standingsThrough } from "./standings.ts";
+import { tradeDeadline } from "./trade-deadline.ts";
 import type { EvidencePack, EvidenceValue } from "./validator/types.ts";
 
 /** A matchup decided by less than this many points is a close matchup. */
@@ -111,6 +112,8 @@ export function buildEvidencePack(
   items["platform.playoff_spots"] = playoffTeams;
   items["platform.playoff_start"] = playoffStartWeek;
   if (faabBudget !== null) items["platform.faab_budget"] = faabBudget;
+  const deadline = tradeDeadline(league, week);
+  if (deadline !== null) items["platform.trade_deadline"] = deadline;
 
   return { week, teams, league: items };
 }

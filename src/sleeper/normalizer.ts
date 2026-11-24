@@ -40,6 +40,8 @@ const leagueSchema = z.object({
     divisions: z.number().int().nullish(),
     /** 0 redraft, 1 keeper, 2 dynasty. */
     type: z.number().int().default(0),
+    /** The last week trades are allowed; 0 or missing with no deadline. */
+    trade_deadline: z.number().int().nullish(),
   }),
 });
 
@@ -203,6 +205,7 @@ export function normalizeSleeper(snapshot: Snapshot): League {
     divisions: s.divisions ?? 0,
     keepers: s.type === 1 ? "keeper" : s.type === 2 ? "dynasty" : null,
     lineupSlots,
+    tradeDeadline: s.trade_deadline ? { week: s.trade_deadline } : null,
   };
 
   const teams: Team[] = rosters.map((r) => {
@@ -401,6 +404,7 @@ export function normalizeSleeper(snapshot: Snapshot): League {
     name: league.name,
     settings,
     lastScoredWeek,
+    dataAsOf: snapshot.manifest.fetched_at,
     teams,
     weeks,
     transactions,

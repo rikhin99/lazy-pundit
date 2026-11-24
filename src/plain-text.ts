@@ -1,6 +1,7 @@
 import { formatRecord, type League, type TeamId } from "./league.ts";
 import { type MovementBaseline, movementMark, shownMove } from "./movement.ts";
 import type { RankingFile } from "./ranking-file.ts";
+import { deadlineReminder } from "./trade-deadline.ts";
 import { type OrderEvidence, stripTags } from "./validator.ts";
 
 /** Each platform's name as the pundit reads it. */
@@ -56,6 +57,8 @@ export function plainTextBlocks(
   const since = movementSince(week, baseline);
   if (since) header.push(since);
   const blocks: PlainTextBlock[] = [{ entry: null, text: header.join("\n") }];
+  const reminder = deadlineReminder(league, week);
+  if (reminder) blocks.push({ entry: null, text: reminder });
   if (ranking.intro) {
     blocks.push({ entry: "intro", text: stripTags(ranking.intro) });
   }

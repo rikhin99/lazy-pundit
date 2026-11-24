@@ -1,9 +1,16 @@
 import { readFileSync } from "node:fs";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HOT_TAKERY_ID } from "../../scripts/scrub-espn.ts";
 import { ESPN_VIEWS, espnLeagueUrl, espnViewUrl } from "../../src/espn/api.ts";
 import { type Deps, fileTransport } from "../../src/index.ts";
-import { type Patch, patchingTransport } from "./workspace.ts";
+import {
+  fixedClock,
+  operator,
+  type Patch,
+  patchingTransport,
+} from "./workspace.ts";
 
 export { HOT_TAKERY_ID };
 
@@ -16,6 +23,40 @@ const HOT_TAKERY = join(
   "espn",
   "hot-takery-2025",
 );
+
+/**
+ * A hand-written Hot Takery workspace on ESPN, with deps replaying `week`'s
+ * committed snapshot and a clock at the time that snapshot was fetched, as
+ * its ID says, so a draft's own snapshot has the same data as of.
+ */
+export async function hotTakeryWorkspace(week: number) {
+  const dir = await mkdtemp(join(tmpdir(), "lazy-pundit-espn-ws-"));
+  await writeFile(
+    join(dir, "workspace.md"),
+    `---
+format: 1
+pundit: rikhin
+seasons:
+  2025:
+    platform: espn
+    league_id: "${HOT_TAKERY_ID}"
+---
+
+# Hot Takery
+`,
+  );
+  const weeks = JSON.parse(
+    readFileSync(join(HOT_TAKERY, "weeks.json"), "utf8"),
+  );
+  const id = /^(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)Z-/.exec(
+    weeks[String(week)] ?? "",
+  );
+  if (!id) throw new Error(`no committed Hot Takery snapshot for week ${week}`);
+  const [, y, mo, d, h, mi, s] = id;
+  const deps = hotTakeryAt(await operator(), week);
+  deps.clock = fixedClock(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`);
+  return { dir, deps };
+}
 
 /** Hot Takery's league request, which ESPN answers 401 or 404 when it refuses. */
 export const HOT_TAKERY_LEAGUE_URL = espnViewUrl(

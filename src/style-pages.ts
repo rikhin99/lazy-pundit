@@ -5,6 +5,7 @@ import { formatRecord, type League, type TeamId } from "./league.ts";
 import { type MovementBaseline, movementMark, shownMove } from "./movement.ts";
 import { credit, movementSince, weekTitle } from "./plain-text.ts";
 import type { RankingFile } from "./ranking-file.ts";
+import { deadlineReminder } from "./trade-deadline.ts";
 import { type OrderEvidence, stripTags } from "./validator.ts";
 
 /** What every style page renders: the frozen copy and what checking it found. */
@@ -138,6 +139,8 @@ interface StylePageParts {
    */
   intro: string;
   corrections: string[];
+  /** The deadline reminder, shown just before the awards, if the week has one. */
+  deadline: string | null;
   awards: Award[];
   rows: (PlaceRow | { kind: "group"; label: string })[];
 }
@@ -185,6 +188,7 @@ function stylePageParts(input: StylePageInput): StylePageParts {
     since: movementSince(week, baseline),
     intro: withoutStatLine(rest, statLines.intro),
     corrections,
+    deadline: deadlineReminder(league, week),
     awards,
     rows,
   };
@@ -193,7 +197,7 @@ function stylePageParts(input: StylePageInput): StylePageParts {
 /** The Tabloid style page: masthead, intro as headline, awards box, pull quotes. */
 export function renderTabloid(input: StylePageInput): string {
   const { league } = input;
-  const { title, pundit, since, intro, corrections, awards, rows } =
+  const { title, pundit, since, intro, corrections, deadline, awards, rows } =
     stylePageParts(input);
   const parts: string[] = [];
 
@@ -211,6 +215,7 @@ export function renderTabloid(input: StylePageInput): string {
       `<p class="correction">${corrections.map(esc).join("<br>")}</p>`,
     );
   }
+  if (deadline) parts.push(`<p class="deadline">${esc(deadline)}</p>`);
   if (awards.length > 0) {
     parts.push(
       `<ul class="awards">${awards.map((a) => `<li><b>${esc(a.label)}</b>${esc(a.says)}</li>`).join("")}</ul>`,
@@ -243,7 +248,7 @@ export function renderTabloid(input: StylePageInput): string {
  */
 export function renderBroadcast(input: StylePageInput): string {
   const { league } = input;
-  const { title, pundit, since, intro, corrections, awards, rows } =
+  const { title, pundit, since, intro, corrections, deadline, awards, rows } =
     stylePageParts(input);
   const parts: string[] = [];
 
@@ -255,6 +260,7 @@ export function renderBroadcast(input: StylePageInput): string {
       `<section class="week"><h2>The week</h2>${intro ? `<div class="intro">${paragraphs(intro)}</div>` : ""}${corrections.length > 0 ? `<p class="correction">${corrections.map(esc).join("<br>")}</p>` : ""}</section>`,
     );
   }
+  if (deadline) parts.push(`<p class="deadline">${esc(deadline)}</p>`);
   if (awards.length > 0) {
     parts.push(
       `<ul class="chips">${awards.map((a) => `<li><b>${esc(a.label)}</b>${esc(a.says)}</li>`).join("")}</ul>`,
@@ -339,6 +345,7 @@ body{margin:0;padding:16px;background:#e9e7e1;color:#111}
 .headline{margin:0;font:900 22px/1.05 ${HEAVY};text-transform:uppercase}
 .standfirst p{margin:6px 0 0;font-size:14px;line-height:1.35}
 .correction{margin:0;padding:8px 14px;border-bottom:1px solid #111;font-size:12px;line-height:1.35;background:#fff6d6}
+.deadline{margin:0;padding:6px 14px;border-bottom:1px solid #111;background:#b0201a;color:#fff;font:700 12px/1.3 ${SANS};letter-spacing:.08em;text-transform:uppercase;text-align:center}
 .awards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #111}
 .awards li{padding:7px 10px;border-right:1px solid #ccc;border-bottom:1px solid #ccc;font-size:12px;line-height:1.25}
 .awards li:last-child:nth-child(odd){grid-column:1/-1}
@@ -369,6 +376,7 @@ body{margin:0;padding:16px;background:#05090f;color:#fff}
 .week h2{margin:0;font:700 11px/1.4 ${SANS};letter-spacing:.14em;text-transform:uppercase;color:#f2a900}
 .intro p{margin:2px 0 0}
 .correction{margin:6px 0 0;font-size:11.5px;color:#c3cbe0}
+.deadline{margin:0;padding:6px 16px;background:#c8102e;font:700 12px/1.3 ${SANS};letter-spacing:.12em;text-transform:uppercase}
 .chips{list-style:none;display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:8px 16px;background:#16233a;border-top:1px solid #24334f}
 .chips li{font-size:11px;line-height:1.3;background:#24334f;border-radius:3px;padding:2px 6px}
 .chips b{margin-right:4px;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#f2a900}

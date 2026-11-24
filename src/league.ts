@@ -12,6 +12,8 @@ export interface League {
   settings: LeagueSettings;
   /** The most recent scored week, or 0 before any week is scored. */
   lastScoredWeek: number;
+  /** When the snapshot was fetched (its manifest's `fetched_at`): the data as of. */
+  dataAsOf: string;
   teams: Team[];
   /** Every week in the snapshot, in order, scored or in progress. */
   weeks: Week[];
@@ -42,7 +44,15 @@ export interface LeagueSettings {
   keepers: "keeper" | "dynasty" | null;
   /** The starting lineup's slots, in order. */
   lineupSlots: LineupSlot[];
+  /** The platform's trade deadline, or null when the league has none. */
+  tradeDeadline: TradeDeadline | null;
 }
+
+/**
+ * The trade deadline as the platform reports it: on Sleeper the last week
+ * trades are allowed, on ESPN the moment they stop (epoch milliseconds).
+ */
+export type TradeDeadline = { week: number } | { at: number };
 
 /** One starting slot and the positions that may fill it. */
 export interface LineupSlot {

@@ -35,6 +35,9 @@ const leagueSchema = z.object({
       acquisitionBudget: z.number().default(0),
       isUsingAcquisitionBudget: z.boolean().default(false),
     }),
+    tradeSettings: z
+      .object({ deadlineDate: z.number().int().positive().nullish() })
+      .default({}),
     draftSettings: z
       .object({
         keeperCount: z.number().default(0),
@@ -363,6 +366,9 @@ export function normalizeEspn(snapshot: Snapshot): League {
           ? "keeper"
           : null,
     lineupSlots,
+    tradeDeadline: league.settings.tradeSettings.deadlineDate
+      ? { at: league.settings.tradeSettings.deadlineDate }
+      : null,
   };
 
   const players: Record<string, NflPlayer> = {};
@@ -503,6 +509,7 @@ export function normalizeEspn(snapshot: Snapshot): League {
     name: league.settings.name,
     settings,
     lastScoredWeek,
+    dataAsOf: snapshot.manifest.fetched_at,
     teams,
     weeks,
     transactions,
