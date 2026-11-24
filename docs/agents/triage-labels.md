@@ -18,7 +18,7 @@ Edit the "Label in our tracker" column to match whatever vocabulary you actually
 
 A `ready-for-human` brief for a run against a live league points to `docs/agents/live-run.md`, which the session running it follows.
 
-Run each command an acceptance criterion names at HEAD before writing the criterion, and write what it does now. A guessed cause stays out of the desired behaviour until it's confirmed. In #75, "every other scenario still exits 0" was false for the four Ctrl-C scenarios, which exit 1 by design, and the offline key check it asked for already happened at HEAD.
+Run each command an acceptance criterion names at HEAD before writing the criterion, and write what it does now. A guessed cause stays out of the desired behaviour until it's confirmed. A criterion about an outside event (a signal, a closed tab, a dropped connection) reproduces it the way a user causes it, since a stand-in can pass where the real event fails: #140's `kill -HUP` left the terminal writable, and a real tab close crashed on the restore's write. In #75, "every other scenario still exits 0" was false for the four Ctrl-C scenarios, which exit 1 by design, and the offline key check it asked for already happened at HEAD.
 
 A bug brief's red-first test runs on a fixture that has the bug's shape: check the payload at HEAD with `npm run fixture:show`. A scrubbed fixture is often tidier than the live answer, and then the brief names the patch that restores the shape. In #116, Hot Takery's box scores held only their own week, where ESPN sends the whole schedule, so a literal on the replay was green at HEAD and the red came from `failingOn` with an `answer`.
 

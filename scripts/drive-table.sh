@@ -5,7 +5,7 @@
 # and exits with the first failure's code.
 set -uo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
-SCENARIOS="keys escape ctrl-c sigterm sighup resize sort no-draft missing-team"
+SCENARIOS="keys escape ctrl-c sigterm sighup tab-close resize sort no-draft missing-team"
 
 run() {
   (

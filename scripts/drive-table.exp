@@ -13,6 +13,9 @@
 #   sigterm      SIGTERM sent to the program restores the screen and exits 143,
 #                the code a shell reports for a process SIGTERM killed
 #   sighup       SIGHUP restores the screen and exits 129, as a shell reports it
+#   tab-close    the terminal closed under it, as closing its tab does: a
+#                hangup whose restore can't be written, still exit 129 with
+#                nothing on stderr
 #   resize       the terminal narrowed to 60 columns redraws to that width
 #   sort         --sort ppg in a terminal prints the static table, no screen opened
 #   no-draft     the draft deleted: its one-line refusal, no screen opened, exit 1
@@ -185,6 +188,22 @@ switch -- $scenario {
     screen
     exec kill -HUP [exp_pid]
     finish 129
+  }
+  tab-close {
+    set errfile "$env(HOME)/tab-close.err"
+    spawn sh -c "stty rows 30 cols 100; exec [join $cli] 2>$errfile"
+    expect {
+      -ex $OPEN {}
+      timeout { fail 9 "no alternate screen" }
+      eof { fail 8 "ended without opening the screen" }
+    }
+    screen
+    # Closing the driver's side of the pty hangs it up: SIGHUP, then EIO.
+    close
+    lassign [wait] pid spawnid oserror code
+    set err [string trim [exec cat $errfile]]
+    if {$err ne ""} { fail 7 "stderr after the hangup: $err" }
+    if {$code != 129} { fail 7 "exit $code, not 129" }
   }
   resize {
     open_view
