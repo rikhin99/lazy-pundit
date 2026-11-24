@@ -11,7 +11,7 @@ Step 3 of `ticket-workflow.md` hands this to one subagent after the commit, with
 > ```
 >
 > Grep #37 and #1 for #<n> and for the terms the build changed. Second pass: read the full text of only the tickets the build affects, or whose conflict with it the first pass leaves unclear, in one call: `gh issue list --state open --limit 200 --json number,title,body,comments --jq '[.[] | select(.number | IN(<numbers>))]'`. Then:
-> - Add an "Input from #<n> (<sha>)" section to an open ticket only when the build changes what that ticket has to do. Keep it to about five lines.
+> - Add an "Input from #<n> (<sha>)" section to an open ticket only when the build changes what that ticket has to do. Keep it to about five lines. On a ticket with an Agent Brief comment, post it as a comment, with that heading: the build's ticket read prints the comments from the brief on and leaves out the body's Input sections.
 > - Comment "Refined by #<n> (<sha>): …" on each closed ticket listed above, with its decision.
 > - Comment on #<n> with what was built, then close it. For one part of a split ticket, keep it open and say what the next part still owes.
 > - For a line in #37 or #1 that the build contradicts, comment on that ticket quoting the line and the new behaviour, and leave its body as it is.

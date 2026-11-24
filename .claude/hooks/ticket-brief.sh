@@ -8,10 +8,14 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
 # tickets on purpose, so the ticket-count checks hold only in the main session.
 agent=$(printf '%s' "$input" | jq -r '.agent_id // ""')
 
+# The ticket read of docs/agents/ticket-workflow.md step 1: with an Agent Brief
+# comment, the body up to its Input sections, then the brief and what follows.
+READ='(.comments | map(.body)) as $c | ($c | map(test("## Agent Brief")) | rindex(true)) as $i | .title, (if $i then (.body | split("## Input from")[0]) else .body end), $c[($i // -1):][]'
+
 # Piped, `gh issue view --comments` prints the comments without the body.
 if printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--comments' &&
   ! printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--json'; then
-  echo "Piped, \`gh issue view --comments\` prints only the comments, without the body. Read the ticket and its brief (the Agent Brief comment and those after it) with \`gh issue view <n> --json title,body,comments --jq '.title, .body, (.comments | map(.body) | (map(test(\"## Agent Brief\")) | rindex(true)) as \$i | .[(\$i // -1):][])'\`, or one comment with \`--json comments --jq '.comments[-1].body'\`." >&2
+  echo "Piped, \`gh issue view --comments\` prints only the comments, without the body. Read the ticket and its brief (the Agent Brief comment and those after it) with \`gh issue view <n> --json title,body,comments --jq '$READ'\`, or one comment with \`--json comments --jq '.comments[-1].body'\`." >&2
   exit 2
 fi
 
@@ -21,7 +25,7 @@ fi
 # retro: 7.2k with the workflow doc); the brief is the Agent Brief comment.
 if printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--json +[^ ]*comments' &&
   ! printf '%s' "$cmd" | grep -Eq 'gh +issue +view[^;&|]*--jq'; then
-  echo "Read the ticket and its brief (the Agent Brief comment and those after it) with \`gh issue view <n> --json title,body,comments --jq '.title, .body, (.comments | map(.body) | (map(test(\"## Agent Brief\")) | rindex(true)) as \$i | .[(\$i // -1):][])'\`, not the whole thread's JSON." >&2
+  echo "Read the ticket and its brief (the Agent Brief comment and those after it) with \`gh issue view <n> --json title,body,comments --jq '$READ'\`, not the whole thread's JSON." >&2
   exit 2
 fi
 
