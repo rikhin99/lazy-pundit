@@ -113,6 +113,16 @@ describe("the deadline reminder", () => {
     }
   });
 
+  test("Sleeper's deadline's own week carries it", async () => {
+    // No committed week-11 replay: week 10's, with its deadline moved to 10.
+    const text = await publishedText(
+      await sleeperAt(10, (league) => {
+        league.settings.trade_deadline = 10;
+      }),
+    );
+    expect(text.split("\n\n")[1]).toBe("Trade deadline: week 10");
+  });
+
   test("a Sleeper league with deadline 0 has none", async () => {
     const text = await publishedText(
       await sleeperAt(10, (league) => {
