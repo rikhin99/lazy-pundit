@@ -49,7 +49,7 @@ Each rule in `docs/agents/ticket-workflow.md` came from a ticket where its absen
 - #101 wrote its commit message twice.
 - In #98, "Fetching the league… prints before the refusal" went to review as cosmetic, and both reviews' fixes moved the refusal out of `checkLeague`.
 - In #93 the hint search was pruned for speed, timed only on a fault no fix mends, and handed to the spec review as a question; it found three combinations the pruning hid, a second red-green round of about 20k.
-
+- In #139 `setup lore` first kept only the lines that read as entries once comments were stripped, tested on plain bullets alone; the spec review found a comment spanning lines that lost its closing line and swallowed every later section, and blank lines, comments and CRLF that made an unchanged re-run show a diff: a second red-green round and eight more mutations, about 35k (`merge.md`). Its test helper also cut `lore.md` at the top comment's example `## League`, a red run.
 ## Step 3: sweep
 
 - #118's e7e5d7f added a state and an option after the sweep, unreviewed.

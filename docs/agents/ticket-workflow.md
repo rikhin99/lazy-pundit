@@ -34,6 +34,7 @@ Before the first test, read the case file in `docs/agents/workflow/` for each ca
 - A new `drive-wizard.exp` scenario, or a change to a wizard prompt (`cli.ts`) or a setup step (`init.ts`): `wizard.md`.
 - A new or changed expect driver (`drive-wizard.exp`, `drive-table.exp`) or a scenario in one: `pty.md`.
 - A change to a style page (`style-pages.ts`): `style-pages.md`.
+- A step that rewrites a file the pundit edits and keeps their lines (`setup lore`, `setup stakes`): `merge.md`.
 - A ticket that says to diagnose before choosing a fix: `diagnose.md`.
 - A change to `scripts/scrub-*.ts` or a committed fixture set: `fixtures.md`.
 - A change to a helper in `test/support/`, or one that adds something to every draft's output: `test-helpers.md`.

@@ -6,21 +6,27 @@ import { parse as parseYaml } from "yaml";
 import {
   type Clipboard,
   type Clock,
+  checkLeague,
   type Deps,
   fetchSleeperSnapshot,
   fileTransport,
   type League,
   normalizeSleeper,
   type Problem,
+  proposedHandles,
+  proposedNicknames,
   publish,
   readManifest,
   readSnapshot,
+  rerunStep,
+  setUpWorkspace,
   type Transport,
   type TransportRequest,
   type TransportResponse,
 } from "../../src/index.ts";
 import { SLEEPER_API } from "../../src/sleeper/api.ts";
 import { listSnapshots } from "../../src/snapshot.ts";
+import { readWorkspace } from "../../src/workspace.ts";
 import { noLlm } from "./llm.ts";
 
 export const FIXTURES = join(
@@ -314,6 +320,31 @@ export async function operator(): Promise<Deps> {
     cwd: home,
     env: { nodeVersion: "v24.0.0" },
   };
+}
+
+/**
+ * A Fear The Turtle workspace set up at week 8 whose `lore.md` is the lore
+ * step's own for the first two teams, their managers linked as handles.
+ * `writeBody` writes `lore.md` as the step's top (front matter, `# Lore` and
+ * its comment) and `body`, for a test that writes sections by hand.
+ */
+export async function twoTeamLore() {
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const { dir } = await setUpWorkspace(deps, { punditName: "Rikhin", league });
+  const yes = async () => true;
+  const handles = proposedHandles(league);
+  await rerunStep(deps, dir, { step: "handles", league, handles }, yes);
+  const nicknames = proposedNicknames(league, handles).slice(0, 2);
+  const lore = { type: "friends" as const, nicknames };
+  await rerunStep(deps, dir, { step: "lore", league, lore }, yes);
+  const lorePath = join(dir, "lore.md");
+  const written = await readFile(lorePath, "utf8");
+  // The top comment shows a `## League` too, so the section is the last one.
+  const top = written.slice(0, written.lastIndexOf("## League"));
+  const writeBody = (body: string) => writeFile(lorePath, top + body);
+  const ws = await readWorkspace(dir);
+  return { deps, dir, league, ws, nicknames, lorePath, top, writeBody };
 }
 
 /** Where a pundit's ranking files for a season live. */

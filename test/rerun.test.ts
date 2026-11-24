@@ -39,6 +39,7 @@ import {
   FEAR_THE_TURTLE_ID,
   frontMatter,
   operator,
+  twoTeamLore,
   withFrontMatter,
 } from "./support/workspace.ts";
 
@@ -146,30 +147,9 @@ test("setup lore over a lore.md that doesn't load offers the step's own text", a
   expect(await readFile(lorePath, "utf8")).not.toMatch(/Jokes/);
 });
 
-/** Two teams' lore, with their managers linked as handles. */
-async function withTwoTeamsLore() {
-  const set = await setUp();
-  const { deps, dir, league } = set;
-  const handles = proposedHandles(league);
-  await rerun(deps, dir, { step: "handles", league, handles });
-  const nicknames = proposedNicknames(league, handles).slice(0, 2);
-  await rerun(deps, dir, {
-    step: "lore",
-    league,
-    lore: { type: "friends", nicknames },
-  });
-  const lorePath = join(dir, "lore.md");
-  const written = await readFile(lorePath, "utf8");
-  // The top comment shows a `## League` too, so the section is the last one.
-  const top = written.slice(0, written.lastIndexOf("## League"));
-  /** Writes `lore.md` with the step's top and this body. */
-  const writeBody = (body: string) => writeFile(lorePath, top + body);
-  return { ...set, nicknames, lorePath, top, writeBody };
-}
-
 test("setup lore keeps each entry under its section and every other section after the step's, a stale handle's too", async () => {
   const { deps, dir, league, nicknames, lorePath, top, writeBody } =
-    await withTwoTeamsLore();
+    await twoTeamLore();
   await writeBody(`## League
 type: friends
 - Founded in 2015.
@@ -225,7 +205,7 @@ nicknames: Old Guy
 
 test("setup lore keeps entries under a heading written another way that names the same section", async () => {
   const { deps, dir, league, nicknames, lorePath, top, writeBody } =
-    await withTwoTeamsLore();
+    await twoTeamLore();
   await writeBody(`## league
 type: work
 - Founded in 2015.
@@ -251,7 +231,7 @@ nicknames: Wendy's Wire, waiver_wendy
 
 test("setup lore keeps a section's blank lines and comments as written, so the same answers ask nothing", async () => {
   const { deps, dir, league, nicknames, lorePath, writeBody } =
-    await withTwoTeamsLore();
+    await twoTeamLore();
   await writeBody(`## League
 type: friends
 - Founded in 2015. <!-- a note
@@ -278,7 +258,7 @@ nicknames: Wendy's Wire, waiver_wendy
 });
 
 test("setup lore over a lore.md with CRLF line endings keeps them, so the same answers ask nothing", async () => {
-  const { deps, dir, league, nicknames, lorePath } = await withTwoTeamsLore();
+  const { deps, dir, league, nicknames, lorePath } = await twoTeamLore();
   const crlf = `${(await readFile(lorePath, "utf8")).replaceAll("\n", "\r\n")}\r\n## Running jokes\r\n- The trade that never was.\r\n`;
   await writeFile(lorePath, crlf);
 
@@ -292,8 +272,7 @@ test("setup lore over a lore.md with CRLF line endings keeps them, so the same a
 });
 
 test("setup lore swaps the step's comment for a team's new nicknames, and keeps the entries under it", async () => {
-  const { deps, dir, league, nicknames, lorePath, top } =
-    await withTwoTeamsLore();
+  const { deps, dir, league, nicknames, lorePath, top } = await twoTeamLore();
   const none = nicknames.map((t, i) => (i === 0 ? { ...t, nicknames: [] } : t));
   await rerun(deps, dir, {
     step: "lore",
@@ -336,7 +315,7 @@ nicknames: Wendy's Wire, waiver_wendy
 
 test("setup lore refuses entries that wouldn't load once kept, naming the line in lore.md, and writes nothing", async () => {
   const { deps, dir, league, nicknames, lorePath, writeBody } =
-    await withTwoTeamsLore();
+    await twoTeamLore();
   // The comment opens on the step's nicknames line, which isn't kept, so the
   // tag on its closing line reads as lore.
   await writeBody(`## {manager=gridiron-gus}
@@ -363,7 +342,7 @@ type: friends
 
 test("setup lore refuses a nickname that clashes with a kept section's", async () => {
   const { deps, dir, league, nicknames, lorePath, writeBody } =
-    await withTwoTeamsLore();
+    await twoTeamLore();
   await writeBody(`## League
 type: friends
 
