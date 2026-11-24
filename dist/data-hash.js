@@ -1,0 +1,55 @@
+import { createHash } from "node:crypto";
+import { standingsThrough } from "./standings.js";
+/**
+ * SHA-256 of the league data a ranking for `throughWeek` stands on, as
+ * canonical JSON: the scored weeks up to it (matchups, scores, results,
+ * lineups, byes), transactions up to it, the standings through it (with
+ * rank, seed and tiebreaks), and the playoff spot count and regular-season
+ * length. Names, managers, current rosters, injuries,
+ * player details and any in-progress week are left out, so only a change that
+ * counts as "data changed" changes it.
+ *
+ * Snapshot IDs end with this hash, so changing what it covers changes every
+ * committed fixture ID: rebuild them (see fixtures/sleeper/README.md).
+ */
+export function dataHash(league, throughWeek) {
+    return createHash("sha256")
+        .update(canonicalJson(coveredData(league, throughWeek)))
+        .digest("hex");
+}
+/**
+ * The data a ranking for `throughWeek` stands on, which the data hash covers.
+ * `inProgressWeek` adds that week's matchups, for a draft that let it in.
+ */
+export function coveredData(league, throughWeek, inProgressWeek) {
+    return {
+        playoffTeams: league.settings.playoffTeams,
+        regularSeasonWeeks: league.settings.regularSeasonWeeks,
+        standings: standingsThrough(league, throughWeek),
+        weeks: league.weeks
+            .filter((w) => (w.scored && w.week <= throughWeek) || w.week === inProgressWeek)
+            .map((w) => ({
+            week: w.week,
+            byes: w.byes,
+            matchups: w.matchups.map((m) => ({
+                ...m,
+                sides: m.sides.map((s) => ({
+                    ...s,
+                    lineup: s.lineup.map(({ player, slot, points }) => ({
+                        player,
+                        slot,
+                        points,
+                    })),
+                })),
+            })),
+        })),
+        transactions: league.transactions.filter((t) => t.week <= throughWeek),
+    };
+}
+/** JSON with every object's keys sorted, so equal data gives equal text. */
+function canonicalJson(value) {
+    return JSON.stringify(value, (_key, v) => v && typeof v === "object" && !Array.isArray(v)
+        ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+        : v);
+}
+//# sourceMappingURL=data-hash.js.map

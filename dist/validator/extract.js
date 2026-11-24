@@ -1,0 +1,532 @@
+import { nameSpans, normalize, overlaps, wholeWords } from "./names.js";
+import { firstNum, HEDGE, hedgeBefore, NUMW, ORDW, parseNum, } from "./numbers.js";
+// ---------- units: sentences, with each bullet its own unit ----------
+export const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+/;
+/** Sentences of the plain text, each with its offset. A bullet never runs into the next line. */
+export function units(plain) {
+    const out = [];
+    const blocks = [];
+    let offset = 0;
+    let current = null;
+    for (const line of plain.split("\n")) {
+        const lineStart = offset;
+        offset += line.length + 1;
+        if (!line.trim() || BULLET.test(line)) {
+            if (current)
+                blocks.push(current);
+            current = null;
+            if (!line.trim())
+                continue;
+            const bullet = line.match(BULLET)[0].length;
+            blocks.push({ text: line.slice(bullet), start: lineStart + bullet });
+            continue;
+        }
+        if (current)
+            current.text += `\n${line}`;
+        else
+            current = { text: line, start: lineStart };
+    }
+    if (current)
+        blocks.push(current);
+    const SENTENCE = /(?:\bNo\.\s|[^.!?]|[.!?](?=\S))+[.!?]*/g;
+    for (const b of blocks) {
+        for (const m of b.text.matchAll(SENTENCE)) {
+            if (m[0].trim())
+                out.push({ s: m[0], start: b.start + m.index });
+        }
+    }
+    return out;
+}
+/**
+ * A week a clause names as the one its claims are about: "in week 8",
+ * "during week 8", "for week 8", "week 8's", or "this week" for the ranking
+ * week. "Since week 3" or "a week 14 bye" name no week a claim reads.
+ */
+const NAMED_WEEK = /\b(?:(?:in|during|for)\s+(?:week|wk)\s*(\d{1,2})\b|(?:week|wk)\s*(\d{1,2})['’]s\b|this week\b)/gi;
+/** Where one clause ends and the next begins. */
+export const CLAUSE_BREAK = /[,;:()—–]|\s-\s|\b(?:and|but|while|though|although|whereas)\b/gi;
+/** Where the clause holding `start`..`end` begins and ends in `s`. */
+function clauseAt(s, start, end) {
+    let from = 0;
+    let to = s.length;
+    for (const m of s.matchAll(CLAUSE_BREAK)) {
+        if (m.index + m[0].length <= start)
+            from = m.index + m[0].length;
+        else if (m.index >= end) {
+            to = m.index;
+            break;
+        }
+    }
+    return [from, to];
+}
+/** How far a match at `mStart`..`mEnd` sits from `start`..`end`: 0 when they overlap. */
+function gap(mStart, mEnd, start, end) {
+    return mEnd <= start ? start - mEnd : mStart >= end ? mStart - end : 0;
+}
+/**
+ * The week a claim at `start`..`end` reads: of the weeks named in the
+ * claim's own clause, the nearest one, else the ranking week.
+ */
+function namedWeek(s, start, end, rankingWeek) {
+    const [from, to] = clauseAt(s, start, end);
+    let best = rankingWeek;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const m of s.slice(from, to).matchAll(NAMED_WEEK)) {
+        const d = gap(from + m.index, from + m.index + m[0].length, start, end);
+        if (d < bestDist) {
+            bestDist = d;
+            best = (m[1] ?? m[2]) ? Number(m[1] ?? m[2]) : rankingWeek;
+        }
+    }
+    return best;
+}
+/** A result's verb, finite or "-ing" ("beat", "after beating"), before the opponent. */
+export const RESULT_VERBS = /\b(beat|beats|beating|edged|edges|edging|crushed|crushes|crushing|smoked|smokes|smoking|took down|takes down|taking down|squeaked past|squeaks past|squeaking past|handled|handles|handling|blew out|blows out|blowing out|outlasted|outlasts|outlasting|lost to|loses to|losing to|fell to|falls to|falling to|dropped one to|drops one to|dropping one to)\s+/gi;
+/** The `RESULT_VERBS` forms that mean a loss, finite or "-ing". */
+export const LOSS_VERB = /^(lost|loses|losing|fell|falls|falling|dropped|drops|dropping)/;
+export const ORDINAL_CUES = [
+    [/all[- ]play/, () => "allplay_rank"],
+    [/points against|\bpa\b/, () => "pa_rank"],
+    [/\bform\b|\blately\b|last (three|3)/, () => "form_rank"],
+    [/this week|the week|week[- ]high|week \d/, (w) => `w${w}.rank`],
+    [/points|scoring|\bpf\b|scored/, () => "pf_rank"],
+    [/standings/, () => "standing"],
+    [/\bseed\b/, () => "seed"],
+    [/\branked\b|\branking|\bspot\b|\bpower\b/, () => "place"],
+];
+/** A recent window: "averaging 120 over the last three" is form, not `ppg`. */
+const FORM_CUE = /\blast three\b|\blast 3\b|\blately\b/;
+export const NUMBER_CUES = [
+    [
+        /\bmargin\b|\bwon by\b|\blost by\b|\bwinning by\b|\blosing by\b/,
+        (w) => `w${w}.margin`,
+    ],
+    [
+        /\b(scored|scores|dropped|drops|put up|puts up|posted|posts|poured in|hung|lit up for)\b/,
+        (w) => `w${w}.points`,
+    ],
+    // "weekly high" and "week-high" are a week's, never the season's
+    [/\bseason[- ]high\b|(?<!\bweek(?:ly)?[- ])\bhigh\b/, () => "high"],
+    [/\bseason[- ]low\b|(?<!\bweek(?:ly)?[- ])\blow\b/, () => "low"],
+    [/\bpoints for\b|\bon the season\b|\bseason total\b|\btotal\b/, () => "pf"],
+    [FORM_CUE, () => "form3"],
+    [/\baverag|\bper week\b|\bper game\b/, () => "ppg"],
+    [/\bpoints against\b|\ballowed\b/, () => "pa"],
+    [
+        /\bluck|\bunlucky\b|\blucky\b|\bcost (them|him|her)\b|\brobbed\b/,
+        () => "luck",
+    ],
+];
+export function ordinalKey(ctx, week) {
+    const c = ctx.toLowerCase();
+    for (const [cue, key] of ORDINAL_CUES)
+        if (cue.test(c))
+            return key(week);
+    return null;
+}
+/** How far either side of an ordinal its cue can sit. */
+const ORDINAL_REACH = 30;
+/**
+ * The stat an ordinal at `start`..`end` of the lowercased `s` reads, from
+ * `ORDINAL_REACH` characters either side of it: the stat cue nearest it in its
+ * own clause, `ORDINAL_CUES` order breaking a tie, so "first" in "second in
+ * points and first in the standings" reads the standings. A ranking cue
+ * ("ranked", "spot") gives place only when the clause holds no stat cue, so
+ * "ranked 2nd in points" reads points. With no cue in its clause, the first
+ * cue in `ORDINAL_CUES` order, as `ordinalKey` reads them.
+ */
+function ordinalCueAt(s, start, end, week) {
+    const [clauseFrom, clauseTo] = clauseAt(s, start, end);
+    const from = Math.max(clauseFrom, start - ORDINAL_REACH);
+    const clause = s.slice(from, Math.min(clauseTo, end + ORDINAL_REACH));
+    let best = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const [cue, key] of ORDINAL_CUES) {
+        const k = key(week);
+        for (const m of clause.matchAll(new RegExp(cue.source, "g"))) {
+            const d = gap(from + m.index, from + m.index + m[0].length, start, end);
+            // a ranking cue counts only past every stat cue's reach
+            const rank = k === "place" ? d + 2 * ORDINAL_REACH : d;
+            if (rank < bestDist) {
+                bestDist = rank;
+                best = k;
+            }
+        }
+    }
+    const nearby = s.slice(Math.max(0, start - ORDINAL_REACH), start) +
+        s.slice(end, end + ORDINAL_REACH);
+    return best ?? ordinalKey(nearby, week);
+}
+/** How far before a number its cue can sit, and how far after. */
+const CUE_BEFORE = 30;
+const CUE_AFTER = 25;
+/** Where a number's own clause ends, for its form cue. */
+const NUMBER_CLAUSE_END = /[;!?]|\.\s/;
+/**
+ * The number cue for the number at `start`..`end` of the lowercased `s`: the
+ * last one before it, else the first after. The cue before gives way to the
+ * first one after when another number sits between them, or when an earlier
+ * number took it (`taken` holds where each taken cue starts), so in "allowed
+ * 924.43 while scoring 891.03 in total" 891.03 reads points for. An average
+ * cue gives way to a form cue in the number's clause.
+ */
+export function nearestCue(s, start, end, week, taken) {
+    const from = Math.max(0, start - CUE_BEFORE);
+    const before = s.slice(from, start);
+    const after = s.slice(end, end + CUE_AFTER);
+    let cueBefore = null;
+    let cueBeforeEnd = Number.NEGATIVE_INFINITY;
+    let cueAfter = null;
+    for (const [cue, key] of NUMBER_CUES) {
+        for (const m of before.matchAll(new RegExp(cue.source, "g"))) {
+            if (m.index + m[0].length > cueBeforeEnd) {
+                cueBeforeEnd = m.index + m[0].length;
+                cueBefore = { key: key(week), at: from + m.index };
+            }
+        }
+        const m = after.match(cue);
+        if (m && (!cueAfter || end + m.index < cueAfter.at)) {
+            cueAfter = { key: key(week), at: end + m.index };
+        }
+    }
+    // a week's number ("in week 8") is no number between
+    const between = before
+        .slice(cueBeforeEnd)
+        .replace(/\b(?:week|wk|w)\s*\d+/g, "");
+    const cueSpent = cueBefore !== null && (taken.has(cueBefore.at) || /\d/.test(between));
+    // with no cue after, the spent one still reads: "scored 120 in week 7, but 133.22"
+    const best = cueBefore && !(cueSpent && cueAfter) ? cueBefore : cueAfter;
+    if (best?.key !== "ppg")
+        return best;
+    // within the number's own clause
+    const tail = before.split(NUMBER_CLAUSE_END).at(-1);
+    const form = [...tail.matchAll(new RegExp(FORM_CUE.source, "g"))]
+        .map((m) => start - tail.length + m.index)
+        .at(-1) ?? formAfter(after, end);
+    return form === undefined ? best : { key: "form3", at: form };
+}
+/** Where the first form cue in the number's clause after it starts. */
+function formAfter(after, end) {
+    const m = after.split(NUMBER_CLAUSE_END)[0].match(FORM_CUE);
+    return m ? end + m.index : undefined;
+}
+export function groupsOf(ctx) {
+    const labels = new Set();
+    for (const o of Object.values(ctx.order))
+        if (o.group)
+            labels.add(o.group);
+    return [...labels];
+}
+/** The group of the team in first place, or in last. */
+export function edgeGroup(ctx, edge) {
+    const places = Object.values(ctx.order).sort((a, b) => a.place - b.place);
+    return (edge === "top" ? places[0] : places.at(-1))?.group;
+}
+/** The numbers a group label carries: "Tier 2" and "Second tier" both carry 2. */
+export function labelNumber(label) {
+    const n = firstNum(label);
+    return n ? n.num.n : null;
+}
+export const MOVE_VERBS = "climbs?|climbed|climbing|rises|rose|rising|jumps?|jumped|jumping|moves? up|moved up|falls?|fell|falling|drops?|dropped|dropping|slides?|slid|sliding|slips?|slipped|tumbles?|tumbled";
+export const MOVE_DOWN = /^(fall|fell|drop|slid|slip|tumbl|down)/;
+/** Playoff phrases and the status each one states; null is a loose phrase. */
+const PLAYOFFS = [
+    [
+        /\b(?:clinch(?:ed|es|ing)?|locked up|locks up|secured|secures) (?:a |the )?(?:first[- ]round |round[- ]one |playoff )?bye\b/gi,
+        "clinched_bye",
+    ],
+    [
+        /\bclinch(?:ed|es|ing)?\b(?: (?:a|their|his|her) (?:playoff )?(?:spot|berth|place))?/gi,
+        "clinched",
+    ],
+    [
+        /\b(?:eliminated|mathematically out|out of (?:the )?playoff (?:race|hunt|picture))\b/gi,
+        "eliminated",
+    ],
+    // A bare "knocked out" can be a player's injury, so only the bracket's is
+    // checked. A round counts only at the clause's end or before its opponent:
+    // "in the final minutes" and "in the first round of the draft" aren't one.
+    [
+        /\bknocked out (?:of (?:the )?(?:playoffs|bracket)\b|in (?:the )?(?:(?:first|second|third|opening|1st|2nd|3rd) round|round (?:one|two|three|[123])|quarter-?finals?|quarters|semi-?finals?|semis|finals?)(?=\s*(?:$|[.,;:!?)—–-]|(?:by|to|against|at)\b)))/gi,
+        "eliminated",
+    ],
+    [
+        /\bplayoff (?:lock|bound|hopes?)\b|\bin the (?:playoff )?hunt\b|\bon the bubble\b|\bpunch(?:ed|es)? (?:their|a) (?:playoff )?ticket\b/gi,
+        null,
+    ],
+];
+/** What these words state about playoff status: undefined when they're no playoff phrase. */
+export function playoffWant(words) {
+    return PLAYOFFS.find(([re]) => words.search(re) >= 0)?.[1];
+}
+/**
+ * Each trigger kind's wording as a noun a count can sit before ("2 high
+ * scores"). A rule whose trigger has none here is read by its name alone.
+ */
+export const TRIGGER_WORDS = {
+    "high-score": "high score",
+    "low-score": "low score",
+    "last-place": "last-place finish",
+    champion: "championship",
+};
+/** A rule's name or trigger wording as a pattern, singular or plural. */
+function rulePhrase(words) {
+    const parts = words
+        .trim()
+        .toLowerCase()
+        .split(/[\s-]+/)
+        .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    return `${parts.join("[- ]+")}(?:e?s)?`;
+}
+/**
+ * Each count straight before one of `words` in the lowercased `low`, as where
+ * it starts and its token: a whole number, number word, or "a"/"another" and
+ * an ordinal ("2 weekly high scores", "a third high score"). A week's number
+ * ("week 3 high score"), one past the ranking week ("a 162 high score") or a
+ * decimal ("a 162.9 high score", "2.0 high scores") is no count; a decimal is
+ * matched whole so its last digits aren't read as one.
+ */
+function countsBefore(low, words, week) {
+    const re = new RegExp(`(?<![\\w.])(?:(\\d+(?:\\.\\d+)?|${NUMW})|(?<=\\b(?:a|another)\\s+)(${ORDW}))\\s+(?:(?:weekly|season)[- ]+)?(?:${words.map(rulePhrase).join("|")})\\b`, "g");
+    return [...low.matchAll(re)]
+        .map((m) => ({ start: m.index, token: (m[1] ?? m[2]) }))
+        .filter(({ start, token }) => {
+        const weekNamed = /\b(?:week|wk|w)\s*$/.test(low.slice(0, start));
+        return !weekNamed && isCount(token, week);
+    });
+}
+/** A number a count can be: written whole, and no more than the weeks played. */
+function isCount(token, week) {
+    return !token.includes(".") && parseNum(token).n <= week;
+}
+/**
+ * Each house rule's count (`countsBefore` its name or its trigger's wording),
+ * as the rule's `rule.<id>.count`. Wording two rules share reads either
+ * rule's count.
+ */
+function ruleCounts(ctx, low) {
+    const counts = new Map();
+    for (const rule of ctx.input.houseRules ?? []) {
+        const trigger = rule.trigger && TRIGGER_WORDS[rule.trigger];
+        const words = [rule.name, ...(trigger ? [trigger] : [])];
+        for (const { start, token } of countsBefore(low, words, ctx.evidence.week)) {
+            const count = counts.get(start) ?? { token, keys: [] };
+            count.keys.push(`rule.${rule.id}.count`);
+            counts.set(start, count);
+        }
+    }
+    return [...counts].map(([start, { token, keys }]) => ({
+        start,
+        end: start + token.length,
+        shape: { type: "stat", keys, num: parseNum(token) },
+        week: ctx.evidence.week,
+    }));
+}
+export function extract(ctx, s) {
+    const low = s.toLowerCase();
+    // first, so a count wins over the bare number or ordinal at its place
+    const out = ruleCounts(ctx, low);
+    const weekAt = (start, end) => namedWeek(s, start, end, ctx.evidence.week);
+    const add = (start, end, shape, week = weekAt(start, end)) => out.push({ start, end, shape, week });
+    // results: a verb, then a team's name
+    for (const m of s.matchAll(RESULT_VERBS)) {
+        const restStart = m.index + m[0].length;
+        const rest = normalize(s.slice(restStart));
+        let best = null;
+        for (const [team, names] of Object.entries(ctx.input.nicknames)) {
+            for (const n of names) {
+                const nn = normalize(n);
+                if (rest.startsWith(nn) &&
+                    !/\w/.test(rest[nn.length] ?? "") &&
+                    (!best || nn.length > best.len)) {
+                    best = { team: team, len: nn.length };
+                }
+            }
+        }
+        if (best) {
+            add(m.index, restStart + best.len, {
+                type: "result",
+                won: !LOSS_VERB.test(m[1].toLowerCase()),
+                opponent: best.team,
+            });
+        }
+    }
+    // scores (133.22-78.22) and records (7-1, 7-1-1)
+    for (const m of s.matchAll(/(?<![\w.])(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)(?:\s*[-–]\s*(\d+))?(?![\w.]*\d)/g)) {
+        const a = parseNum(m[1]);
+        const b = parseNum(m[2]);
+        const split = m[0].search(/[-–]/);
+        const end = m.index + m[0].length;
+        if (a.dp || b.dp) {
+            add(m.index, end, { type: "score", a, b, split });
+            continue;
+        }
+        const near = low.slice(Math.max(0, m.index - 20), end + 20);
+        add(m.index, end, {
+            type: "stat",
+            keys: /all[- ]play/.test(near) ? ["allplay"] : ["record", "allplay"],
+            record: m[0],
+            ...(a.n > 30 && b.n > 30 && !m[3] ? { score: { a, b, split } } : {}),
+        });
+    }
+    // streaks: "three straight (losses)", a skid or heater, "three losses in a
+    // row", "the third loss in a row"
+    for (const m of s.matchAll(new RegExp(`\\b(?:\\d+(?:st|nd|rd|th)?|${NUMW}|${ORDW})(?:[- ]games?)?(?: straight| consecutive| in a row)+(?! weeks?\\b)(?:\\s+(?:wins?|losses|loss|games|w's|l's|heater|skid|win(?:ning)? streak|losing streak)\\b)?|\\b(?:\\d+|${NUMW})[- ]game (?:heater|skid|win(?:ning)? streak|losing streak)\\b|\\b(?:\\d+(?:st|nd|rd|th)?|${NUMW}|${ORDW}) (?:wins?|loss(?:es)?) in a row\\b`, "gi"))) {
+        add(m.index, m.index + m[0].length, {
+            type: "stat",
+            keys: ["streak"],
+        });
+    }
+    // movement
+    for (const m of s.matchAll(new RegExp(`\\b(${MOVE_VERBS}|up|down)\\s+(\\d+|${NUMW})(\\s+(?:spots?|places?))?`, "gi"))) {
+        const verb = m[1].toLowerCase();
+        const n = parseNum(m[2]);
+        const bare = verb === "up" || verb === "down";
+        if (!m[3] && !bare)
+            continue;
+        if (bare) {
+            const after = low.slice(m.index + m[0].length);
+            const before = low.slice(0, m.index);
+            if (/^\s*(points|pts|wins|losses|on the (year|season))/.test(after))
+                continue;
+            if (/\b(put|puts|putting|racked|racks)\s*$/.test(before))
+                continue;
+            if (n.n > ctx.teamCount)
+                continue;
+        }
+        add(m.index, m.index + m[0].length, {
+            type: "move",
+            by: MOVE_DOWN.test(verb) ? -n.n : n.n,
+        });
+    }
+    for (const m of s.matchAll(/\b(?:debuts?|debuted|debuting)\b|\bnew (?:to|in) the rankings\b|\bnew entry\b|\(new\)|(?<=\b(?:is|are|['’]re|['’]s)\s+)new\b(?!\s+(?:high|low|record|career|season))/gi)) {
+        add(m.index, m.index + m[0].length, { type: "move", by: "new" });
+    }
+    // groups: a heading's text, or a tier with a number
+    for (const label of groupsOf(ctx)) {
+        for (const m of normalize(s).matchAll(wholeWords(label))) {
+            add(m.index, m.index + m[0].length, { type: "group", label });
+        }
+    }
+    for (const m of s.matchAll(new RegExp(`\\b(\\d+(?:st|nd|rd|th)|${ORDW})[- ]tier\\b|\\btier (\\d+|${NUMW})\\b`, "gi"))) {
+        add(m.index, m.index + m[0].length, {
+            type: "group",
+            tier: parseNum((m[1] ?? m[2])).n,
+        });
+    }
+    for (const m of s.matchAll(/\b(top|bottom)[- ]tier\b/gi)) {
+        add(m.index, m.index + m[0].length, {
+            type: "group",
+            edge: m[1].toLowerCase(),
+        });
+    }
+    // playoff words
+    for (const [re, want] of PLAYOFFS) {
+        for (const m of s.matchAll(re)) {
+            add(m.index, m.index + m[0].length, { type: "playoffs", want });
+        }
+    }
+    // place: #N, No. N, top N, bottom N
+    for (const m of s.matchAll(new RegExp(`(?:#|\\bNo\\.\\s?)(\\d+)\\b|\\b(top|bottom) (\\d+|${NUMW})\\b`, "gi"))) {
+        const after = low.slice(m.index + m[0].length, m.index + m[0].length + 30);
+        const week = weekAt(m.index, m.index + m[0].length);
+        const key = m[2] ? (ordinalKey(after, week) ?? "place") : "place";
+        if (m[1]) {
+            const n = Number(m[1]);
+            add(m.index, m.index + m[0].length, {
+                type: "place",
+                key,
+                test: (p) => p === n,
+            });
+        }
+        else {
+            const n = parseNum(m[3]).n;
+            const top = m[2].toLowerCase() === "top";
+            const count = ctx.teamCount;
+            add(m.index, m.index + m[0].length, {
+                type: "place",
+                key,
+                test: top ? (p) => p <= n : (p) => p > count - n,
+            });
+        }
+    }
+    // ordinals: a stat cue picks the stat, a ranking cue picks place
+    for (const m of s.matchAll(new RegExp(`\\b(\\d+(?:st|nd|rd|th)|${ORDW})\\b`, "gi"))) {
+        const word = m[1];
+        const after = low.slice(m.index + word.length, m.index + word.length + 30);
+        const before = low.slice(Math.max(0, m.index - 30), m.index);
+        if (/^[- ](game|straight|consecutive|tier)/.test(after))
+            continue;
+        const num = parseNum(word);
+        const key = ordinalCueAt(low, m.index, m.index + word.length, weekAt(m.index, m.index + word.length));
+        const standingWords = /\bin\s*$/.test(before) || /^ place\b/.test(after);
+        if (key) {
+            add(m.index, m.index + word.length, {
+                type: "stat",
+                keys: [key],
+                num,
+                ordinal: true,
+            });
+        }
+        else if (standingWords) {
+            add(m.index, m.index + word.length, {
+                type: "stat",
+                keys: ["standing", "place"],
+                num,
+                ordinal: true,
+            });
+        }
+        else if (/\d/.test(word)) {
+            add(m.index, m.index + word.length, {
+                type: "stat",
+                keys: [],
+                num,
+                ordinal: true,
+            });
+        }
+    }
+    // bare numbers, and "nearly two wins"
+    const taken = new Set();
+    // a count before a trigger's wording ("2 high scores") reads no cue: a
+    // league's rule reads it as the rule's count, else it's a cueless number
+    const triggerCounts = new Set(countsBefore(low, Object.values(TRIGGER_WORDS), ctx.evidence.week).map((c) => c.start));
+    for (const m of s.matchAll(new RegExp(`(?<![\\w.#])(\\d[\\d,]*(?:\\.\\d+)?)(?![\\w.]*\\d)(?!\\s*(?:st|nd|rd|th)\\b)|\\b(${NUMW}) (wins|losses|points)\\b`, "gi"))) {
+        const before = low.slice(Math.max(0, m.index - 30), m.index);
+        if (/\b(week|wk|w)\s*$/.test(before))
+            continue;
+        const token = (m[1] ?? m[2]);
+        if (m[1] && /^(19|20)\d\d$/.test(token))
+            continue;
+        const num = parseNum(token);
+        const tailStart = m.index + m[0].length;
+        const week = weekAt(m.index, tailStart);
+        const byMargin = /\bby\s*$/.test(before);
+        const cue = byMargin || triggerCounts.has(m.index)
+            ? null
+            : nearestCue(low, m.index, tailStart, week, taken);
+        if (cue)
+            taken.add(cue.at);
+        let key = byMargin ? `w${week}.margin` : (cue?.key ?? null);
+        const hedge = hedgeBefore(before);
+        // "nearly two wins" with no other cue is wins above or below expectation
+        if (m[2] && !key && hedge)
+            key = "luck";
+        const hedgeLen = hedge
+            ? before.match(HEDGE)[0].length
+            : 0;
+        add(m.index - hedgeLen, m.index + m[0].length, { type: "stat", keys: key ? [key] : [], num, hedge }, week);
+    }
+    // a team's own name is never a claim, and the earlier, longer claim wins an overlap
+    const names = nameSpans(ctx, s);
+    out.sort((a, b) => a.start - b.start || b.end - b.start - (a.end - a.start));
+    const kept = [];
+    for (const c of out) {
+        const inName = c.shape.type !== "result" && names.some((n) => overlaps(c, n));
+        if (inName)
+            continue;
+        if (!kept.some((k) => overlaps(c, k)))
+            kept.push(c);
+    }
+    return kept;
+}
+//# sourceMappingURL=extract.js.map

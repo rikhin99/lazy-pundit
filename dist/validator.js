@@ -1,0 +1,230 @@
+import { claimsTeam } from "./validator/claims-team.js";
+import { agrees, resolve } from "./validator/evidence.js";
+import { extract, playoffWant, units, } from "./validator/extract.js";
+import { idFor, judge, LOOSE_PLAYOFF_PHRASE, show, } from "./validator/judge.js";
+import { wrongPlayer } from "./validator/players.js";
+import { stakesMentions, swears } from "./validator/swears.js";
+import { unwrap } from "./validator/tags.js";
+/**
+ * The validator: a pure check of every claim in a blurb or week intro against
+ * the evidence pack and order evidence, plus the swearing word list. No I/O,
+ * and nothing here knows about the ranking file or the workspace.
+ */
+export { CLINCHED_LABEL } from "./validator/evidence.js";
+export { normalize, wholeWords } from "./validator/names.js";
+export { applyAutoTags, stripTags } from "./validator/tags.js";
+function judgeClaim(ctx, claim, section) {
+    if (claim.tag && claim.tag.kind !== "ev") {
+        const { kind, value } = claim.tag;
+        return ctx.input.sections[kind].includes(value)
+            ? {
+                status: "verified",
+                reason: `the ${kind} section ${value} exists`,
+                hits: [],
+            }
+            : {
+                status: "unknown-id",
+                reason: `cites the ${kind} section "${value}", which doesn't exist`,
+                hits: [],
+            };
+    }
+    if (claim.tag) {
+        const id = claim.tag.value;
+        if (/(^|\/)playoffs$/.test(id) && playoffWant(claim.text) === null) {
+            return { status: "unchecked", reason: LOOSE_PLAYOFF_PHRASE, hits: [] };
+        }
+        const r = resolve(ctx, id, section);
+        const corrected = /^w(\d+)\.correction$/.exec(id);
+        if (!r && corrected) {
+            // Its line was true when `draft` wrote it: the correction has reverted
+            // since, so the week stands as first published.
+            return {
+                status: "wrong",
+                reason: `no drastic correction to week ${corrected[1]} is found now, so this line is out of date: delete it`,
+                hits: [],
+            };
+        }
+        if (!r) {
+            return {
+                status: "unknown-id",
+                reason: `cites "${id}", which isn't in the evidence pack`,
+                hits: [],
+            };
+        }
+        // An empty tag still cites its evidence, so an unknown ID is said first.
+        if (claim.text === "") {
+            return {
+                status: "empty-tag",
+                reason: "the tag has no words to check: put the claim between its brackets, or delete the tag",
+                hits: [],
+            };
+        }
+        const other = wrongPlayer(ctx, r, claim.text);
+        if (other)
+            return { status: "wrong", reason: other, hits: [] };
+        return agrees(ctx, r, claim.text)
+            ? { status: "verified", reason: show(ctx, r), hits: [] }
+            : { status: "wrong", reason: show(ctx, r), hits: [] };
+    }
+    const u = claim.untagged;
+    return judge(ctx, u.team, claim.text, u.shape);
+}
+/**
+ * Where a claim's words sit in `text`, a tag's inner text or a claim shape:
+ * spaces at either end and trailing punctuation read as the sentence's.
+ */
+function claimWords(text) {
+    const lead = text.length - text.trimStart().length;
+    return { lead, text: text.slice(lead).replace(/[\s,;:.!?]+$/, "") };
+}
+export function validate(input) {
+    const ctxFor = (evidence, order) => ({
+        input,
+        evidence,
+        order,
+        teamCount: Object.keys(evidence.teams).length,
+    });
+    const ctx = ctxFor(input.evidence, input.order);
+    const { plain, tags, toInput } = unwrap(input.text);
+    /** A plain-text span's place in the text as written. */
+    const written = (start, end) => ({
+        start: toInput[start],
+        end: toInput[end - 1] + 1,
+    });
+    const found = [];
+    for (const tag of tags) {
+        const { lead, text } = claimWords(tag.inner);
+        found.push({
+            text,
+            start: tag.plainStart + lead,
+            end: tag.plainStart + lead + text.length,
+            tag,
+        });
+    }
+    for (const { s, start } of units(plain)) {
+        for (const f of extract(ctx, s)) {
+            const { lead, text } = claimWords(s.slice(f.start, f.end));
+            const a = start + f.start + lead;
+            const b = a + text.length;
+            if (tags.some((t) => a < t.plainEnd && t.plainStart < b))
+                continue;
+            found.push({
+                text,
+                start: a,
+                end: b,
+                untagged: {
+                    shape: f,
+                    team: claimsTeam(ctx, s, f.start, input.team),
+                },
+            });
+        }
+    }
+    found.sort((a, b) => a.start - b.start);
+    const claims = [];
+    const autoTags = [];
+    for (const claim of found) {
+        let verdict = judgeClaim(ctx, claim, input.team);
+        let cause;
+        if (verdict.status === "wrong" && input.before) {
+            const tries = [
+                ...(input.before.evidence ?? []).map((earlier) => [
+                    ctxFor(earlier, input.order),
+                    "refresh",
+                ]),
+                [
+                    input.before.order
+                        ? ctxFor(input.evidence, input.before.order)
+                        : null,
+                    "reorder",
+                ],
+            ];
+            for (const [then, why] of tries) {
+                if (!then)
+                    continue;
+                const was = judgeClaim(then, claim, input.team);
+                if (was.status === "verified") {
+                    verdict = {
+                        status: "stale",
+                        reason: `true when written (${was.reason}); now ${verdict.reason}`,
+                        hits: [],
+                    };
+                    cause = why;
+                    break;
+                }
+            }
+        }
+        const out = {
+            text: verdict.status === "empty-tag" && claim.tag
+                ? input.text.slice(claim.tag.start, claim.tag.end)
+                : claim.text,
+            ...(claim.tag
+                ? { start: claim.tag.start, end: claim.tag.end }
+                : written(claim.start, claim.end)),
+            tagged: !!claim.tag,
+            status: verdict.status,
+            reason: verdict.reason,
+        };
+        if (claim.tag) {
+            out.id =
+                claim.tag.kind === "ev"
+                    ? claim.tag.value
+                    : `${claim.tag.kind}=${claim.tag.value}`;
+        }
+        if (cause)
+            out.cause = cause;
+        const own = verdict.hits.filter((h) => h.team === input.team);
+        const hits = own.length && !own.some((h) => h.part) ? own : verdict.hits;
+        const single = hits.length === 1 || (hits.length === 2 && hits.every((h) => h.part));
+        if (!claim.tag && verdict.status === "verified" && single) {
+            if (hits.length === 1)
+                out.id = idFor(ctx, hits[0]);
+            for (const h of hits) {
+                const from = claim.start + (h.part?.start ?? 0);
+                const to = h.part ? claim.start + h.part.end : claim.end;
+                const { lead, text } = claimWords(plain.slice(from, to));
+                autoTags.push({
+                    ...written(from + lead, from + lead + text.length),
+                    id: idFor(ctx, h),
+                });
+            }
+        }
+        claims.push(out);
+    }
+    return {
+        claims,
+        autoTags,
+        swears: input.swearing === "off"
+            ? swears(ctx, plain).map((w) => ({ ...w, ...written(w.start, w.end) }))
+            : [],
+        stakesMentions: input.noStakes
+            ? stakesMentions(ctx, plain).map((w) => ({
+                ...w,
+                ...written(w.start, w.end),
+            }))
+            : [],
+    };
+}
+/** Hard problems block nothing on their own, but publish asks before going ahead. */
+export function isHard(status) {
+    return (status === "wrong" ||
+        status === "stale" ||
+        status === "unknown-id" ||
+        status === "empty-tag");
+}
+/**
+ * The LLM gate: an LLM draft passes only if every claim is tagged and
+ * verified, the word list is clean and, under `stakes: none`, nothing
+ * mentions money, a prize or a punishment.
+ */
+export function gateLlm(result) {
+    const claims = result.claims.filter((c) => !c.tagged || c.status !== "verified");
+    return {
+        pass: claims.length === 0 &&
+            result.swears.length === 0 &&
+            result.stakesMentions.length === 0,
+        claims,
+        swears: result.swears,
+        stakesMentions: result.stakesMentions,
+    };
+}
+//# sourceMappingURL=validator.js.map
