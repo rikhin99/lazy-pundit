@@ -98,9 +98,12 @@ function withoutStatLine(text: string, generated: string | undefined): string {
     .trim();
 }
 
-/** `text`'s first sentence, and what follows it. */
+/**
+ * `text`'s first sentence, and what follows it. A single capital and its
+ * period ("J.K.", "T.") is an initial, not a sentence's end.
+ */
 function firstSentence(text: string): [string, string] {
-  const at = text.search(/(?<=[.!?…])\s/);
+  const at = text.search(/(?<=[.!?…])(?<!(?:^|[^\p{L}])\p{Lu}\.)\s/u);
   return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at).trim()];
 }
 

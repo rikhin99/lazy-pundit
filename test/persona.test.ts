@@ -89,6 +89,35 @@ describe("persona.md", () => {
     );
   });
 
+  test.each([
+    [
+      "prose with the intro on",
+      "",
+      "Write each blurb and the intro as prose, 2 to 3 sentences. Open each blurb and the intro with its best line, since the shared graphics show only the first sentence. The best line is often a stat or a result, not a lore line.",
+    ],
+    [
+      "prose with the intro off",
+      "intro: off\n",
+      "Write each blurb as prose, 2 to 3 sentences. Open each blurb with its best line, since the shared graphics show only the first sentence. The best line is often a stat or a result, not a lore line. Write no week intro: leave out the {intro} section.",
+    ],
+    [
+      "bullets",
+      "shape: bullets\nlength: 1–2\n",
+      'Write each blurb and the intro as 1 to 2 bullets, each starting "- ". Open each blurb and the intro with its best line, since the shared graphics show only the first bullet. The best line is often a stat or a result, not a lore line.',
+    ],
+  ])(
+    "with %s, the prompt asks for the best line first, since the style pages quote only it",
+    async (_, fields, expected) => {
+      const { dir, deps, llm } = await withPersona(
+        `---\nformat: 1\npreset: broadcast\n${fields}---\n`,
+      );
+
+      await draft(dir, deps);
+
+      expect(personaPart(llm.requests[0]?.prompt)).toContain(expected);
+    },
+  );
+
   test("with no persona.md, the draft is Broadcast", async () => {
     const { dir, deps, llm } = await withPersona(null);
 

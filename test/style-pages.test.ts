@@ -245,6 +245,48 @@ ${highScore()}rivalry-weeks:
     expect(textOf(html)).not.toContain("They won by plenty.");
   });
 
+  test("a first sentence doesn't end at an initial: the headline and both pages' quotes go past 'J.K.', 'A.J.' and 'T.'", async () => {
+    const ws = await drafted(10);
+    const text = await readFile(ws.path, "utf8");
+    await writeFile(
+      ws.path,
+      text
+        .replace(
+          /## Intro \{intro\}\n[\s\S]*?\n(?=## )/,
+          "## Intro {intro}\nJ.K. Dobbins went off for 30. Then he sat.\n\n",
+        )
+        .replace(
+          /(## Bench Mob \{team=sleeper:3\}\n)[^\n]*\n/,
+          "$1J.K. Dobbins went off for 30. Then he sat.\n",
+        )
+        .replace(
+          /(## Gus Bus \{team=sleeper:[0-9]+\}\n)[^\n]*\n/,
+          "$1A.J. Brown and T. Hill carried them. Nobody else showed.\n",
+        )
+        .replace(
+          // A word ending in capitals still ends its sentence.
+          /(## Pylon Patrol \{team=sleeper:[0-9]+\}\n)[^\n]*\n/,
+          "$1Benched the MVP. Nobody else showed.\n",
+        ),
+    );
+    // The made-up players are hard problems, so publish anyway.
+    await publish(ws.dir, ws.deps, { yes: true });
+    const onAir = await broadcast(ws.dir, 10);
+    const rows = textOf(onAir).split("Bench Mob 9-1")[1];
+    expect(rows).toContain("J.K. Dobbins went off for 30. (new)");
+    expect(rows).toContain("A.J. Brown and T. Hill carried them. (new)");
+    expect(rows).toContain("Benched the MVP. (new)");
+    const page = await tabloid(ws.dir, 10);
+    expect(textOf(page)).toContain("“J.K. Dobbins went off for 30.”");
+    expect(textOf(page)).toContain("“A.J. Brown and T. Hill carried them.”");
+    expect(textOf(page)).toContain("“Benched the MVP.”");
+    expect(partOf(page, "headline")).toBe("J.K. Dobbins went off for 30.");
+    expect(partOf(page, "standfirst")).toBe("Then he sat.");
+    for (const html of [page, onAir]) {
+      expect(textOf(html)).not.toContain("Nobody else showed.");
+    }
+  });
+
   test("with no LLM, the intro's league stat line repeats the awards, so there's no headline; each team's stat line shows whole, unquoted", async () => {
     const ws = await drafted(10);
     await published(ws.dir, ws.deps);

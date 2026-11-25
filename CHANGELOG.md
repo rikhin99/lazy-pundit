@@ -7,11 +7,13 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 ### Changed
 
 - Setup now says what lore is for and what to write in it. The comment at the top of a new `lore.md` lists the kinds of entry worth writing (league history, each manager's titles and habits, relationships and rivalries, running jokes) under the section each goes in, and the lore step ends by pointing you there. `draft` notes when `lore.md` has no entries yet, with its full path, and `setup`'s checklist reads `lore: done, no entries yet`. An older workspace's `lore.md` keeps its comment: re-run `setup lore` to get the new one, which shows the change and asks before writing it (#138).
+- The LLM is now asked to open each blurb and the week intro with its best line, since the Tabloid and Broadcast pages show only the first sentence (or bullet). It's also told the best line is often a stat or a result, not a lore line. Blurbs you write yourself are quoted the same way, so put your best line first (#145).
 
 ### Fixed
 
 - The full-screen Stats table puts your terminal back however it ends: closing the terminal's tab or a `kill` (SIGHUP or SIGTERM) now restores the screen, the cursor and typing, as `q`, Esc and Ctrl-C do (#140).
 - `setup lore` starts from what `lore.md` already says: each team's nicknames as you last wrote them, and the league type, so a re-run that accepts every answer changes nothing (#143).
+- The style pages' quotes and the Tabloid's headline no longer stop at an initial: a blurb starting "J.K. Dobbins went off for 30." is quoted whole, not as "J.K." (#145).
 
 ## 0.1.2
 

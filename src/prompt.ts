@@ -298,10 +298,12 @@ function personaInstructions(p: Persona): string {
     p.length.min === p.length.max
       ? `${p.length.min}`
       : `${p.length.min} to ${p.length.max}`;
-  const shape =
+  const [shape, unit] =
     p.shape === "prose"
-      ? `Write ${what} as prose, ${count} sentences.`
-      : `Write ${what} as ${count} bullets, each starting "- ".`;
+      ? [`Write ${what} as prose, ${count} sentences.`, "sentence"]
+      : [`Write ${what} as ${count} bullets, each starting "- ".`, "bullet"];
+  // The style pages quote only the first sentence or bullet (#145).
+  const bestLine = `Open ${what} with its best line, since the shared graphics show only the first ${unit}. The best line is often a stat or a result, not a lore line.`;
   const intro = p.intro
     ? ""
     : "Write no week intro: leave out the {intro} section.";
@@ -312,6 +314,7 @@ function personaInstructions(p: Persona): string {
     teasing,
     formality,
     shape,
+    bestLine,
     intro,
   ]
     .filter(Boolean)
