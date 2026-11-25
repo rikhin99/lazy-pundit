@@ -16,7 +16,7 @@ To find code, start from the module map's exports column and read only the funct
 
 For a split ticket's later part, run each owed item at HEAD (a scratch run) before the first test: an item HEAD already does needs tests only.
 
-Done when the list is in a message, each noun with its `GLOSSARY.md` line or a new entry. A ticket with no new noun still gets the message: one line naming the glossary terms its user-facing text uses, and any phrase in that text the glossary doesn't define. For a state where a glossary noun no longer holds, the message also lists each line `docs/agents/workflow/messages.md`'s grep printed, with its fix or "stays".
+Done when the list is in a message, each noun with its `GLOSSARY.md` line or a new entry. A ticket with no new noun still gets the message: one line naming the glossary terms its user-facing text uses, and any phrase in that text the glossary doesn't define. For a state where a glossary noun no longer holds, the message also lists each line `docs/agents/workflow/messages.md`'s grep printed, with its fix or "stays". For a new error or warning, it lists each state that reaches it, each with the test that will show it: in #138 the draft note's placeholder state had none until the standards review.
 
 A brief line the build would meet only loosely (a wording, a path form, an exit code): ask in this message, beside the list, rather than recording the choice in the commit, since a choice the maintainer reverses after the sweep costs a second commit.
 
@@ -34,7 +34,7 @@ Before the first test, read the case file in `docs/agents/workflow/` for each ca
 - A new `drive-wizard.exp` scenario, or a change to a wizard prompt (`cli.ts`) or a setup step (`init.ts`): `wizard.md`.
 - A new or changed expect driver (`drive-wizard.exp`, `drive-table.exp`) or a scenario in one: `pty.md`.
 - A change to a style page (`style-pages.ts`): `style-pages.md`.
-- A step that rewrites a file the pundit edits and keeps their lines (`setup lore`, `setup stakes`): `merge.md`.
+- A change to how `setup lore` or `setup stakes` keeps the pundit's lines: `merge.md`.
 - A ticket that says to diagnose before choosing a fix: `diagnose.md`.
 - A change to `scripts/scrub-*.ts` or a committed fixture set: `fixtures.md`.
 - A change to a helper in `test/support/`, or one that adds something to every draft's output: `test-helpers.md`.

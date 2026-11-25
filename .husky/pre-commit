@@ -1,4 +1,6 @@
 git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++ ' | node scripts/denylist-check.ts
 npm run typecheck
 npm run lint
-npm test
+# The full run is kept in the git folder; on a failure, the failing tests print last.
+log="$(git rev-parse --git-path last-test.log)"
+npm test > "$log" 2>&1 || { grep -E '^ FAIL|×' "$log"; echo "full run: $log"; exit 1; }
