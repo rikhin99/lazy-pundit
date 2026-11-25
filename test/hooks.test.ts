@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -309,22 +309,43 @@ describe("the commit checks (.husky)", () => {
     return line.replace("scripts/", `${ROOT}/scripts/`);
   }
 
-  /** Runs each hook's denylist line as git does, through `sh -e`, in a scratch repo. */
-  function commit(message: string, file: string) {
+  /**
+   * The environment without git's own variables, which a git hook running
+   * this suite passes on: under `git commit -a`, `GIT_INDEX_FILE` names the
+   * outer repo's index by its full path, and the scratch repo would use it.
+   */
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+  );
+
+  /** A scratch repo holding `a.md`, staged; `git` runs in it. */
+  function scratchRepo(file: string) {
     const repo = mkdtempSync(join(tmpdir(), "lazy-pundit-commit-"));
     const git = (...args: string[]) =>
-      spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+      spawnSync("git", args, { cwd: repo, env, encoding: "utf8" });
     git("init", "-q");
     writeFileSync(join(repo, "a.md"), file);
     git("add", "a.md");
+    return { repo, git };
+  }
+
+  /** A hook's denylist line run as git runs it, through `sh -e`, in `repo`. */
+  function runLine(repo: string, hook: string, ...args: string[]) {
+    return spawnSync("sh", ["-ec", denylistLine(hook), "hook", ...args], {
+      cwd: repo,
+      env: { ...env, DENYLIST },
+      encoding: "utf8",
+    });
+  }
+
+  /** Runs each hook's denylist line on a commit of `file` with `message`. */
+  function commit(message: string, file: string) {
+    const { repo } = scratchRepo(file);
     writeFileSync(join(repo, "msg.txt"), message);
-    const run = (hook: string, ...args: string[]) =>
-      spawnSync("sh", ["-ec", denylistLine(hook), "hook", ...args], {
-        cwd: repo,
-        env: { ...process.env, DENYLIST },
-        encoding: "utf8",
-      }).status;
-    return { pre: run("pre-commit"), msg: run("commit-msg", "msg.txt") };
+    return {
+      pre: runLine(repo, "pre-commit").status,
+      msg: runLine(repo, "commit-msg", "msg.txt").status,
+    };
   }
 
   test.each([
@@ -333,5 +354,16 @@ describe("the commit checks (.husky)", () => {
     ["a name in the message", "Zorblax won", "notes\n", { pre: 0, msg: 1 }],
   ])("%s", (_, message, file, expected) => {
     expect(commit(message, file)).toEqual(expected);
+  });
+
+  test("the pre-commit line fails when git diff does", () => {
+    const { repo, git } = scratchRepo("Zorblax won\n");
+    const sha = git("rev-parse", ":a.md").stdout.trim();
+    rmSync(join(repo, ".git", "objects", sha.slice(0, 2), sha.slice(2)));
+    rmSync(join(repo, "a.md"));
+    expect(git("diff", "--cached").status).not.toBe(0);
+    const pre = runLine(repo, "pre-commit");
+    expect(pre.status).not.toBe(0);
+    expect(pre.stderr).toContain("so the staged diff went unchecked");
   });
 });

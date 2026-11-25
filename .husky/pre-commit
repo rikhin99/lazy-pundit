@@ -1,4 +1,4 @@
-git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++ ' | node scripts/denylist-check.ts
+node scripts/denylist-check.ts --staged
 npm run typecheck
 npm run lint
 # The full run is kept in the git folder; on a failure, the failing tests print last.
