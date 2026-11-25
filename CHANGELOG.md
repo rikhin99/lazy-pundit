@@ -4,6 +4,10 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 ## 0.1.3
 
+### Changed
+
+- Setup now says what lore is for and what to write in it. The comment at the top of a new `lore.md` lists the kinds of entry worth writing (league history, each manager's titles and habits, relationships and rivalries, running jokes) under the section each goes in, and the lore step ends by pointing you there. `draft` notes when `lore.md` has no entries yet, with its full path, and `setup`'s checklist reads `lore: done, no entries yet`. An older workspace's `lore.md` keeps its comment: re-run `setup lore` to get the new one, which shows the change and asks before writing it (#138).
+
 ### Fixed
 
 - The full-screen Stats table puts your terminal back however it ends: closing the terminal's tab or a `kill` (SIGHUP or SIGTERM) now restores the screen, the cursor and typing, as `q`, Esc and Ctrl-C do (#140).
@@ -38,7 +42,6 @@ Releases are hand-cut 0.x tags, installed with `npm i -g github:rikhin99/lazy-pu
 
 ### Not in it yet
 
-- `setup` doesn't yet say what lore is for or what to write in it, so a workspace set up by `init` has nicknames and nothing else in `lore.md` until you add entries by hand (#138).
 - A test of the preview page's reload sometimes fails when the tests run in parallel; the preview page itself is unaffected (#142).
 - Yahoo leagues.
 - `revise`, the LLM revision of one blurb or the intro.

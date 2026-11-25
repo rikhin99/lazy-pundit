@@ -84,6 +84,25 @@ test("setup espn in a Sleeper league's workspace is refused before its terminal 
   expect(espn.stderr).not.toMatch(/terminal/);
 });
 
+test("setup's checklist says when lore has no entries yet", async () => {
+  const { dir } = await fearTheTurtle(8);
+  const path = join(dir, "workspace.md");
+  const text = await readFile(path, "utf8");
+  await writeFile(
+    path,
+    text.replace("---\n\n", "setup:\n  lore: done\n---\n\n"),
+  );
+  await writeFile(
+    join(dir, "lore.md"),
+    "---\nlore: 1\n---\n\n## League\ntype: friends\n\n## {team=sleeper:1}\nnicknames: Gus Bus\n",
+  );
+
+  const { code, stdout } = await cli(dir, ["setup"]);
+
+  expect(code).toBe(0);
+  expect(stdout).toContain("\n✓ lore: done, no entries yet\n");
+});
+
 test("setup method on an indented workspace.md refuses it in one line before asking anything; setup key still gets to its terminal check", async () => {
   const { dir } = await fearTheTurtle(8);
   const path = join(dir, "workspace.md");

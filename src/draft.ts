@@ -35,6 +35,7 @@ import {
 import { renderLlmProseFile } from "./llm-prose-file.ts";
 import {
   loadLore,
+  noEntriesYet,
   refuseLocal,
   sentLore,
   type ValidatorNames,
@@ -131,6 +132,7 @@ export async function draft(
   const lore = await loadLore(ws);
   refuseLocal(lore);
   warn(lore.warnings);
+  if (noEntriesYet(lore)) warn([noEntriesWarning(ws.dir)]);
   // Before the fetch, so a malformed league.md costs nothing.
   const { stakes, warnings: leagueFileWarnings } = await loadLeagueFile(ws);
   warn(leagueFileWarnings);
@@ -374,6 +376,14 @@ interface ProseOutcome {
 
 /** Lore's size, in the tokens `ceilingCost` counts, past which a draft warns. */
 const LORE_TOKENS_WARNED = 2000;
+
+/**
+ * Said on every draft while `lore.md` has no lore entry, with its full path,
+ * since `--league` drafts from anywhere.
+ */
+function noEntriesWarning(dir: string): string {
+  return `lore.md has no entries yet, so the blurbs have nothing about your league's people to draw on. Add entries (titles and droughts, rivalries, running jokes) as "- " lines under its sections: ${join(dir, "lore.md")}`;
+}
 
 /**
  * The warning for lore past about 2,000 tokens: what it sends, and the most a

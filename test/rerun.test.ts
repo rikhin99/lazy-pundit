@@ -337,7 +337,7 @@ type: friends
 
   await expect(refused).rejects.toThrow(SetupRefusal);
   await expect(refused).rejects.toThrow(
-    "These nicknames can't be written over lore.md's entries: lore.md has tags this version doesn't know, so remove each one (a {manager=<handle>} or {team=<platform>:<id>} is a whole heading): line 23: {oops}",
+    "These nicknames can't be written over lore.md's entries: lore.md has tags this version doesn't know, so remove each one (a {manager=<handle>} or {team=<platform>:<id>} is a whole heading): line 36: {oops}",
   );
   expect(await readFile(lorePath, "utf8")).toBe(before);
 });

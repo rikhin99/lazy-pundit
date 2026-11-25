@@ -7,7 +7,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   buyInProblem,
   COMMON_HOUSE_RULES,
@@ -37,12 +37,13 @@ import {
   spendCapProblem,
   spendCapWarning,
 } from "../src/index.ts";
+import { loreFileText } from "../src/init.ts";
 import {
   familyLeague,
   leagueFilePath,
   loadLeagueFile,
 } from "../src/league-file.ts";
-import { loadLore, refuseLocal } from "../src/lore.ts";
+import { loadLore, parseLore, refuseLocal } from "../src/lore.ts";
 import { loadPersona, personaPath } from "../src/persona.ts";
 import { powerScoreMethodSchema } from "../src/power-score.ts";
 import { punditSettingsPath } from "../src/pundit-settings.ts";
@@ -290,7 +291,10 @@ test("answered lore is written with its type and nicknames, loads with no warnin
 
   const result = await draft(dir, { ...deps, llm });
   expect(llm.requests[0]?.prompt).toContain("Mobsters");
-  expect(result.warnings).toEqual([]);
+  // The step writes no entry, so the draft says so.
+  expect(result.warnings).toEqual([
+    `lore.md has no entries yet, so the blurbs have nothing about your league's people to draw on. Add entries (titles and droughts, rivalries, running jokes) as "- " lines under its sections: ${dir}/lore.md`,
+  ]);
 });
 
 test("a team left with no nicknames keeps its section, with a comment saying whose it is", async () => {
@@ -312,6 +316,51 @@ test("a team left with no nicknames keeps its section, with a comment saying who
   expect(
     lore.sections.find((s) => s.name === "team:sleeper:1")?.nicknames,
   ).toEqual([]);
+});
+
+test("lore.md's comment says what entries to write, under which sections, and its examples count for nothing", async () => {
+  const comment = `<!--
+Lore is sent to the LLM provider with each draft, and kept in this workspace's LLM transcripts until you run lazy-pundit transcripts delete. Don't write anything personal: no addresses, phone numbers, emails, birthdays or health.
+Lore is context for the prose, and the data still comes from the league.
+
+Lore's entries are what make the blurbs about your league and its people, not just the scores. Write one fact per line, starting with "- ", under the section it's about. Worth writing:
+League: how you all know each other, the year it started, past champions and last places, the trophy and the last-place punishment, the most famous moment.
+Each manager: titles and droughts, their NFL team, how they draft and trade, the thing the league always brings up.
+Relationships: who's related, married or roommates (for a family league, how everyone's related), the rivalries and why, who trades with whom.
+Running jokes: the inside jokes the whole league would get.
+
+Sections look like this:
+
+## League
+type: friends
+- Started in 2015 by four college roommates.
+
+## {manager=their-handle}
+nicknames: Bo, The Boss
+- Hasn't won a title since 2019.
+
+## Relationships
+- Bo and Cy are brothers, and haven't traded since 2021.
+
+## Running jokes
+- Nobody accepts a trade from Bo.
+-->`;
+  const deps = atWeek(await operator(), 8);
+  const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+  const answers = {
+    type: "friends" as const,
+    nicknames: proposedNicknames(league),
+  };
+  for (const text of [
+    loreFileText(answers, league),
+    loreFileText(undefined, league),
+  ]) {
+    expect(text).toContain(`# Lore\n\n${comment}\n`);
+    expect(text).not.toContain("{local}");
+    const lore = parseLore(text);
+    expect(lore.sections.flatMap((s) => s.entries)).toEqual([]);
+    expect(lore.warnings).toEqual([]);
+  }
 });
 
 test("typed nicknames are split on commas, trimmed, with blanks dropped", () => {
@@ -731,6 +780,50 @@ test("a checklist tells the accepted default method from a skipped one, and skip
   const skipped = await setUp({}, other);
   expect(statuses(await setupChecklist(other, skipped.dir))).toMatchObject({
     method: "skipped",
+  });
+});
+
+describe("the checklist's lore line says when lore has no entries yet", () => {
+  const loreItem = async (deps: Deps, dir: string) =>
+    (await setupChecklist(deps, dir)).find((i) => i.step === "lore");
+  const answered = async () => {
+    const deps = atWeek(await operator(), 8);
+    const league = await checkLeague(deps, FEAR_THE_TURTLE_ID);
+    const lore = {
+      type: "friends" as const,
+      nicknames: proposedNicknames(league),
+    };
+    return setUp({ lore }, deps);
+  };
+
+  test("only the type and nicknames: done, no entries yet", async () => {
+    const { deps, dir } = await answered();
+    expect(await loreItem(deps, dir)).toEqual({
+      step: "lore",
+      status: "done",
+      note: "no entries yet",
+    });
+  });
+
+  test("the skipped step's placeholder: skipped, no entries yet", async () => {
+    const { deps, dir } = await setUp();
+    expect(await loreItem(deps, dir)).toEqual({
+      step: "lore",
+      status: "skipped",
+      note: "no entries yet",
+    });
+  });
+
+  test("one entry: done, as before", async () => {
+    const { deps, dir } = await answered();
+    await appendFile(join(dir, "lore.md"), "\n## Running jokes\n- Bo.\n");
+    expect(await loreItem(deps, dir)).toEqual({ step: "lore", status: "done" });
+  });
+
+  test("a lore.md that doesn't load: done, as before, with no throw", async () => {
+    const { deps, dir } = await answered();
+    await appendFile(join(dir, "lore.md"), "\n## Running jokes\n{oops}\n");
+    expect(await loreItem(deps, dir)).toEqual({ step: "lore", status: "done" });
   });
 });
 

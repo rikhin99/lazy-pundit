@@ -81,6 +81,7 @@ export {
   type LeagueChoice,
   type LeagueManager,
   type LeagueTeam,
+  LORE_CLOSING,
   LORE_NOTICE,
   type LoreAnswers,
   type ManagerHandle,

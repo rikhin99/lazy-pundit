@@ -37,6 +37,8 @@ export interface Lore {
   localLines: number[];
   /** Personal data it seems to hold, and text no section holds. */
   warnings: string[];
+  /** Set when there's no `lore.md`, as against one with nothing in it. */
+  missing?: true;
 }
 
 /**
@@ -64,9 +66,17 @@ export async function loadLore(ws: Workspace): Promise<Lore> {
     text = await readFile(join(ws.dir, "lore.md"), "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    return { sections: [], localLines: [], warnings: [] };
+    return { sections: [], localLines: [], warnings: [], missing: true };
   }
   return parseLore(text);
+}
+
+/**
+ * Whether a `lore.md` is there but has no lore entry in any section, as the
+ * lore step leaves it: only the type and nicknames, or its placeholder.
+ */
+export function noEntriesYet(lore: Lore): boolean {
+  return !lore.missing && lore.sections.every((s) => s.entries.length === 0);
 }
 
 /** `lore.md`'s text read as `loadLore` reads the file, refusing as it does. */

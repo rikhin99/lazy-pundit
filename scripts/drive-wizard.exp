@@ -308,10 +308,13 @@ if {$scenario eq "folder"} {
 }
 
 set UP "\033\[A"
+# What the lore step says on accepting the nicknames: its first sentence, which
+# fits the 120 columns unwrapped.
+set LORE_CLOSING "Lore's entries are what make blurbs about your league."
 need "Manager handles"
 if {$scenario eq "skip-rest"} {
   send $UP; after 200; send "\r"
-  need "Set up another"
+  need_without "Set up another" $LORE_CLOSING
   send "\r"
   finish
 }
@@ -329,6 +332,7 @@ if {$scenario eq "family"} { send $DOWN; after 200 }
 send "\r"
 need "nicknames each team"
 send "\r"
+need_without $LORE_CLOSING "bragging rights"
 
 need "bragging rights"
 # Money at stake: buy-in 50, the default payouts, a weekly high score paying `outcome`.
@@ -441,6 +445,7 @@ need "What kind of league"
 send "\r"
 need "nicknames each team"
 send "\r"
+need_without $LORE_CLOSING "left as it was"
 need_without "lore left as it was" "differs"
 expect eof
 wait
@@ -455,6 +460,7 @@ foreach answer {n y} {
   send [string repeat "\x7f" 30]; after 200; send "The Bus, gridiron_gus\r"
   need "nicknames each team"
   send "\r"
+  need_without $LORE_CLOSING "differs"
   need "+nicknames: The Bus, gridiron_gus"
   need_without "Overwrite" "-## Running jokes"
   send "$answer"; after 200; send "\r"
@@ -484,6 +490,7 @@ foreach edit {none type} {
   send "\r"
   need "nicknames each team"
   send "\r"
+  need_without $LORE_CLOSING "left as it was"
   need_without "lore left as it was" "differs"
   # The last run is `finish`'s to wait for.
   if {$edit eq "none"} { expect eof; wait }

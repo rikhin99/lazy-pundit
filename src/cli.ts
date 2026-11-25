@@ -57,6 +57,7 @@ import {
   LEAGUE_TYPE_CHOICES,
   type LeagueCheck,
   type LeagueType,
+  LORE_CLOSING,
   LORE_NOTICE,
   type LoreAnswers,
   type ManagerHandle,
@@ -767,6 +768,7 @@ async function askLore(
       }),
     );
     if (picked === "accept") {
+      log.info(LORE_CLOSING);
       return { lore: { type: type as LeagueType, nicknames }, skipRest: false };
     }
     const i = nicknames.findIndex((t) => t.team === picked);
@@ -1036,7 +1038,7 @@ program
     if (step === undefined) {
       for (const item of await setupChecklist(deps, await workspace(deps))) {
         console.log(
-          `${STATUS_MARKS[item.status]} ${item.step}: ${item.status}`,
+          `${STATUS_MARKS[item.status]} ${item.step}: ${item.status}${item.note ? `, ${item.note}` : ""}`,
         );
       }
       return;

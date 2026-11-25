@@ -23,7 +23,9 @@ import {
   type LeagueNames,
   type LeagueType,
   type Lore,
+  loadLore,
   looksLikePersonalData,
+  noEntriesYet,
   validatorNames,
 } from "./lore.ts";
 import { PRESETS, type PresetName, personaPath } from "./persona.ts";
@@ -315,6 +317,10 @@ export const LEAGUE_TYPE_CHOICES: { value: LeagueType; label: string }[] = [
 export const LORE_NOTICE =
   "Lore is sent to the LLM provider with each draft, and kept in this workspace's LLM transcripts until you run lazy-pundit transcripts delete. Don't write anything personal: no addresses, phone numbers, emails, birthdays or health.";
 
+/** Said when the lore step's nicknames are accepted, before anything else. */
+export const LORE_CLOSING =
+  "Lore's entries are what make blurbs about your league. The comment at the top of lore.md lists what to write: add to it any time.";
+
 /** One team's nicknames at the lore step, and the lore section they go under. */
 export interface TeamNicknames {
   team: TeamId;
@@ -483,14 +489,27 @@ const LORE_COMMENT = `<!--
 ${LORE_NOTICE}
 Lore is context for the prose, and the data still comes from the league.
 
+Lore's entries are what make the blurbs about your league and its people, not just the scores. Write one fact per line, starting with "- ", under the section it's about. Worth writing:
+League: how you all know each other, the year it started, past champions and last places, the trophy and the last-place punishment, the most famous moment.
+Each manager: titles and droughts, their NFL team, how they draft and trade, the thing the league always brings up.
+Relationships: who's related, married or roommates (for a family league, how everyone's related), the rivalries and why, who trades with whom.
+Running jokes: the inside jokes the whole league would get.
+
 Sections look like this:
 
 ## League
 type: friends
+- Started in 2015 by four college roommates.
 
 ## {manager=their-handle}
 nicknames: Bo, The Boss
 - Hasn't won a title since 2019.
+
+## Relationships
+- Bo and Cy are brothers, and haven't traded since 2021.
+
+## Running jokes
+- Nobody accepts a trade from Bo.
 -->`;
 
 /** The answered lore step's \`lore.md\`. */
@@ -977,6 +996,8 @@ export function methodStatus(
 export interface ChecklistItem {
   step: LeagueStep | "pundit name" | "league data" | "key" | "cap";
   status: SetupStatus;
+  /** Said after the status: for lore, a `lore.md` with no lore entry yet. */
+  note?: "no entries yet";
 }
 
 /**
@@ -989,21 +1010,37 @@ export async function setupChecklist(
   deps: Pick<Deps, "configDir" | "env">,
   dir: string,
 ): Promise<ChecklistItem[]> {
-  const { setup } = await readWorkspace(dir);
+  const ws = await readWorkspace(dir);
+  const { setup } = ws;
   const { askKey, spendCap } = await operatorSteps(deps);
   const hasKey = !askKey;
   const { spend_cap_usd } = defaultConfig();
+  const loreNote = (await loreHasNoEntries(ws))
+    ? { note: "no entries yet" as const }
+    : {};
   return [
     { step: "pundit name", status: "done" },
     { step: "league data", status: "done" },
     { step: "handles", status: setup.handles ?? "skipped" },
-    { step: "lore", status: setup.lore ?? "skipped" },
+    { step: "lore", status: setup.lore ?? "skipped", ...loreNote },
     { step: "stakes", status: setup.stakes ?? "skipped" },
     { step: "method", status: setup.method ?? "skipped" },
     { step: "key", status: hasKey ? "done" : "skipped" },
     { step: "cap", status: spendCap === spend_cap_usd ? "default" : "done" },
     { step: "persona", status: setup.persona ?? "skipped" },
   ];
+}
+
+/**
+ * Whether `lore.md` is there with no lore entry. One that doesn't load reads
+ * as false, so the checklist shows its lore line as it would anyway.
+ */
+async function loreHasNoEntries(ws: Workspace): Promise<boolean> {
+  try {
+    return noEntriesYet(await loadLore(ws));
+  } catch {
+    return false;
+  }
 }
 
 /**

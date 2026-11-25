@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   check,
+  checkLeague,
   type Deps,
   DraftExistsError,
   draft,
@@ -12,6 +13,7 @@ import {
   refresh,
   WorkspaceFileError,
 } from "../src/index.ts";
+import { loreFileText } from "../src/init.ts";
 import { loadLore } from "../src/lore.ts";
 import { SLEEPER_API } from "../src/sleeper/api.ts";
 import { readWorkspace } from "../src/workspace.ts";
@@ -662,6 +664,67 @@ describe("lore that isn't sent", () => {
     expect(result.warnings).toContainEqual(
       "lore.md line 4 is above the first ## heading, so it isn't sent. Move it under a heading.",
     );
+  });
+});
+
+describe("lore with no entries yet", () => {
+  const SKELETON =
+    "## League\ntype: friends\n\n## {team=sleeper:1}\nnicknames: Gus Bus, gridiron_gus\n";
+  const note = (dir: string) =>
+    `lore.md has no entries yet, so the blurbs have nothing about your league's people to draw on. Add entries (titles and droughts, rivalries, running jokes) as "- " lines under its sections: ${dir}/lore.md`;
+
+  test("a lore.md of only the type and nicknames gets a note with its full path, with no key", async () => {
+    const ws = await fearTheTurtle(8);
+    await writeLore(ws.dir, SKELETON);
+    const told: string[] = [];
+    const { warnings } = await draft(ws.dir, ws.deps, {
+      onWarnings: (w) => told.push(...w),
+    });
+    expect(warnings).toEqual([note(ws.dir)]);
+    expect(told).toEqual([note(ws.dir)]);
+  });
+
+  test("the skipped lore step's placeholder gets the note too", async () => {
+    const ws = await fearTheTurtle(8);
+    const league = await checkLeague(ws.deps, FEAR_THE_TURTLE_ID);
+    await writeFile(join(ws.dir, "lore.md"), loreFileText(undefined, league));
+    const { warnings } = await draft(ws.dir, ws.deps);
+    expect(warnings).toEqual([note(ws.dir)]);
+  });
+
+  test("with a key the note comes before the LLM is called", async () => {
+    const ws = await fearTheTurtle(8);
+    await writeLore(ws.dir, SKELETON);
+    const llm = scriptedLlm("## {intro}\nA quiet week.");
+    ws.deps.llm = llm;
+    ws.deps.env.anthropicApiKey = "sk-ant-test";
+    const calls: number[] = [];
+    const { warnings } = await draft(ws.dir, ws.deps, {
+      onWarnings: (w) => {
+        if (w.includes(note(ws.dir))) calls.push(llm.requests.length);
+      },
+    });
+    expect(warnings).toContain(note(ws.dir));
+    expect(calls).toEqual([0]);
+  });
+
+  test.each([
+    ["a hand-made section", "## Running jokes\n- Nobody trades with Bo.\n"],
+    ["a handle with no link", "## {manager=bo}\n- Bo is a dentist.\n"],
+  ])("one entry in %s means no note", async (_, body) => {
+    const ws = await fearTheTurtle(8);
+    await writeLore(ws.dir, `${SKELETON}\n${body}`);
+    const { warnings } = await draft(ws.dir, ws.deps);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining("no entries yet"),
+    );
+  });
+
+  test("no lore.md means no note", async () => {
+    const ws = await fearTheTurtle(8);
+    expect(existsSync(join(ws.dir, "lore.md"))).toBe(false);
+    const { warnings } = await draft(ws.dir, ws.deps);
+    expect(warnings).toEqual([]);
   });
 });
 
