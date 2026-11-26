@@ -74,6 +74,10 @@ try {
         "--headless=new",
         "--hide-scrollbars",
         "--allow-file-access-from-files",
+        // Under a temp HOME, macOS has no keychain for Chrome: without
+        // these it opens a "Keychain Not Found" dialog and exits non-zero.
+        "--use-mock-keychain",
+        "--password-store=basic",
         `--window-size=${Math.max(width, 500)},${height}`,
         `--screenshot=${png}`,
         pathToFileURL(frame).href,
